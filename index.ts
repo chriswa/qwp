@@ -1,4 +1,8 @@
-import { lex } from './parser/lexer'
+import { Interpreter } from './interpreter/interpreter'
+import { parse } from './parser/parser'
+import { Token, TokenType } from './parser/Token'
+import { AstPrinter } from './syntax/printer'
+import { BinarySyntaxNode, GroupingSyntaxNode, LiteralSyntaxNode, StatementBlockSyntaxNode, SyntaxNode, SyntaxNodeVisitor, UnarySyntaxNode, ValueType } from './syntax/syntax'
 
 const input = `// sample input
 import "@/quux/bar/foo" as foo
@@ -9,14 +13,19 @@ export {
   foo: #FOO,
   bar: 123,
 }
-foo %%% bar
 
 #FOO string (string x, float y) => {
 }
 `;
 
-console.log(input);
+const tempInput = "2 + (3 * 7)";
 
-const tokens = lex(input, "/path/to/file/for/reporting.myl");
+const ast = parse(tempInput, "/hello.dog");
+if (ast === null) {
+  throw new Error("Parse failed!");
+}
 
-console.log(tokens);
+console.log(ast?.accept(new AstPrinter()));
+
+const interpreter = new Interpreter();
+const result = interpreter.evaluate(ast);

@@ -1,4 +1,4 @@
-export class BasicLexerToken {
+export class GenericLexerToken {
   private _path: string = "unspecified";
   private _row: number = -1;
   private _col: number = -1;
@@ -15,7 +15,7 @@ export class BasicLexerToken {
   }
 }
 
-class BasicLexerRule<T_TOKEN extends BasicLexerToken, T_STATE> {
+class GenericLexerRule<T_TOKEN extends GenericLexerToken, T_STATE> {
   public constructor(
     public filter: (state: T_STATE) => boolean,
     public pattern: RegExp,
@@ -25,18 +25,17 @@ class BasicLexerRule<T_TOKEN extends BasicLexerToken, T_STATE> {
     if (!this.pattern.source.startsWith('^')) {
       this.pattern = new RegExp('^' + this.pattern.source, this.pattern.flags);
     }
-    console.log(this.pattern);
   }
 }
 
-export class BasicLexer<T_TOKEN extends BasicLexerToken, T_STATE> {
+export class GenericLexer<T_TOKEN extends GenericLexerToken, T_STATE> {
   public constructor() {
   }
-  private rules: Array<BasicLexerRule<T_TOKEN, T_STATE>> = [];
+  private rules: Array<GenericLexerRule<T_TOKEN, T_STATE>> = [];
   public addRule(filter: (state: T_STATE) => boolean, pattern: RegExp, tokenize: (lexeme: string, state: T_STATE, matches: RegExpExecArray) => Array<T_TOKEN>) {
-    this.rules.push(new BasicLexerRule<T_TOKEN, T_STATE>(filter, pattern, tokenize));
+    this.rules.push(new GenericLexerRule<T_TOKEN, T_STATE>(filter, pattern, tokenize));
   }
-  public lex(input: string, path: string, state: T_STATE): Array<T_TOKEN> {
+  public lex(input: string, path: string, state: T_STATE, eofToken: T_TOKEN): Array<T_TOKEN> {
     let row = 1;
     let col = 1;
     let currentLine = "";
@@ -86,9 +85,11 @@ export class BasicLexer<T_TOKEN extends BasicLexerToken, T_STATE> {
         const remainderOfLineMatches = input.match(/^[^\n]*/);
         if (remainderOfLineMatches === null) { throw new Error("impossible, since an empty string is valid for this pattern"); } // appease typescript
         const snippet = currentLine + remainderOfLineMatches[0];
-        throw new Error(`Syntax Error: at line ${row}, col ${col}:\n> ${snippet}\n${" ".repeat(col - 1)}^ HERE`);
+        throw new Error(`Syntax Error: at line ${row}, col ${col}:\n  ${" ".repeat(col - 1)}v\n> ${snippet}\n  ${" ".repeat(col - 1)}^`);
       }
     }
+    eofToken.setInternals(path, row, col, "");
+    collectedTokens.push(eofToken);
     return collectedTokens;
   }
 }
