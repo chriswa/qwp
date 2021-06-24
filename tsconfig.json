@@ -4,5 +4,9 @@
     "target": "ES6",
     "outDir": "out",
     "sourceMap": true,
-  }
+
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+  },
+  "lib": ["es2015"],
 }

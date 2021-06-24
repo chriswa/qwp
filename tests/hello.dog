@@ -1,0 +1,15 @@
+const foo := "bar";
+foo + foo;
+
+const f := fn(a, b) {
+  return a + b;
+};
+
+println(f(1, 2));
+println(f(3, 4));
+println("hello world");
+
+====================================
+3
+7
+hello world

@@ -26,9 +26,8 @@ addRule(filters.ALWAYS, /^\/\*.*?\*\//, null); // BLOCK_COMMENT
 addRule(filters.ALWAYS, /^"(\\.|[^"\\])*"/, TokenType.STRING);
 addRule(filters.ALWAYS, /^;/, TokenType.SEMICOLON);
 addRule(filters.ALWAYS, /^#[a-zA-Z][a-zA-Z0-9_]*/, TokenType.ANCHOR);
-addRule(filters.ALWAYS, /^-?\d*(\.\d+)?/, TokenType.NUMBER);
+addRule(filters.ALWAYS, /^\d*(\.\d+)?/, TokenType.NUMBER);
 addRule(filters.ALWAYS, /^,/, TokenType.COMMA);
-addRule(filters.ALWAYS, /^:/, TokenType.COLON);
 addRule(filters.ALWAYS, /^{/, TokenType.OPEN_BRACE);
 addRule(filters.ALWAYS, /^}/, TokenType.CLOSE_BRACE);
 addRule(filters.ALWAYS, /^\(/, TokenType.OPEN_PAREN);
@@ -49,10 +48,20 @@ addRule(filters.ALWAYS, /^-/, TokenType.OP_MINUS);
 addRule(filters.ALWAYS, /^\*/, TokenType.OP_MULT);
 addRule(filters.ALWAYS, /^\//, TokenType.OP_DIV);
 addRule(filters.ALWAYS, /^!/, TokenType.OP_BANG);
+addRule(filters.ALWAYS, /^&&/, TokenType.OP_AND);
+addRule(filters.ALWAYS, /^\|\|/, TokenType.OP_OR);
 
 addRule(filters.ALWAYS, /^if/, TokenType.KEYWORD_IF);
+addRule(filters.ALWAYS, /^else/, TokenType.KEYWORD_ELSE);
+addRule(filters.ALWAYS, /^while/, TokenType.KEYWORD_WHILE);
+addRule(filters.ALWAYS, /^const/, TokenType.KEYWORD_CONST);
+addRule(filters.ALWAYS, /^let/, TokenType.KEYWORD_LET);
+addRule(filters.ALWAYS, /^fn/, TokenType.KEYWORD_FN);
+addRule(filters.ALWAYS, /^return/, TokenType.KEYWORD_RETURN);
 
-addRule(filters.ALWAYS, /^[a-zA-Z][a-zA-Z0-9_]*/, TokenType.IDENTIFIER);
+addRule(filters.ALWAYS, /^[a-zA-Z][a-zA-Z0-9_]*/, TokenType.IDENTIFIER); // must be after keywords
+
+addRule(filters.ALWAYS, /^:/, TokenType.COLON); // must be after OP_ASSIGN
 
 
 export function lex(input: string, path: string) {
