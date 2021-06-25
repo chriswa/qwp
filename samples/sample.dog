@@ -1,0 +1,22 @@
+const foo := "bar";
+foo + foo;
+
+const f := fn(a, b) {
+  return a + b;
+};
+
+println(f(1, 2));
+println(f(3, 4));
+println("hello world");
+
+const a := "global";
+{
+  const showA := fn() {
+    println(a);
+  };
+
+  showA();
+  const a := "block";
+  showA();
+}
+

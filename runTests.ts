@@ -5,6 +5,7 @@ import { parse } from "./parser/parser";
 import { Token } from "./parser/Token"
 import { ParserError } from "./parser/ParserError"
 import { RuntimeError } from "./interpreter/RuntimeError"
+import { printPositionInSource } from "./cliUtil"
 // import { AstPrinter } from "./syntax/printer"
 
 
@@ -28,7 +29,7 @@ fs.readdirSync("tests/").forEach((filename) => {
 
 function performTest(path: string): boolean {
   // console.log(chalk.cyan(`=== ${path} ===`));
-  const testInput = loadTestFile(path)
+  const testInput = loadTestFile(path);
   const { source, expectedResultType, expectedResultContent } = testInput;
   const runResult = runSource(path, source);
   if (expectedResultType === "PARSER_ERROR") {
@@ -122,27 +123,6 @@ function runSource(path: string, source: string): IRunResult {
   }
   const output = interpreter.getOutput();
   return { status: "COMPLETED", parserErrors: null, runtimeError: null, output };
-}
-
-function printPositionInSource(path: string, source: string, charPos: number) {
-  const precedingSource = source.substr(0, charPos);
-  const newlineCountMatches = precedingSource.match(/\n/g);
-  let lineNumber = 1;
-  let lineBeginning = "";
-  if (newlineCountMatches !== null) {
-    lineNumber = newlineCountMatches.length + 1
-    lineBeginning = precedingSource.substr(precedingSource.lastIndexOf("\n") + 1);
-  }
-  else {
-    lineBeginning = precedingSource;
-  }
-  let nextNewlinePos = source.indexOf("\n", charPos);
-  const lineEnding = nextNewlinePos === -1 ? source.substr(charPos) : source.substr(charPos, nextNewlinePos - charPos);
-  const line = lineBeginning + lineEnding;
-  
-  const pathAndLineIdentificationString = `${path} ${lineNumber}: `
-  console.log(chalk.red(pathAndLineIdentificationString) + chalk.bgWhite.black(`${lineBeginning}${lineEnding}`));
-  console.log(chalk.white(`${" ".repeat(pathAndLineIdentificationString.length + lineBeginning.length)}▲`));
 }
 
 function printFailedTestHeader(path: string, reason: string) {
