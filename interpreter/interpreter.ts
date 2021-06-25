@@ -1,8 +1,8 @@
 import { Token, TokenType } from "../parser/Token"
-import { SyntaxNodeVisitor, SyntaxNode, BinarySyntaxNode, UnarySyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableIdentifierSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode } from "../syntax/syntax"
+import { SyntaxNodeVisitor, SyntaxNode, BinarySyntaxNode, UnarySyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode } from "../syntax/syntax"
 import { GLOBAL_BUILTINS } from "./builtins"
 import { RuntimeError } from "./RuntimeError"
-import { Scope } from "./Scope"
+import { InterpreterScope } from "./InterpreterScope"
 import { Value, BooleanValue, NumberValue, StringValue, NullValue, UserFunctionValue, BuiltInFunctionValue, ValueType } from "./Value"
 
 class Return {
@@ -12,40 +12,46 @@ class Return {
 }
 
 export class Interpreter implements SyntaxNodeVisitor<Value> {
-  scope: Scope;
-  output = "";
+  private scope: InterpreterScope;
+  private output = "";
   constructor() {
-    this.scope = new Scope(null, GLOBAL_BUILTINS);
+    this.scope = new InterpreterScope(null, GLOBAL_BUILTINS);
+  }
+  appendOutput(content: string) {
+    this.output += content;
   }
   getOutput(): string {
     return this.output;
   }
-  evaluate(node: SyntaxNode): Value {
+  interpret(node: SyntaxNode): RuntimeError | null {
     try {
-      return node.accept(this);
+      const _result = this.evaluate(node) // discard result
+      return null;
     }
     catch (error) {
       if (error instanceof RuntimeError) {
-        console.log(`Interpreter.evaluate failed:`);
-        console.log(error);
-        return NullValue.INSTANCE;
+        return error;
       }
       else {
         throw error; // rethrow
       }
     }
   }
-  assertTypeOfValue(requiredValueType: ValueType, op: Token, value: Value) {
+
+  private evaluate(node: SyntaxNode): Value {
+    return node.accept(this);
+  }
+  private assertTypeOfValue(requiredValueType: ValueType, op: Token, value: Value) {
     if (value.valueType !== requiredValueType) {
       throw new RuntimeError(op, `operand must be of type ${ValueType[requiredValueType]}`)
     }
   }
-  assertTypeOfValues(requiredValueType: ValueType, op: Token, left: Value, right: Value) {
+  private assertTypeOfValues(requiredValueType: ValueType, op: Token, left: Value, right: Value) {
     if (left.valueType !== requiredValueType || right.valueType !== requiredValueType) {
       throw new RuntimeError(op, `operands must be of type ${ValueType[requiredValueType]}`)
     }
   }
-  isEqual(left: Value, right: Value): BooleanValue {
+  private isEqual(left: Value, right: Value): BooleanValue {
     if (left.valueType !== right.valueType) {
       return BooleanValue.FALSE;
     }
@@ -125,9 +131,9 @@ export class Interpreter implements SyntaxNodeVisitor<Value> {
     return this.evaluate(node.expr);
   }
   visitStatementBlock(node: StatementBlockSyntaxNode): Value {
-    this.pushScope();
+    this.pushScope({});
     try {
-      node.statements.forEach(statementNode => {
+      node.statementList.forEach(statementNode => {
         const _statementResult = this.evaluate(statementNode)
         // console.log(`TEMP: statement result being discarded:`)
         // console.dir(_statementResult)
@@ -172,7 +178,7 @@ export class Interpreter implements SyntaxNodeVisitor<Value> {
     this.assertTypeOfValue(ValueType.BOOLEAN, node.op, right);
     return right;
   }
-  visitVariableIdentifier(node: VariableIdentifierSyntaxNode): Value {
+  visitVariableLookup(node: VariableLookupSyntaxNode): Value {
     return this.scope.lookup(node.identifier);
   }
   visitVariableAssignment(node: VariableAssignmentSyntaxNode): Value {
@@ -220,10 +226,10 @@ export class Interpreter implements SyntaxNodeVisitor<Value> {
 
     if (functionValue.valueType === ValueType.USER_FUNCTION) {
       const functionDefinition = (functionValue as UserFunctionValue).functionDefinition;
-      this.pushScope()
-      for (let i = 0; i < argumentCount; i += 1) {
-        this.scope.declare(functionDefinition.parameterList[i], argumentValueList[i])
-      }
+      const argumentIdentifiers = functionDefinition.parameterList;
+      const interim = argumentIdentifiers.map((_, i) => [argumentIdentifiers[i].lexeme, argumentValueList[i]]);
+      const table = Object.fromEntries(argumentIdentifiers.map((_, i) => [argumentIdentifiers[i].lexeme, argumentValueList[i]]));
+      this.pushScope(table);
       try {
         this.evaluate(functionDefinition.statementBlock)
       }
@@ -243,10 +249,10 @@ export class Interpreter implements SyntaxNodeVisitor<Value> {
 
     return retval;
   }
-  pushScope() {
-    this.scope = new Scope(this.scope);
+  private pushScope(table: Record<string, Value>) {
+    this.scope = new InterpreterScope(this.scope, table);
   }
-  popScope() {
+  private popScope() {
     if (this.scope.parentScope === null) {
       throw new Error("Cannot pop scope: already at top!")
     }

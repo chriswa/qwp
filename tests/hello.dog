@@ -9,7 +9,7 @@ println(f(1, 2));
 println(f(3, 4));
 println("hello world");
 
-====================================
+__OUTPUT__
 3
 7
 hello world

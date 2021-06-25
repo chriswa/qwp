@@ -1,20 +1,15 @@
 import { lex } from "./lexer";
 import { Token, TokenType } from "./Token";
-import { BinarySyntaxNode, LiteralSyntaxNode, UnarySyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableIdentifierSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode } from "../syntax/syntax";
+import { BinarySyntaxNode, LiteralSyntaxNode, UnarySyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode } from "../syntax/syntax";
 import { ValueType } from "../interpreter/Value"
-
-class ParseError {
-  constructor(
-    public token: Token,
-    public message: string,
-  ) { }
-}
+import { ParserError } from "./ParserError"
+import { Resolver } from "./resolver"
 
 class TokenReader {
   private index = 0;
   public constructor(
     private tokens: Array<Token>,
-    private parseErrorGenerator: (token: Token, message: string) => ParseError,
+    private parseErrorGenerator: (token: Token, message: string) => ParserError,
   ) {
   }
   public peek() {
@@ -56,29 +51,44 @@ class TokenReader {
 
 class ParserResponse {
   public constructor(
-    public syntaxNodes: SyntaxNode | null,
-    public parseErrors: Array<ParseError> | null,
+    public topSyntaxNode: SyntaxNode | null,
+    public parserErrors: Array<ParserError> | null,
   ) { }
 }
 
 export function parse(input: string, path: string): ParserResponse {
   const tokens = lex(input, path);
-  const reader = new TokenReader(tokens, generateParseError);
-  const parseErrors: Array<ParseError> = [];
+  const reader = new TokenReader(tokens, generateParserError);
+  const parserErrors: Array<ParserError> = [];
+  let ast: SyntaxNode | null = null;
   try {
-    return new ParserResponse(module(), null);
+    ast = module();
   }
   catch (error) {
-    return new ParserResponse(null, parseErrors);
+    if (!(error instanceof ParserError)) {
+      throw error;
+    }
   }
+  if (ast === null) {
+    if (parserErrors.length === 0) {
+      throw new Error(`Internal error: ast not set but no parsererrors set`);
+    }
+    return new ParserResponse(null, parserErrors);
+  }
+  const resolver = new Resolver();
+  const resolverErrors = resolver.resolve(ast);
+  if (resolverErrors.length > 0) {
+    return new ParserResponse(null, resolverErrors);
+  }
+  return new ParserResponse(ast, null);
 
-  function generateParseError(token: Token, message: string) {
-    const parseError = new ParseError(token, message);
-    parseErrors.push(parseError);
+  function generateParserError(token: Token, message: string) {
+    const parseError = new ParserError(message, token.path, token.charPos);
+    parserErrors.push(parseError);
     return parseError;
   }
 
-  function synchronizeAfterParseError() {
+  function synchronizeAfterParserError() {
     reader.advance();
     while (!reader.isAtEnd()) {
       if (reader.previous().type === TokenType.SEMICOLON) {
@@ -193,7 +203,7 @@ export function parse(input: string, path: string): ParserResponse {
     if (reader.match([TokenType.OP_ASSIGN])) {
       const referenceToken = reader.previous();
       const rvalue = expression();
-      if (expr instanceof VariableIdentifierSyntaxNode) {
+      if (expr instanceof VariableLookupSyntaxNode) {
         reader.consume(TokenType.SEMICOLON, `semicolon required after variable assignment`);
         return new VariableAssignmentSyntaxNode(referenceToken, null, expr.identifier, rvalue);
       }
@@ -218,7 +228,7 @@ export function parse(input: string, path: string): ParserResponse {
         }
         isFirst = false;
         if (!reader.match([TokenType.IDENTIFIER])) {
-          throw generateParseError(reader.peek(), `identifier expected in function argument list`);
+          throw generateParserError(reader.peek(), `identifier expected in function argument list`);
         }
         parameterList.push(reader.previous());
       }
@@ -308,14 +318,14 @@ export function parse(input: string, path: string): ParserResponse {
       return new LiteralSyntaxNode(reader.previous(), string, ValueType.STRING);
     }
     if (reader.match([TokenType.IDENTIFIER])) {
-      return new VariableIdentifierSyntaxNode(reader.previous(), reader.previous());
+      return new VariableLookupSyntaxNode(reader.previous(), reader.previous()); // n.b. this might be an lvalue, which we will discover soon
     }
     if (reader.match([TokenType.OPEN_PAREN])) {
       const expr = expression();
       reader.consume(TokenType.CLOSE_PAREN, "Expect ')' after expression.");
       return expr;
     }
-    throw generateParseError(reader.peek(), `expecting expression`);
+    throw generateParserError(reader.peek(), `expecting expression`);
   }
 }
 

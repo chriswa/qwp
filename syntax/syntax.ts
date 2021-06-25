@@ -11,7 +11,7 @@ export interface SyntaxNodeVisitor<T> {
   visitWhileStatement(node: WhileStatementSyntaxNode): T;
   visitReturnStatement(node: ReturnStatementSyntaxNode): T;
   visitLogicShortCircuit(node: LogicShortCircuitSyntaxNode): T;
-  visitVariableIdentifier(node: VariableIdentifierSyntaxNode): T;
+  visitVariableLookup(node: VariableLookupSyntaxNode): T;
   visitVariableAssignment(node: VariableAssignmentSyntaxNode): T;
   visitFunctionDefinition(node: FunctionDefinitionSyntaxNode): T;
   visitFunctionCall(node: FunctionCallSyntaxNode): T;
@@ -79,7 +79,7 @@ export class GroupingSyntaxNode extends SyntaxNode {
 export class StatementBlockSyntaxNode extends SyntaxNode {
   constructor(
     referenceToken: Token,
-    public statements: Array<SyntaxNode>,
+    public statementList: Array<SyntaxNode>,
   ) {
     super(referenceToken);
   }
@@ -141,7 +141,7 @@ export class LogicShortCircuitSyntaxNode extends SyntaxNode {
   }
 }
 
-export class VariableIdentifierSyntaxNode extends SyntaxNode {
+export class VariableLookupSyntaxNode extends SyntaxNode {
   constructor(
     referenceToken: Token,
     public identifier: Token,
@@ -149,7 +149,7 @@ export class VariableIdentifierSyntaxNode extends SyntaxNode {
     super(referenceToken);
   }
   accept<R>(visitor: SyntaxNodeVisitor<R>) {
-    return visitor.visitVariableIdentifier(this);
+    return visitor.visitVariableLookup(this);
   }
 }
 

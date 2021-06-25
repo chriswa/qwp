@@ -2,10 +2,10 @@ import { Token } from "../parser/Token"
 import { RuntimeError } from "./RuntimeError"
 import { Value } from "./Value"
 
-export class Scope {
+export class InterpreterScope {
   public constructor(
-    public parentScope: Scope | null,
-    public table: Record<string, Value> = {},
+    public parentScope: InterpreterScope | null,
+    public table: Record<string, Value>,
   ) { }
   public declare(identifierToken: Token, value: Value) {
     const key = identifierToken.lexeme;
@@ -45,6 +45,6 @@ export class Scope {
     if (this.parentScope !== null) {
       return this.parentScope.lookup(identifierToken);
     }
-    throw new RuntimeError(identifierToken, `Cannot lookup variable "${key}" because it has not been declared in this or parent scope`);
+    throw new RuntimeError(identifierToken, `Undeclared variable "${key}"`);
   }
 }

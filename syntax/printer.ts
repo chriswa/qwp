@@ -1,5 +1,5 @@
 import { TokenType } from "../parser/Token"
-import { SyntaxNodeVisitor, BinarySyntaxNode, UnarySyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableIdentifierSyntaxNode, VariableAssignmentSyntaxNode } from "./syntax"
+import { SyntaxNodeVisitor, BinarySyntaxNode, UnarySyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode } from "./syntax"
 
 /*
 export class AstPrinter implements SyntaxNodeVisitor<string> {
@@ -20,7 +20,7 @@ export class AstPrinter implements SyntaxNodeVisitor<string> {
     return `(${node.expr.accept(this)})`;
   }
   visitStatementBlock(node: StatementBlockSyntaxNode): string {
-    return node.statements.map(statement => this.indent() + statement.accept(this) + ";").join("\n");
+    return node.statementList.map(statement => this.indent() + statement.accept(this) + ";").join("\n");
   }
   visitIfStatement(node: IfStatementSyntaxNode): string {
     this.indentLevel += 1;
@@ -40,7 +40,7 @@ export class AstPrinter implements SyntaxNodeVisitor<string> {
   visitLogicShortCircuit(node: LogicShortCircuitSyntaxNode): string {
     return `${node.left.accept(this)} ${TokenType[node.op.type]} ${node.right.accept(this)}`;
   }
-  visitVariableIdentifier(node: VariableIdentifierSyntaxNode): string {
+  visitVariableLookup(node: VariableLookupSyntaxNode): string {
     return node.identifier.lexeme;
   }
   visitVariableAssignment(node: VariableAssignmentSyntaxNode): string {
