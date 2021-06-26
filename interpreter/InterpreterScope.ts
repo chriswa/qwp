@@ -1,31 +1,31 @@
 import { Token } from "../parser/Token"
-import { RuntimeError } from "./RuntimeError"
-import { Value } from "./Value"
+import { InterpreterRuntimeError } from "./InterpreterRuntimeError"
+import { InterpreterValue } from "./InterpreterValue"
 
 export class InterpreterScope {
   public constructor(
     public parentScope: InterpreterScope | null,
-    public table: Record<string, Value>,
+    public table: Record<string, InterpreterValue>,
   ) { }
-  public declare(identifierToken: Token, value: Value) {
+  public declare(identifierToken: Token, value: InterpreterValue) {
     const key = identifierToken.lexeme;
     if (key in this.table) {
-      throw new RuntimeError(identifierToken, `Cannot redeclare variable "${key}" in this scope`);
+      throw new InterpreterRuntimeError(identifierToken, `Cannot redeclare variable "${key}" in this scope`);
     }
     this.table[key] = value;
   }
-  public assign(identifierToken: Token, value: Value) {
+  public assign(identifierToken: Token, value: InterpreterValue) {
     const key = identifierToken.lexeme;
     const wasAssignSuccessful = this.assignImpl(identifierToken, value);
     if (!wasAssignSuccessful) {
-      throw new RuntimeError(identifierToken, `Cannot assign to undeclared variable "${key}"`);
+      throw new InterpreterRuntimeError(identifierToken, `Cannot assign to undeclared variable "${key}"`);
     }
   }
-  private assignImpl(identifierToken: Token, value: Value): boolean {
+  private assignImpl(identifierToken: Token, value: InterpreterValue): boolean {
     const key = identifierToken.lexeme;
     if (key in this.table) {
       if (this.table[key].readonly) {
-        throw new RuntimeError(identifierToken, `Cannot modify readonly variable "${key}"`);
+        throw new InterpreterRuntimeError(identifierToken, `Cannot modify readonly variable "${key}"`);
       }
       this.table[key] = value;
       return true;
@@ -37,7 +37,7 @@ export class InterpreterScope {
       return false;
     }
   }
-  public lookup(identifierToken: Token): Value {
+  public lookup(identifierToken: Token): InterpreterValue {
     const key = identifierToken.lexeme;
     if (key in this.table) {
       return this.table[key];
@@ -45,6 +45,6 @@ export class InterpreterScope {
     if (this.parentScope !== null) {
       return this.parentScope.lookup(identifierToken);
     }
-    throw new RuntimeError(identifierToken, `Undeclared variable "${key}"`);
+    throw new InterpreterRuntimeError(identifierToken, `Undeclared variable "${key}"`);
   }
 }

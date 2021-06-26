@@ -1,12 +1,12 @@
-import { BuiltInFunctionValue, NullValue } from "./Value"
+import { BuiltInFunctionInterpreterValue, NullInterpreterValue } from "./InterpreterValue"
 
-export const GLOBAL_BUILTINS = {
-  "print": new BuiltInFunctionValue(1, (interpreter, arg0) => {
+export const INTERPRETER_BUILTINS = {
+  "print": new BuiltInFunctionInterpreterValue(1, (interpreter, arg0) => {
     interpreter.appendOutput(arg0.stringify());
-    return NullValue.INSTANCE;
+    return NullInterpreterValue.INSTANCE;
   }),
-  "println": new BuiltInFunctionValue(1, (interpreter, arg0) => {
+  "println": new BuiltInFunctionInterpreterValue(1, (interpreter, arg0) => {
     interpreter.appendOutput(arg0.stringify() + "\n");
-    return NullValue.INSTANCE;
+    return NullInterpreterValue.INSTANCE;
   }),
 };

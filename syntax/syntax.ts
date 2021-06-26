@@ -1,4 +1,4 @@
-import { ValueType } from "../interpreter/Value"
+import { InterpreterValueType } from "../interpreter/InterpreterValue"
 import { Token, TokenType } from "../parser/Token"
 
 export interface SyntaxNodeVisitor<T> {
@@ -55,7 +55,7 @@ export class LiteralSyntaxNode extends SyntaxNode {
   constructor(
     referenceToken: Token,
     public value: unknown,
-    public type: ValueType,
+    public type: InterpreterValueType,
   ) {
     super(referenceToken);
   }

@@ -1,5 +1,5 @@
 import { BinarySyntaxNode, FunctionCallSyntaxNode, FunctionDefinitionSyntaxNode, GroupingSyntaxNode, IfStatementSyntaxNode, LiteralSyntaxNode, LogicShortCircuitSyntaxNode, ReturnStatementSyntaxNode, StatementBlockSyntaxNode, SyntaxNode, SyntaxNodeVisitor, UnarySyntaxNode, VariableAssignmentSyntaxNode, VariableLookupSyntaxNode, WhileStatementSyntaxNode } from "../syntax/syntax"
-import { GLOBAL_BUILTINS } from "../interpreter/builtins"
+import { INTERPRETER_BUILTINS } from "../interpreter/builtins"
 import { ParserError } from "./ParserError"
 
 enum VariableStatus {
@@ -39,7 +39,7 @@ export class Resolver implements SyntaxNodeVisitor<void> {
   scope: ResolverScope;
   resolverErrors: Array<ParserError> = [];
   constructor() {
-    this.scope = new ResolverScope(null, Object.keys(GLOBAL_BUILTINS));
+    this.scope = new ResolverScope(null, Object.keys(INTERPRETER_BUILTINS));
   }
   beginScope(preinitializedIdentifiers: Array<string>) {
     this.scope = new ResolverScope(this.scope, preinitializedIdentifiers);

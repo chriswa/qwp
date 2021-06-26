@@ -4,7 +4,7 @@ import { Interpreter } from "./interpreter/interpreter";
 import { parse } from "./parser/parser";
 import { Token } from "./parser/Token"
 import { ParserError } from "./parser/ParserError"
-import { RuntimeError } from "./interpreter/RuntimeError"
+import { InterpreterRuntimeError } from "./interpreter/InterpreterRuntimeError"
 import { printPositionInSource } from "./cliUtil"
 // import { AstPrinter } from "./syntax/printer"
 
@@ -76,7 +76,7 @@ function reportFailedTest(path: string, source: string, testInput: ITestDetails,
       printPositionInSource(firstParserError.path, source, firstParserError.charPos);
       break;
     case "RUNTIME_ERROR":
-      const runtimeError = runResult.runtimeError as RuntimeError;
+      const runtimeError = runResult.runtimeError as InterpreterRuntimeError;
       console.log(chalk.red(`${runtimeError.message}`));
       printPositionInSource(runtimeError.token.path, source, runtimeError.token.charPos);
       break;
@@ -105,7 +105,7 @@ function loadTestFile(path: string): ITestDetails {
 interface IRunResult {
   status: "PARSER_ERROR" | "RUNTIME_ERROR" | "COMPLETED";
   parserErrors: Array<ParserError> | null,
-  runtimeError: RuntimeError | null,
+  runtimeError: InterpreterRuntimeError | null,
   output: string | null,
 }
 function runSource(path: string, source: string): IRunResult {

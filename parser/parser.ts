@@ -1,7 +1,7 @@
 import { lex } from "./lexer";
 import { Token, TokenType } from "./Token";
 import { BinarySyntaxNode, LiteralSyntaxNode, UnarySyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode } from "../syntax/syntax";
-import { ValueType } from "../interpreter/Value"
+import { InterpreterValueType } from "../interpreter/InterpreterValue"
 import { ParserError } from "./ParserError"
 import { Resolver } from "./resolver"
 
@@ -301,21 +301,21 @@ export function parse(input: string, path: string): ParserResponse {
   }
   function primary() {
     if (reader.match([TokenType.LITERAL_FALSE])) {
-      return new LiteralSyntaxNode(reader.previous(), false, ValueType.BOOLEAN);
+      return new LiteralSyntaxNode(reader.previous(), false, InterpreterValueType.BOOLEAN);
     }
     if (reader.match([TokenType.LITERAL_TRUE])) {
-      return new LiteralSyntaxNode(reader.previous(), true, ValueType.BOOLEAN);
+      return new LiteralSyntaxNode(reader.previous(), true, InterpreterValueType.BOOLEAN);
     }
     if (reader.match([TokenType.LITERAL_NULL])) {
-      return new LiteralSyntaxNode(reader.previous(), null, ValueType.NULL); // ?
+      return new LiteralSyntaxNode(reader.previous(), null, InterpreterValueType.NULL); // ?
     }
     if (reader.match([TokenType.NUMBER])) {
-      return new LiteralSyntaxNode(reader.previous(), parseFloat(reader.previous().lexeme), ValueType.NUMBER);
+      return new LiteralSyntaxNode(reader.previous(), parseFloat(reader.previous().lexeme), InterpreterValueType.NUMBER);
     }
     if (reader.match([TokenType.STRING])) {
       let string = reader.previous().lexeme;
       string = unescapeString(string.substr(1, string.length - 2)); // strip quotes and then unescape newlines, tabs, etc
-      return new LiteralSyntaxNode(reader.previous(), string, ValueType.STRING);
+      return new LiteralSyntaxNode(reader.previous(), string, InterpreterValueType.STRING);
     }
     if (reader.match([TokenType.IDENTIFIER])) {
       return new VariableLookupSyntaxNode(reader.previous(), reader.previous()); // n.b. this might be an lvalue, which we will discover soon
