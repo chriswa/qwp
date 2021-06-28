@@ -1,9 +1,9 @@
 import fs from "fs";
 import chalk from "chalk";
-import { Interpreter } from "./interpreter/interpreter";
-import { parse } from "./parser/parser";
-import { Token } from "./parser/Token"
-import { ParserError } from "./parser/ParserError"
+import { Interpreter } from "./interpreter/Interpreter";
+import { parse } from "./sourcecode/parser/parser";
+import { Token } from "./sourcecode/parser/Token"
+import { ParserError } from "./sourcecode/parser/ParserError"
 import { InterpreterRuntimeError } from "./interpreter/InterpreterRuntimeError"
 import { printPositionInSource } from "./cliUtil"
 // import { AstPrinter } from "./syntax/printer"
@@ -12,7 +12,6 @@ import { printPositionInSource } from "./cliUtil"
 fs.readdirSync("tests/").forEach((filename) => {
   const path = "tests/" + filename;
   if (fs.lstatSync(path).isFile()) {
-
     try {
       const wasSuccessful = performTest(path);
       if (!wasSuccessful) {
@@ -26,6 +25,7 @@ fs.readdirSync("tests/").forEach((filename) => {
     }
   }
 });
+process.exit(0); // success!
 
 function performTest(path: string): boolean {
   // console.log(chalk.cyan(`=== ${path} ===`));

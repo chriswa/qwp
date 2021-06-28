@@ -1,4 +1,4 @@
-import { Token } from "../parser/Token"
+import { Token } from "../sourcecode/parser/Token"
 import { InterpreterRuntimeError } from "./InterpreterRuntimeError"
 import { InterpreterValue } from "./InterpreterValue"
 

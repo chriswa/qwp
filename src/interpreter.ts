@@ -1,8 +1,8 @@
 import chalk from "chalk"
 import fs from "fs";
 import { printPositionInSource } from "./cliUtil"
-import { Interpreter } from "./interpreter/interpreter"
-import { parse } from "./parser/parser"
+import { Interpreter } from "./interpreter/Interpreter"
+import { parse } from "./sourcecode/parser/parser"
 
 var myArgs = process.argv.slice(2);
 

@@ -1,5 +1,5 @@
-import { FunctionDefinitionSyntaxNode } from "../syntax/syntax"
-import { Interpreter } from "./interpreter"
+import { FunctionDefinitionSyntaxNode } from "../sourcecode/syntax/syntax"
+import { Interpreter } from "./Interpreter"
 
 export enum InterpreterValueType {
   BOOLEAN,

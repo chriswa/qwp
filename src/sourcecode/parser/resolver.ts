@@ -1,5 +1,5 @@
 import { BinarySyntaxNode, FunctionCallSyntaxNode, FunctionDefinitionSyntaxNode, GroupingSyntaxNode, IfStatementSyntaxNode, LiteralSyntaxNode, LogicShortCircuitSyntaxNode, ReturnStatementSyntaxNode, StatementBlockSyntaxNode, SyntaxNode, SyntaxNodeVisitor, UnarySyntaxNode, VariableAssignmentSyntaxNode, VariableLookupSyntaxNode, WhileStatementSyntaxNode } from "../syntax/syntax"
-import { INTERPRETER_BUILTINS } from "../interpreter/builtins"
+import { INTERPRETER_BUILTINS } from "../../interpreter/builtins"
 import { ParserError } from "./ParserError"
 
 enum VariableStatus {
@@ -152,7 +152,7 @@ export class Resolver implements SyntaxNodeVisitor<void> {
       }
     }
     this.beginScope(node.parameterList.map((token) => token.lexeme));
-    this.resolveSyntaxNode(node.statementBlock);
+    this.resolveList(node.statementList);
     this.endScope();
   }
   visitFunctionCall(node: FunctionCallSyntaxNode): void {

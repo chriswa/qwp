@@ -1,5 +1,5 @@
-import { Token, TokenType } from "../parser/Token"
-import { SyntaxNodeVisitor, SyntaxNode, BinarySyntaxNode, UnarySyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode } from "../syntax/syntax"
+import { Token, TokenType } from "../sourcecode/parser/Token"
+import { SyntaxNodeVisitor, SyntaxNode, BinarySyntaxNode, UnarySyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode } from "../sourcecode/syntax/syntax"
 import { INTERPRETER_BUILTINS } from "./builtins"
 import { InterpreterRuntimeError } from "./InterpreterRuntimeError"
 import { InterpreterScope } from "./InterpreterScope"
@@ -134,9 +134,7 @@ export class Interpreter implements SyntaxNodeVisitor<InterpreterValue> {
     this.pushScope({});
     try {
       node.statementList.forEach(statementNode => {
-        const _statementResult = this.evaluate(statementNode)
-        // console.log(`TEMP: statement result being discarded:`)
-        // console.dir(_statementResult)
+        this.evaluate(statementNode); // returned expression value is discarded for statements
       });
     }
     finally {
@@ -231,7 +229,9 @@ export class Interpreter implements SyntaxNodeVisitor<InterpreterValue> {
       const table = Object.fromEntries(argumentIdentifiers.map((_, i) => [argumentIdentifiers[i].lexeme, argumentInterpreterValueList[i]]));
       this.pushScope(table);
       try {
-        this.evaluate(functionDefinition.statementBlock)
+        functionDefinition.statementList.forEach(statementNode => {
+          this.evaluate(statementNode); // returned expression value is discarded for statements
+        });
       }
       catch (error) {
         if (error instanceof Return) {

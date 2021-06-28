@@ -1,7 +1,7 @@
 import { lex } from "./lexer";
 import { Token, TokenType } from "./Token";
 import { BinarySyntaxNode, LiteralSyntaxNode, UnarySyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode } from "../syntax/syntax";
-import { InterpreterValueType } from "../interpreter/InterpreterValue"
+import { InterpreterValueType } from "../../interpreter/InterpreterValue"
 import { ParserError } from "./ParserError"
 import { Resolver } from "./resolver"
 
@@ -233,8 +233,8 @@ export function parse(input: string, path: string): ParserResponse {
         parameterList.push(reader.previous());
       }
       reader.consume(TokenType.OPEN_BRACE, `function body must start with "{"`);
-      const blockNode = block(`function body must end with "}"`);
-      return new FunctionDefinitionSyntaxNode(referenceToken, parameterList, blockNode);
+      const temporaryBlockNode = block(`function body must end with "}"`);
+      return new FunctionDefinitionSyntaxNode(referenceToken, parameterList, temporaryBlockNode.statementList);
     }
     return or();
   }
