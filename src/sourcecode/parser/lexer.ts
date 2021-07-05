@@ -51,6 +51,10 @@ addRule(filters.ALWAYS, /^!/, TokenType.OP_BANG);
 addRule(filters.ALWAYS, /^&&/, TokenType.OP_AND);
 addRule(filters.ALWAYS, /^\|\|/, TokenType.OP_OR);
 
+addRule(filters.ALWAYS, /^false/, TokenType.LITERAL_FALSE);
+addRule(filters.ALWAYS, /^true/, TokenType.LITERAL_TRUE);
+addRule(filters.ALWAYS, /^null/, TokenType.LITERAL_NULL);
+
 addRule(filters.ALWAYS, /^if/, TokenType.KEYWORD_IF);
 addRule(filters.ALWAYS, /^else/, TokenType.KEYWORD_ELSE);
 addRule(filters.ALWAYS, /^while/, TokenType.KEYWORD_WHILE);

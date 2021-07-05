@@ -7,4 +7,10 @@ export class InterpreterRuntimeError extends Error {
   ) {
     super(message);
   }
+  public get charPos() {
+    return this.token.charPos;
+  }
+  public get path() {
+    return this.token.path;
+  }
 }

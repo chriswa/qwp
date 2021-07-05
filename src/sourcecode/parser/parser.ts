@@ -2,14 +2,14 @@ import { lex } from "./lexer";
 import { Token, TokenType } from "./Token";
 import { BinarySyntaxNode, LiteralSyntaxNode, UnarySyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode } from "../syntax/syntax";
 import { InterpreterValueType } from "../../interpreter/InterpreterValue"
-import { ParserError } from "./ParserError"
+import { SyntaxError } from "./SyntaxError"
 import { Resolver } from "./resolver"
 
 class TokenReader {
   private index = 0;
   public constructor(
     private tokens: Array<Token>,
-    private parseErrorGenerator: (token: Token, message: string) => ParserError,
+    private parseErrorGenerator: (token: Token, message: string) => SyntaxError,
   ) {
   }
   public peek() {
@@ -52,28 +52,28 @@ class TokenReader {
 class ParserResponse {
   public constructor(
     public topSyntaxNode: SyntaxNode | null,
-    public parserErrors: Array<ParserError> | null,
+    public syntaxErrors: Array<SyntaxError> | null,
   ) { }
 }
 
 export function parse(input: string, path: string): ParserResponse {
   const tokens = lex(input, path);
-  const reader = new TokenReader(tokens, generateParserError);
-  const parserErrors: Array<ParserError> = [];
+  const reader = new TokenReader(tokens, generateSyntaxError);
+  const syntaxErrors: Array<SyntaxError> = [];
   let ast: SyntaxNode | null = null;
   try {
     ast = module();
   }
   catch (error) {
-    if (!(error instanceof ParserError)) {
+    if (!(error instanceof SyntaxError)) {
       throw error;
     }
   }
   if (ast === null) {
-    if (parserErrors.length === 0) {
+    if (syntaxErrors.length === 0) {
       throw new Error(`Internal error: ast not set but no parsererrors set`);
     }
-    return new ParserResponse(null, parserErrors);
+    return new ParserResponse(null, syntaxErrors);
   }
   const resolver = new Resolver();
   const resolverErrors = resolver.resolve(ast);
@@ -82,13 +82,13 @@ export function parse(input: string, path: string): ParserResponse {
   }
   return new ParserResponse(ast, null);
 
-  function generateParserError(token: Token, message: string) {
-    const parseError = new ParserError(message, token.path, token.charPos);
-    parserErrors.push(parseError);
+  function generateSyntaxError(token: Token, message: string) {
+    const parseError = new SyntaxError("Parser: " + message, token.path, token.charPos);
+    syntaxErrors.push(parseError);
     return parseError;
   }
 
-  function synchronizeAfterParserError() {
+  function synchronizeAfterSyntaxError() {
     reader.advance();
     while (!reader.isAtEnd()) {
       if (reader.previous().type === TokenType.SEMICOLON) {
@@ -123,7 +123,9 @@ export function parse(input: string, path: string): ParserResponse {
   }
   function statement() {
     if (reader.match([TokenType.OPEN_BRACE])) {
-      return block();
+      const blockNode = block();
+      reader.consume(TokenType.CLOSE_BRACE, `explicit block must end with "}"`);
+      return blockNode;
     }
     else if (reader.match([TokenType.KEYWORD_CONST, TokenType.KEYWORD_LET])) {
       return variableDeclarationStatement();
@@ -138,7 +140,7 @@ export function parse(input: string, path: string): ParserResponse {
       return returnStatement();
     }
     const expr = expression();
-    reader.consume(TokenType.SEMICOLON, `Semicolon expected after expression statement`);
+    reader.consume(TokenType.SEMICOLON, `Semicolon expected after expression/assignment statement`);
     return expr;
   }
   function variableDeclarationStatement() {
@@ -172,10 +174,10 @@ export function parse(input: string, path: string): ParserResponse {
     reader.consume(TokenType.OPEN_PAREN, `Open paren expected after "while" statement`);
     const condExpr = expression();
     reader.consume(TokenType.CLOSE_PAREN, `Open paren expected after "while" statement`);
-    reader.consume(TokenType.OPEN_BRACE, `Opening curly brace required for "while" statement's "then" block`);
-    const thenBlock = block();
-    reader.consume(TokenType.CLOSE_BRACE, `Closing curly brace required after "while" statement's "then" block`);
-    return new WhileStatementSyntaxNode(referenceToken, condExpr, thenBlock);
+    reader.consume(TokenType.OPEN_BRACE, `Opening curly brace required for "while" statement's "loop" block`);
+    const loopBlock = block();
+    reader.consume(TokenType.CLOSE_BRACE, `Closing curly brace required after "while" statement's "loop" block`);
+    return new WhileStatementSyntaxNode(referenceToken, condExpr, loopBlock);
   }
   function returnStatement() {
     const referenceToken = reader.previous();
@@ -186,13 +188,12 @@ export function parse(input: string, path: string): ParserResponse {
     reader.consume(TokenType.SEMICOLON, `Return statement must end with semicolon`);
     return new ReturnStatementSyntaxNode(referenceToken, retval);
   }
-  function block(errorMessageForMissingCloseBrace: string | null = null) {
+  function block() {
     const referenceToken = reader.previous();
     const statementList: Array<SyntaxNode> = [];
     while (!reader.check([TokenType.CLOSE_BRACE]) && !reader.isAtEnd()) {
       statementList.push(statement());
     }
-    reader.consume(TokenType.CLOSE_BRACE, errorMessageForMissingCloseBrace ?? `Closing curly brace required after statement block`);
     return new StatementBlockSyntaxNode(referenceToken, statementList);
   }
   function expression(): SyntaxNode {
@@ -204,7 +205,6 @@ export function parse(input: string, path: string): ParserResponse {
       const referenceToken = reader.previous();
       const rvalue = expression();
       if (expr instanceof VariableLookupSyntaxNode) {
-        reader.consume(TokenType.SEMICOLON, `semicolon required after variable assignment`);
         return new VariableAssignmentSyntaxNode(referenceToken, null, expr.identifier, rvalue);
       }
       else {
@@ -228,12 +228,13 @@ export function parse(input: string, path: string): ParserResponse {
         }
         isFirst = false;
         if (!reader.match([TokenType.IDENTIFIER])) {
-          throw generateParserError(reader.peek(), `identifier expected in function argument list`);
+          throw generateSyntaxError(reader.peek(), `identifier expected in function argument list`);
         }
         parameterList.push(reader.previous());
       }
       reader.consume(TokenType.OPEN_BRACE, `function body must start with "{"`);
-      const temporaryBlockNode = block(`function body must end with "}"`);
+      const temporaryBlockNode = block();
+      reader.consume(TokenType.CLOSE_BRACE, `function body must end with "}"`);
       return new FunctionDefinitionSyntaxNode(referenceToken, parameterList, temporaryBlockNode.statementList);
     }
     return or();
@@ -325,7 +326,7 @@ export function parse(input: string, path: string): ParserResponse {
       reader.consume(TokenType.CLOSE_PAREN, "Expect ')' after expression.");
       return expr;
     }
-    throw generateParserError(reader.peek(), `expecting expression`);
+    throw generateSyntaxError(reader.peek(), `expecting expression`);
   }
 }
 

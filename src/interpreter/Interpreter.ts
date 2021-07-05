@@ -152,7 +152,7 @@ export class Interpreter implements SyntaxNodeVisitor<InterpreterValue> {
     return NullInterpreterValue.INSTANCE;
   }
   visitWhileStatement(node: WhileStatementSyntaxNode): InterpreterValue {
-    while (node.cond.accept(this)) {
+    while (node.cond.accept(this) === BooleanInterpreterValue.TRUE) {
       node.loopBody.accept(this);
     }
     return NullInterpreterValue.INSTANCE;

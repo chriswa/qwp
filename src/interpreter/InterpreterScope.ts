@@ -24,9 +24,10 @@ export class InterpreterScope {
   private assignImpl(identifierToken: Token, value: InterpreterValue): boolean {
     const key = identifierToken.lexeme;
     if (key in this.table) {
-      if (this.table[key].readonly) {
-        throw new InterpreterRuntimeError(identifierToken, `Cannot modify readonly variable "${key}"`);
-      }
+      // readonly stuff is now taken care of by resolver
+      // if (this.table[key].readonly) {
+      //   throw new InterpreterRuntimeError(identifierToken, `Cannot modify readonly variable "${key}"`);
+      // }
       this.table[key] = value;
       return true;
     }

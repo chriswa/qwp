@@ -1,6 +1,6 @@
 import chalk from "chalk";
 
-export function printPositionInSource(path: string, source: string, charPos: number) {
+function getLineNumberAndLineBeginning(path: string, source: string, charPos: number) {
   const precedingSource = source.substr(0, charPos);
   const newlineCountMatches = precedingSource.match(/\n/g);
   let lineNumber = 1;
@@ -12,6 +12,17 @@ export function printPositionInSource(path: string, source: string, charPos: num
   else {
     lineBeginning = precedingSource;
   }
+  return { lineNumber, lineBeginning };
+}
+
+export function getPositionInSource(path: string, source: string, charPos: number) {
+  const { lineNumber, lineBeginning } = getLineNumberAndLineBeginning(path, source, charPos);
+  return { row: lineNumber, col: lineBeginning.length + 1 };
+}
+
+export function printPositionInSource(path: string, source: string, charPos: number) {
+  const { lineNumber, lineBeginning } = getLineNumberAndLineBeginning(path, source, charPos);
+
   let nextNewlinePos = source.indexOf("\n", charPos);
   const lineEnding = nextNewlinePos === -1 ? source.substr(charPos) : source.substr(charPos, nextNewlinePos - charPos);
   const line = lineBeginning + lineEnding;

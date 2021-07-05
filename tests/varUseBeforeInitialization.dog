@@ -1,0 +1,6 @@
+let a;
+print(a);
+a := 1;
+
+__SYNTAX_ERROR__
+Resolver: Uninitialized variable cannot be substituted at line 2, col 7

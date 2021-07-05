@@ -1,0 +1,15 @@
+const a;
+if (true) {
+  a := 1;
+}
+else {
+  if (true) {
+    a := 2;
+  }
+  else {
+  }
+}
+print(a);
+
+__SYNTAX_ERROR__
+Resolver: Late const assignment of variable "a" must occur in all branches at line 6, col 3
