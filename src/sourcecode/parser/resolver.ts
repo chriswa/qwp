@@ -104,7 +104,6 @@ export class Resolver implements SyntaxNodeVisitor<ResolverScope | null> {
     return null;
   }
   visitLiteral(node: LiteralSyntaxNode): ResolverScope | null {
-    // pass
     return null;
   }
   visitGrouping(node: GroupingSyntaxNode): ResolverScope | null {
@@ -191,17 +190,20 @@ export class Resolver implements SyntaxNodeVisitor<ResolverScope | null> {
     if (declarationModifier !== null) {
       if (existingVariableStatusInStack !== null) {
         this.generateResolverError(node, `Variable/parameter shadowing is not allowed`);
+        return null;
       }
       existingVariableStatusInStack = this.scope.declareVariable(variableName, declarationModifier.type === TokenType.KEYWORD_CONST);
     }
     else {
       if (existingVariableStatusInStack === null) {
         this.generateResolverError(node, `Undeclared variable cannot be assigned to`);
+        return null;
       }
     }
     if (node.rvalue !== null) {
       if (existingVariableStatusInStack?.isInitialized && existingVariableStatusInStack.isReadOnly) {
         this.generateResolverError(node, `Constant variable cannot be re-assigned to`);
+        return null;
       }
       this.scope.assignVariable(variableName);
     }

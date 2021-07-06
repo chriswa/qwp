@@ -1,0 +1,4 @@
+undec := 123;
+
+__SYNTAX_ERROR__
+Resolver: Undeclared variable cannot be assigned to at line 1, col 7

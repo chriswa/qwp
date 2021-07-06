@@ -1,3 +1,24 @@
 export enum OpCode {
-  POP, // discard stack value
+  NEGATE,
+  LOGICAL_NOT,
+  ADD,
+  SUBTRACT,
+  MULTIPLY,
+  DIVIDE,
+  LT,
+  LTE,
+  GT,
+  GTE,
+  EQ,
+  NEQ,
+  LOGICAL_OR,
+  LOGICAL_AND,
+  
+  CONSTANT,
+  POP, // discard
+  RETURN_VALUE,
+  RETURN_VOID,
+  JUMP_FORWARD_IF_FALSE,
+  JUMP_FORWARD,
+  JUMP_BACKWARD,
 };
