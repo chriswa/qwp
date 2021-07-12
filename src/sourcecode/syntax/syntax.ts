@@ -1,5 +1,5 @@
-import { InterpreterValueType } from "../../interpreter/InterpreterValue"
 import { Token } from "../parser/Token"
+import { ValueType } from "./ValueType"
 
 export interface SyntaxNodeVisitor<T> {
   visitBinary(node: BinarySyntaxNode): T;
@@ -55,7 +55,7 @@ export class LiteralSyntaxNode extends SyntaxNode {
   constructor(
     referenceToken: Token,
     public value: unknown,
-    public type: InterpreterValueType,
+    public type: ValueType,
   ) {
     super(referenceToken);
   }

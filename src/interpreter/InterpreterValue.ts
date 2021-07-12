@@ -1,14 +1,6 @@
 import { FunctionDefinitionSyntaxNode } from "../sourcecode/syntax/syntax"
+import { ValueType } from "../sourcecode/syntax/ValueType"
 import { Interpreter } from "./Interpreter"
-
-export enum InterpreterValueType {
-  BOOLEAN,
-  NUMBER,
-  STRING,
-  NULL,
-  USER_FUNCTION,
-  BUILTIN_FUNCTION,
-}
 
 export interface InterpreterValueVisitor<T> {
   visitBoolean(node: BooleanInterpreterValue): T;
@@ -20,29 +12,29 @@ export interface InterpreterValueVisitor<T> {
 }
 
 export abstract class InterpreterValue {
-  public abstract get valueType(): InterpreterValueType;
+  public abstract get valueType(): ValueType;
   public readonly: boolean = false;
   public abstract accept<R>(visitor: InterpreterValueVisitor<R>): R;
   public abstract stringify(): string;
   protected constructor(
   ) { }
-  public static create(valueType: InterpreterValueType, rawInterpreterValue: unknown) {
+  public static create(valueType: ValueType, rawInterpreterValue: unknown) {
     switch (valueType) {
-      case InterpreterValueType.BOOLEAN:
+      case ValueType.BOOLEAN:
         return rawInterpreterValue === true ? BooleanInterpreterValue.TRUE : BooleanInterpreterValue.FALSE;
-      case InterpreterValueType.NUMBER:
+      case ValueType.NUMBER:
         return new NumberInterpreterValue(rawInterpreterValue as number);
-      case InterpreterValueType.STRING:
+      case ValueType.STRING:
         return new StringInterpreterValue(rawInterpreterValue as string);
-      case InterpreterValueType.NULL:
+      case ValueType.NULL:
         return NullInterpreterValue.INSTANCE;
       default:
-        throw new Error(`Attempted to create a InterpreterValue with unknown valueType ${InterpreterValueType[valueType]}`);
+        throw new Error(`Attempted to create a InterpreterValue with unknown valueType ${ValueType[valueType]}`);
     }
   }
 }
 export class BooleanInterpreterValue extends InterpreterValue {
-  public get valueType() { return InterpreterValueType.BOOLEAN }
+  public get valueType() { return ValueType.BOOLEAN }
   accept<R>(visitor: InterpreterValueVisitor<R>) {
     return visitor.visitBoolean(this);
   }
@@ -56,7 +48,7 @@ export class BooleanInterpreterValue extends InterpreterValue {
   public static FALSE: BooleanInterpreterValue = new BooleanInterpreterValue(false);
 }
 export class NumberInterpreterValue extends InterpreterValue {
-  public get valueType() { return InterpreterValueType.NUMBER; }
+  public get valueType() { return ValueType.NUMBER; }
   accept<R>(visitor: InterpreterValueVisitor<R>) {
     return visitor.visitNumber(this);
   }
@@ -68,7 +60,7 @@ export class NumberInterpreterValue extends InterpreterValue {
   stringify() { return this.rawInterpreterValue.toString(); }
 }
 export class StringInterpreterValue extends InterpreterValue {
-  public get valueType() { return InterpreterValueType.STRING; }
+  public get valueType() { return ValueType.STRING; }
   accept<R>(visitor: InterpreterValueVisitor<R>) {
     return visitor.visitString(this);
   }
@@ -80,7 +72,7 @@ export class StringInterpreterValue extends InterpreterValue {
   stringify() { return this.rawInterpreterValue; }
 }
 export class NullInterpreterValue extends InterpreterValue {
-  public get valueType() { return InterpreterValueType.NULL; }
+  public get valueType() { return ValueType.NULL; }
   accept<R>(visitor: InterpreterValueVisitor<R>) {
     return visitor.visitNull(this);
   }
@@ -92,7 +84,7 @@ export class NullInterpreterValue extends InterpreterValue {
   public static INSTANCE: NullInterpreterValue = new NullInterpreterValue();
 }
 export class UserFunctionInterpreterValue extends InterpreterValue {
-  public get valueType() { return InterpreterValueType.USER_FUNCTION; }
+  public get valueType() { return ValueType.USER_FUNCTION; }
   accept<R>(visitor: InterpreterValueVisitor<R>) {
     return visitor.visitUserFunction(this);
   }
@@ -104,7 +96,7 @@ export class UserFunctionInterpreterValue extends InterpreterValue {
   stringify() { return "[FUNCTION]"; }
 }
 export class BuiltInFunctionInterpreterValue extends InterpreterValue {
-  public get valueType() { return InterpreterValueType.BUILTIN_FUNCTION; }
+  public get valueType() { return ValueType.BUILTIN_FUNCTION; }
   accept<R>(visitor: InterpreterValueVisitor<R>) {
     return visitor.visitBuiltInFunction(this);
   }

@@ -14,7 +14,7 @@ if (path === undefined) {
 
 const source = fs.readFileSync(path, "utf8");
 const parserResponse = parse(source, path);
-if (parserResponse.syntaxErrors !== null) {
+if (parserResponse.kind === "SYNTAX_ERROR") {
   const firstSyntaxError = parserResponse.syntaxErrors[0];
   console.log(chalk.red(`PARSER ERROR: ${firstSyntaxError.message}`));
   printPositionInSource(firstSyntaxError.path, source, firstSyntaxError.charPos);

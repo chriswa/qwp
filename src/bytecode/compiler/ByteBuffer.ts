@@ -1,152 +1,121 @@
 import assert from "assert"
 
 export class ByteBuffer {
-  private buffer: ArrayBuffer = new ArrayBuffer(256);
-  private uint8View!: Uint8Array;
-  private uint16Views!: Array<Uint16Array>;
-  private uint32Views!: Array<Uint32Array>;
-  private int8View!: Int8Array;
-  private int16Views!: Array<Int16Array>;
-  private int32Views!: Array<Int32Array>;
-  private float32Views!: Array<Float32Array>;
-  private float64Views!: Array<Float32Array>;
+  private _buffer: ArrayBuffer = new ArrayBuffer(256);
+  private dataView: DataView = new DataView(this._buffer);
   private _byteCursor: number = 0;
   public get byteCursor() { return this._byteCursor }
   public constructor(initialBuffer?: ArrayBuffer) {
-    this.buffer = initialBuffer ?? new ArrayBuffer(256)
+    this._buffer = initialBuffer ?? new ArrayBuffer(256)
     this.updateViews()
   }
   private updateViews() {
-    this.uint8View = new Uint8Array(this.buffer);
-    this.uint16Views = [
-      new Uint16Array(this.buffer, 0),
-      new Uint16Array(this.buffer, 1),
-    ];
-    this.uint32Views = [
-      new Uint32Array(this.buffer, 0),
-      new Uint32Array(this.buffer, 1),
-      new Uint32Array(this.buffer, 2),
-      new Uint32Array(this.buffer, 3),
-    ];
-    this.int8View = new Int8Array(this.buffer);
-    this.int16Views = [
-      new Int16Array(this.buffer, 0),
-      new Int16Array(this.buffer, 1),
-    ];
-    this.int32Views = [
-      new Int32Array(this.buffer, 0),
-      new Int32Array(this.buffer, 1),
-      new Int32Array(this.buffer, 2),
-      new Int32Array(this.buffer, 3),
-    ];
-    this.float32Views = [
-      new Float32Array(this.buffer, 0),
-      new Float32Array(this.buffer, 1),
-      new Float32Array(this.buffer, 2),
-      new Float32Array(this.buffer, 3),
-    ];
-    this.float64Views = [
-      new Float32Array(this.buffer, 0),
-      new Float32Array(this.buffer, 1),
-      new Float32Array(this.buffer, 2),
-      new Float32Array(this.buffer, 3),
-      new Float32Array(this.buffer, 4),
-      new Float32Array(this.buffer, 5),
-      new Float32Array(this.buffer, 6),
-      new Float32Array(this.buffer, 7),
-    ];
+    this.dataView = new DataView(this._buffer);
   }
   private resize(newLength: number) {
     const newBuffer = new ArrayBuffer(newLength);
-    new Uint8Array(newBuffer).set(new Uint8Array(this.buffer)); // copy buffer
-    this.buffer = newBuffer;
+    const bytesToCopy = Math.min(newLength, this._buffer.byteLength);
+    new Uint8Array(newBuffer, 0, bytesToCopy).set(new Uint8Array(this._buffer, 0, bytesToCopy)); // copy buffer
+    this._buffer = newBuffer;
     this.updateViews();
   }
   private extendIfNecessary(extraBytes: number) {
-    if (this._byteCursor + extraBytes > this.buffer.byteLength) {
-      this.resize(this.buffer.byteLength * 2);
+    if (this._byteCursor + extraBytes > this._buffer.byteLength) {
+      this.resize(this._buffer.byteLength * 2);
     }
   }
   public compact() {
     this.resize(this._byteCursor);
   }
+  public get buffer() {
+    return this._buffer;
+  }
+  public setByteCursor(pos: number) {
+    this._byteCursor = pos;
+  }
 
-  public backpatch(bytePosition: number, callback: () => void) {
+  public backpatch(targetPosition: number, callback: () => void) {
     const origPosition = this._byteCursor;
+    this._byteCursor = targetPosition;
     callback();
     this._byteCursor = origPosition;
+  }
+
+  public writeBuffer(buffer: ArrayBuffer) {
+    new Uint8Array(this._buffer).set(new Uint8Array(buffer), this._byteCursor);
+    this._byteCursor += buffer.byteLength;
   }
 
   public writeUInt8(value: number) {
     assert.ok(Number.isInteger(value) && value >= 0 && value <= 0xff);
     this.extendIfNecessary(1);
-    this.uint8View[this._byteCursor] = value;
+    this.dataView.setUint8(this._byteCursor, value);
     this._byteCursor += 1;
   }
   public writeUInt16(value: number) {
     assert.ok(Number.isInteger(value) && value >= 0 && value <= 0xffff);
     this.extendIfNecessary(2);
-    this.uint16Views[this._byteCursor % 2][this._byteCursor / 2 | 0] = value;
+    this.dataView.setUint16(this._byteCursor, value);
     this._byteCursor += 2;
   }
   public writeUInt32(value: number) {
     assert.ok(Number.isInteger(value) && value >= 0 && value <= 0xffffffff);
     this.extendIfNecessary(4);
-    this.uint32Views[this._byteCursor % 4][this._byteCursor / 4 | 0] = value;
+    this.dataView.setUint32(this._byteCursor, value);
     this._byteCursor += 4;
   }
   public writeInt8(value: number) {
     assert.ok(Number.isInteger(value) && value >= -(2 ** 7) && value <= (2 ** 7) - 1);
     this.extendIfNecessary(1);
-    this.int8View[this._byteCursor] = value;
+    this.dataView.setInt8(this._byteCursor, value);
     this._byteCursor += 1;
   }
   public writeInt16(value: number) {
     assert.ok(Number.isInteger(value) && value >= -(2 ** 15) && value <= (2 ** 15) - 1);
     this.extendIfNecessary(2);
-    this.int16Views[this._byteCursor % 2][this._byteCursor / 2 | 0] = value;
+    this.dataView.setInt16(this._byteCursor, value);
     this._byteCursor += 2;
   }
   public writeInt32(value: number) {
     assert.ok(Number.isInteger(value) && value >= -(2 ** 31) && value <= (2 ** 31) - 1);
     this.extendIfNecessary(4);
-    this.int32Views[this._byteCursor % 4][this._byteCursor / 4 | 0] = value;
+    this.dataView.setInt32(this._byteCursor, value);
     this._byteCursor += 4;
   }
   public writeFloat32(value: number) {
     this.extendIfNecessary(4);
-    this.float32Views[this._byteCursor % 4][this._byteCursor / 4 | 0] = value;
+    this.dataView.setFloat32(this._byteCursor, value);
     this._byteCursor += 4;
   }
   public writeFloat64(value: number) {
     this.extendIfNecessary(8);
-    this.float32Views[this._byteCursor % 8][this._byteCursor / 8 | 0] = value;
+    this.dataView.setFloat64(this._byteCursor, value);
     this._byteCursor += 8;
   }
 
   public peekUint8(): number {
-    return this.uint8View[this._byteCursor];
+    return this.dataView.getUint8(this._byteCursor);
   }
   public peekUint16(): number {
-    return this.uint16Views[this._byteCursor % 2][this._byteCursor / 2 | 0];
+    return this.dataView.getUint16(this._byteCursor);
   }
   public peekUint32(): number {
-    return this.uint32Views[this._byteCursor % 4][this._byteCursor / 4 | 0];
+    return this.dataView.getUint32(this._byteCursor);
   }
   public peekInt8(): number {
-    return this.int8View[this._byteCursor];
+    return this.dataView.getInt8(this._byteCursor);
   }
   public peekInt16(): number {
-    return this.int16Views[this._byteCursor % 2][this._byteCursor / 2 | 0];
+    return this.dataView.getInt16(this._byteCursor);
   }
   public peekInt32(): number {
-    return this.int32Views[this._byteCursor % 4][this._byteCursor / 4 | 0];
+    return this.dataView.getInt32(this._byteCursor);
   }
   public peekFloat32(): number {
-    return this.float32Views[this._byteCursor % 4][this._byteCursor / 4 | 0];
+    return this.dataView.getFloat32(this._byteCursor);
   }
   public peekFloat64(): number {
-    return this.float64Views[this._byteCursor % 8][this._byteCursor / 8 | 0];
+    return this.dataView.getFloat64(this._byteCursor);
   }
 
   public readUint8(): number {
@@ -189,4 +158,30 @@ export class ByteBuffer {
     this._byteCursor += 8;
     return value;
   }
+
+  public peekUint8At(bytePos: number): number {
+    return this.dataView.getUint8(bytePos);
+  }
+  public peekUint16At(bytePos: number): number {
+    return this.dataView.getUint16(bytePos);
+  }
+  public peekUint32At(bytePos: number): number {
+    return this.dataView.getUint32(bytePos);
+  }
+  public peekInt8At(bytePos: number): number {
+    return this.dataView.getInt8(bytePos);
+  }
+  public peekInt16At(bytePos: number): number {
+    return this.dataView.getInt16(bytePos);
+  }
+  public peekInt32At(bytePos: number): number {
+    return this.dataView.getInt32(bytePos);
+  }
+  public peekFloat32At(bytePos: number): number {
+    return this.dataView.getFloat32(bytePos);
+  }
+  public peekFloat64At(bytePos: number): number {
+    return this.dataView.getFloat64(bytePos);
+  }
+
 }

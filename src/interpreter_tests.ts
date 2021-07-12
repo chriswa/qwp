@@ -122,11 +122,8 @@ interface ICompletedRunResult {
 type RunResult = ISyntaxErrorRunResult | IRuntimeErrorRunResult | ICompletedRunResult;
 function runSource(path: string, source: string): RunResult {
   const parserResponse = parse(source, path);
-  if (parserResponse.syntaxErrors !== null) {
+  if (parserResponse.kind === "SYNTAX_ERROR") {
     return { kind: "SYNTAX_ERROR", syntaxErrors: parserResponse.syntaxErrors };
-  }
-  if (parserResponse.topSyntaxNode === null) {
-    throw new Error(`Internal logic error: either topSyntaxNode or syntaxErrors should be non-null`);
   }
   const interpreter = new Interpreter();
   const runtimeError = interpreter.interpret(parserResponse.topSyntaxNode);

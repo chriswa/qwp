@@ -1,9 +1,9 @@
 import { lex } from "./lexer";
 import { Token, TokenType } from "./Token";
 import { BinarySyntaxNode, LiteralSyntaxNode, UnarySyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode } from "../syntax/syntax";
-import { InterpreterValueType } from "../../interpreter/InterpreterValue"
 import { SyntaxError } from "./SyntaxError"
-import { Resolver } from "./resolver"
+import { Resolver, ResolverScope } from "./resolver"
+import { ValueType } from "../syntax/ValueType"
 
 class TokenReader {
   private index = 0;
@@ -49,17 +49,22 @@ class TokenReader {
   }
 }
 
-class ParserResponse {
-  public constructor(
-    public topSyntaxNode: SyntaxNode | null,
-    public syntaxErrors: Array<SyntaxError> | null,
-  ) { }
+interface ISyntaxErrorParserResponse {
+  kind: "SYNTAX_ERROR";
+  syntaxErrors: Array<SyntaxError>;
 }
+interface ISuccessParserResponse {
+  kind: "SUCCESS";
+  topSyntaxNode: SyntaxNode;
+  closedVarsByFunctionNode: Map<SyntaxNode, Array<string>>; // map from FunctionDefinitionSyntaxNode to set of identifiers
+}
+type ParserResponse = ISyntaxErrorParserResponse | ISuccessParserResponse;
 
 export function parse(input: string, path: string): ParserResponse {
   const tokens = lex(input, path);
   const reader = new TokenReader(tokens, generateSyntaxError);
-  const syntaxErrors: Array<SyntaxError> = [];
+
+  const parserSyntaxErrors: Array<SyntaxError> = [];
   let ast: SyntaxNode | null = null;
   try {
     ast = module();
@@ -70,21 +75,26 @@ export function parse(input: string, path: string): ParserResponse {
     }
   }
   if (ast === null) {
-    if (syntaxErrors.length === 0) {
+    if (parserSyntaxErrors.length === 0) {
       throw new Error(`Internal error: ast not set but no parsererrors set`);
     }
-    return new ParserResponse(null, syntaxErrors);
+    return { kind: "SYNTAX_ERROR", syntaxErrors: parserSyntaxErrors };
   }
+
   const resolver = new Resolver();
   const resolverErrors = resolver.resolve(ast);
   if (resolverErrors.length > 0) {
-    return new ParserResponse(null, resolverErrors);
+    return { kind: "SYNTAX_ERROR", syntaxErrors: resolverErrors };
   }
-  return new ParserResponse(ast, null);
+  return {
+    kind: "SUCCESS",
+    topSyntaxNode: ast,
+    closedVarsByFunctionNode: resolver.closedVarsByFunctionNode,
+  };
 
   function generateSyntaxError(token: Token, message: string) {
     const parseError = new SyntaxError("Parser: " + message, token.path, token.charPos);
-    syntaxErrors.push(parseError);
+    parserSyntaxErrors.push(parseError);
     return parseError;
   }
 
@@ -302,21 +312,21 @@ export function parse(input: string, path: string): ParserResponse {
   }
   function primary() {
     if (reader.match([TokenType.LITERAL_FALSE])) {
-      return new LiteralSyntaxNode(reader.previous(), false, InterpreterValueType.BOOLEAN);
+      return new LiteralSyntaxNode(reader.previous(), false, ValueType.BOOLEAN);
     }
     if (reader.match([TokenType.LITERAL_TRUE])) {
-      return new LiteralSyntaxNode(reader.previous(), true, InterpreterValueType.BOOLEAN);
+      return new LiteralSyntaxNode(reader.previous(), true, ValueType.BOOLEAN);
     }
     if (reader.match([TokenType.LITERAL_NULL])) {
-      return new LiteralSyntaxNode(reader.previous(), null, InterpreterValueType.NULL); // ?
+      return new LiteralSyntaxNode(reader.previous(), null, ValueType.NULL); // ?
     }
     if (reader.match([TokenType.NUMBER])) {
-      return new LiteralSyntaxNode(reader.previous(), parseFloat(reader.previous().lexeme), InterpreterValueType.NUMBER);
+      return new LiteralSyntaxNode(reader.previous(), parseFloat(reader.previous().lexeme), ValueType.NUMBER);
     }
     if (reader.match([TokenType.STRING])) {
       let string = reader.previous().lexeme;
       string = unescapeString(string.substr(1, string.length - 2)); // strip quotes and then unescape newlines, tabs, etc
-      return new LiteralSyntaxNode(reader.previous(), string, InterpreterValueType.STRING);
+      return new LiteralSyntaxNode(reader.previous(), string, ValueType.STRING);
     }
     if (reader.match([TokenType.IDENTIFIER])) {
       return new VariableLookupSyntaxNode(reader.previous(), reader.previous()); // n.b. this might be an lvalue, which we will discover soon

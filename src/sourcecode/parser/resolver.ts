@@ -10,22 +10,25 @@ enum VariableStatusEnum {
 };
 
 class VariableStatus {
+  public isClosed = false;
   constructor(
+    public isDeclaredHere: boolean,
     public isBuiltInOrParameter: boolean,
     public isInitialized: boolean,
     public isReadOnly: boolean,
   ) { }
 }
 
-
-class ResolverScope {
+export class ResolverScope {
   private table: Record<string, VariableStatus> = {};
+  public closedVars: Array<string> = []; // only used if !!this.isFunction
   public constructor(
+    private isFunction: boolean,
     public parentScope: ResolverScope | null = null,
     preinitializedIdentifiers: Array<string>,
   ) {
     for (const identifier of preinitializedIdentifiers) {
-      const variableStatus = new VariableStatus(true, true, true);
+      const variableStatus = new VariableStatus(true, true, true, true);
       variableStatus.isBuiltInOrParameter = true;
       this.table[identifier] = variableStatus;
     }
@@ -35,20 +38,25 @@ class ResolverScope {
       return this.table[identifier];
     }
     if (this.parentScope !== null) {
-      return this.parentScope.getVariableStatusFromStack(identifier);
+      const variableStatus = this.parentScope.getVariableStatusFromStack(identifier);
+      if (this.isFunction) {
+        this.closedVars.push(identifier);
+      }
+      return variableStatus;
     }
     return null;
   }
   public declareVariable(identifier: string, isReadOnly: boolean): VariableStatus {
-    const variableStatus = new VariableStatus(false, false, isReadOnly);
+    const variableStatus = new VariableStatus(true, false, false, isReadOnly);
     this.table[identifier] = variableStatus;
     return variableStatus;
   }
   public assignVariable(identifier: string) {
     const existingVariableInStack = this.getVariableStatusFromStack(identifier);
     if (existingVariableInStack === null) { throw new Error("logic error in resolver"); }
-    if (existingVariableInStack.isBuiltInOrParameter) { throw new Error("logic error in resolver"); }
-    this.table[identifier] = new VariableStatus(false, true, existingVariableInStack.isReadOnly);
+    if (existingVariableInStack.isBuiltInOrParameter) { throw new Error("logic error in resolver") }
+    const isDeclaredHere = existingVariableInStack.isDeclaredHere && existingVariableInStack === this.table[identifier];
+    this.table[identifier] = new VariableStatus(isDeclaredHere, false, true, existingVariableInStack.isReadOnly);
   }
   public getInitializedVariables(): Set<string> {
     return new Set(Object.keys(this.table).filter(id => this.table[id].isInitialized));
@@ -57,12 +65,13 @@ class ResolverScope {
 
 export class Resolver implements SyntaxNodeVisitor<ResolverScope | null> {
   scope: ResolverScope;
+  closedVarsByFunctionNode: Map<SyntaxNode, Array<string>> = new Map(); // map from FunctionDeclarationSyntaxNode to list of closed identifiers
   resolverErrors: Array<SyntaxError> = [];
   constructor() {
-    this.scope = new ResolverScope(null, Object.keys(INTERPRETER_BUILTINS));
+    this.scope = new ResolverScope(false, null, Object.keys(INTERPRETER_BUILTINS));
   }
-  beginScope(preinitializedIdentifiers: Array<string>) {
-    this.scope = new ResolverScope(this.scope, preinitializedIdentifiers);
+  beginScope(isFunction: boolean, node: SyntaxNode, preinitializedIdentifiers: Array<string>) {
+    this.scope = new ResolverScope(isFunction, this.scope, preinitializedIdentifiers);
   }
   endScope(): ResolverScope {
     if (this.scope.parentScope === null) {
@@ -111,7 +120,7 @@ export class Resolver implements SyntaxNodeVisitor<ResolverScope | null> {
     return null;
   }
   visitStatementBlock(node: StatementBlockSyntaxNode): ResolverScope | null {
-    this.beginScope([]);
+    this.beginScope(false, node, []);
     // hoist declarations
     // for (const statement of node.statementList) {
     //   if (statement instanceof VariableAssignmentSyntaxNode && statement.modifier !== null) {
@@ -216,8 +225,11 @@ export class Resolver implements SyntaxNodeVisitor<ResolverScope | null> {
         this.generateResolverError(node, `Variable/parameter shadowing is not allowed`);
       }
     }
-    this.beginScope(node.parameterList.map((token) => token.lexeme));
+    this.beginScope(true, node, node.parameterList.map((token) => token.lexeme));
     this.resolveList(node.statementList);
+
+    this.closedVarsByFunctionNode.set(node, this.scope.closedVars);
+
     this.endScope();
     return null;
   }

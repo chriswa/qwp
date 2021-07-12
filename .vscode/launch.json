@@ -9,7 +9,7 @@
       "request": "launch",
       "name": "Launch Program",
       "preLaunchTask": "tsc: build - tsconfig.json",
-      "program": "${workspaceFolder}/bin/interpreter_tests.js",
+      "program": "${workspaceFolder}/bin/compiler_test.js",
       "outFiles": ["${workspaceFolder}/bin/**/*.js"]
     }
   ]

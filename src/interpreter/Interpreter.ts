@@ -1,9 +1,10 @@
 import { Token, TokenType } from "../sourcecode/parser/Token"
 import { SyntaxNodeVisitor, SyntaxNode, BinarySyntaxNode, UnarySyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode } from "../sourcecode/syntax/syntax"
+import { ValueType } from "../sourcecode/syntax/ValueType"
 import { INTERPRETER_BUILTINS } from "./builtins"
 import { InterpreterRuntimeError } from "./InterpreterRuntimeError"
 import { InterpreterScope } from "./InterpreterScope"
-import { InterpreterValue, BooleanInterpreterValue, NumberInterpreterValue, StringInterpreterValue, NullInterpreterValue, UserFunctionInterpreterValue, BuiltInFunctionInterpreterValue, InterpreterValueType } from "./InterpreterValue"
+import { InterpreterValue, BooleanInterpreterValue, NumberInterpreterValue, StringInterpreterValue, NullInterpreterValue, UserFunctionInterpreterValue, BuiltInFunctionInterpreterValue } from "./InterpreterValue"
 
 class Return {
   constructor(
@@ -41,14 +42,14 @@ export class Interpreter implements SyntaxNodeVisitor<InterpreterValue> {
   private evaluate(node: SyntaxNode): InterpreterValue {
     return node.accept(this);
   }
-  private assertTypeOfInterpreterValue(requiredInterpreterValueType: InterpreterValueType, op: Token, value: InterpreterValue) {
-    if (value.valueType !== requiredInterpreterValueType) {
-      throw new InterpreterRuntimeError(op, `operand must be of type ${InterpreterValueType[requiredInterpreterValueType]}`)
+  private assertTypeOfInterpreterValue(requiredValueType: ValueType, op: Token, value: InterpreterValue) {
+    if (value.valueType !== requiredValueType) {
+      throw new InterpreterRuntimeError(op, `operand must be of type ${ValueType[requiredValueType]}`)
     }
   }
-  private assertTypeOfInterpreterValues(requiredInterpreterValueType: InterpreterValueType, op: Token, left: InterpreterValue, right: InterpreterValue) {
-    if (left.valueType !== requiredInterpreterValueType || right.valueType !== requiredInterpreterValueType) {
-      throw new InterpreterRuntimeError(op, `operands must be of type ${InterpreterValueType[requiredInterpreterValueType]}`)
+  private assertTypeOfInterpreterValues(requiredValueType: ValueType, op: Token, left: InterpreterValue, right: InterpreterValue) {
+    if (left.valueType !== requiredValueType || right.valueType !== requiredValueType) {
+      throw new InterpreterRuntimeError(op, `operands must be of type ${ValueType[requiredValueType]}`)
     }
   }
   private isEqual(left: InterpreterValue, right: InterpreterValue): BooleanInterpreterValue {
@@ -56,16 +57,16 @@ export class Interpreter implements SyntaxNodeVisitor<InterpreterValue> {
       return BooleanInterpreterValue.FALSE;
     }
     switch (left.valueType) {
-      case InterpreterValueType.BOOLEAN:
+      case ValueType.BOOLEAN:
         return (((left as BooleanInterpreterValue).rawInterpreterValue === (right as BooleanInterpreterValue).rawInterpreterValue) ? BooleanInterpreterValue.TRUE : BooleanInterpreterValue.FALSE);
-      case InterpreterValueType.NUMBER:
+      case ValueType.NUMBER:
         return (((left as NumberInterpreterValue).rawInterpreterValue === (right as NumberInterpreterValue).rawInterpreterValue) ? BooleanInterpreterValue.TRUE : BooleanInterpreterValue.FALSE);
-      case InterpreterValueType.STRING:
+      case ValueType.STRING:
         return (((left as StringInterpreterValue).rawInterpreterValue === (right as StringInterpreterValue).rawInterpreterValue) ? BooleanInterpreterValue.TRUE : BooleanInterpreterValue.FALSE);
-      case InterpreterValueType.NULL:
+      case ValueType.NULL:
         return BooleanInterpreterValue.TRUE;
       default:
-        throw new Error(`unrecognized InterpreterValueType`);
+        throw new Error(`unrecognized ValueType`);
     }
   }
   visitBinary(node: BinarySyntaxNode): InterpreterValue {
@@ -83,25 +84,25 @@ export class Interpreter implements SyntaxNodeVisitor<InterpreterValue> {
           throw new InterpreterRuntimeError(node.op, "operands must either both be numbers or both be strings")
         }
       case TokenType.OP_MINUS:
-        this.assertTypeOfInterpreterValues(InterpreterValueType.NUMBER, node.op, left, right);
+        this.assertTypeOfInterpreterValues(ValueType.NUMBER, node.op, left, right);
         return new NumberInterpreterValue((left as NumberInterpreterValue).rawInterpreterValue - (right as NumberInterpreterValue).rawInterpreterValue);
       case TokenType.OP_MULT:
-        this.assertTypeOfInterpreterValues(InterpreterValueType.NUMBER, node.op, left, right);
+        this.assertTypeOfInterpreterValues(ValueType.NUMBER, node.op, left, right);
         return new NumberInterpreterValue((left as NumberInterpreterValue).rawInterpreterValue * (right as NumberInterpreterValue).rawInterpreterValue);
       case TokenType.OP_DIV:
-        this.assertTypeOfInterpreterValues(InterpreterValueType.NUMBER, node.op, left, right);
+        this.assertTypeOfInterpreterValues(ValueType.NUMBER, node.op, left, right);
         return new NumberInterpreterValue((left as NumberInterpreterValue).rawInterpreterValue * (right as NumberInterpreterValue).rawInterpreterValue);
       case TokenType.OP_LT:
-        this.assertTypeOfInterpreterValues(InterpreterValueType.NUMBER, node.op, left, right);
+        this.assertTypeOfInterpreterValues(ValueType.NUMBER, node.op, left, right);
         return ((left as NumberInterpreterValue).rawInterpreterValue < (right as NumberInterpreterValue).rawInterpreterValue ? BooleanInterpreterValue.TRUE : BooleanInterpreterValue.FALSE);
       case TokenType.OP_LTE:
-        this.assertTypeOfInterpreterValues(InterpreterValueType.NUMBER, node.op, left, right);
+        this.assertTypeOfInterpreterValues(ValueType.NUMBER, node.op, left, right);
         return ((left as NumberInterpreterValue).rawInterpreterValue <= (right as NumberInterpreterValue).rawInterpreterValue ? BooleanInterpreterValue.TRUE : BooleanInterpreterValue.FALSE);
       case TokenType.OP_GT:
-        this.assertTypeOfInterpreterValues(InterpreterValueType.NUMBER, node.op, left, right);
+        this.assertTypeOfInterpreterValues(ValueType.NUMBER, node.op, left, right);
         return ((left as NumberInterpreterValue).rawInterpreterValue > (right as NumberInterpreterValue).rawInterpreterValue ? BooleanInterpreterValue.TRUE : BooleanInterpreterValue.FALSE);
       case TokenType.OP_GTE:
-        this.assertTypeOfInterpreterValues(InterpreterValueType.NUMBER, node.op, left, right);
+        this.assertTypeOfInterpreterValues(ValueType.NUMBER, node.op, left, right);
         return ((left as NumberInterpreterValue).rawInterpreterValue >= (right as NumberInterpreterValue).rawInterpreterValue ? BooleanInterpreterValue.TRUE : BooleanInterpreterValue.FALSE);
       case TokenType.OP_EQ:
         return this.isEqual(left, right);
@@ -115,10 +116,10 @@ export class Interpreter implements SyntaxNodeVisitor<InterpreterValue> {
     const right = this.evaluate(node.right);
     switch (node.op.type) {
       case TokenType.OP_MINUS:
-        this.assertTypeOfInterpreterValue(InterpreterValueType.NUMBER, node.op, right);
+        this.assertTypeOfInterpreterValue(ValueType.NUMBER, node.op, right);
         return new NumberInterpreterValue(-((right as NumberInterpreterValue).rawInterpreterValue));
       case TokenType.OP_BANG:
-        this.assertTypeOfInterpreterValue(InterpreterValueType.BOOLEAN, node.op, right);
+        this.assertTypeOfInterpreterValue(ValueType.BOOLEAN, node.op, right);
         return (right as BooleanInterpreterValue).rawInterpreterValue ? BooleanInterpreterValue.FALSE : BooleanInterpreterValue.TRUE;
       default:
         throw new Error(`Interpreter attempted to interpret a unary expression with invalid op ${TokenType[node.op.type]}`);
@@ -166,14 +167,14 @@ export class Interpreter implements SyntaxNodeVisitor<InterpreterValue> {
   }
   visitLogicShortCircuit(node: LogicShortCircuitSyntaxNode): InterpreterValue {
     const left = this.evaluate(node.left);
-    this.assertTypeOfInterpreterValue(InterpreterValueType.BOOLEAN, node.op, left);
+    this.assertTypeOfInterpreterValue(ValueType.BOOLEAN, node.op, left);
     const isLeftTrue = (left as BooleanInterpreterValue).rawInterpreterValue;
     const isOpOr = node.op.type === TokenType.OP_OR;
     if (isOpOr && isLeftTrue || !isOpOr && !isLeftTrue) {
       return BooleanInterpreterValue.TRUE
     }
     const right = this.evaluate(node.right);
-    this.assertTypeOfInterpreterValue(InterpreterValueType.BOOLEAN, node.op, right);
+    this.assertTypeOfInterpreterValue(ValueType.BOOLEAN, node.op, right);
     return right;
   }
   visitVariableLookup(node: VariableLookupSyntaxNode): InterpreterValue {
@@ -200,14 +201,14 @@ export class Interpreter implements SyntaxNodeVisitor<InterpreterValue> {
     const functionInterpreterValue = this.evaluate(node.callee);
     
     let argumentCount = 0;
-    if (functionInterpreterValue.valueType === InterpreterValueType.USER_FUNCTION) {
+    if (functionInterpreterValue.valueType === ValueType.USER_FUNCTION) {
       argumentCount = (functionInterpreterValue as UserFunctionInterpreterValue).functionDefinition.parameterList.length;
     }
-    else if (functionInterpreterValue.valueType === InterpreterValueType.BUILTIN_FUNCTION) {
+    else if (functionInterpreterValue.valueType === ValueType.BUILTIN_FUNCTION) {
       argumentCount = (functionInterpreterValue as BuiltInFunctionInterpreterValue).argumentCount;
     }
     else {
-      throw new InterpreterRuntimeError(node.referenceToken, `Cannot call expression of type ${InterpreterValueType[functionInterpreterValue.valueType]} as a function`);
+      throw new InterpreterRuntimeError(node.referenceToken, `Cannot call expression of type ${ValueType[functionInterpreterValue.valueType]} as a function`);
     }
     
     if (argumentCount !== node.argumentList.length) {
@@ -222,7 +223,7 @@ export class Interpreter implements SyntaxNodeVisitor<InterpreterValue> {
 
     let retval = NullInterpreterValue.INSTANCE;
 
-    if (functionInterpreterValue.valueType === InterpreterValueType.USER_FUNCTION) {
+    if (functionInterpreterValue.valueType === ValueType.USER_FUNCTION) {
       const functionDefinition = (functionInterpreterValue as UserFunctionInterpreterValue).functionDefinition;
       const argumentIdentifiers = functionDefinition.parameterList;
       const interim = argumentIdentifiers.map((_, i) => [argumentIdentifiers[i].lexeme, argumentInterpreterValueList[i]]);
