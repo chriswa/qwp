@@ -1,12 +1,13 @@
 import assert from "assert"
 
 export class ByteBuffer {
-  private _buffer: ArrayBuffer = new ArrayBuffer(256);
-  private dataView: DataView = new DataView(this._buffer);
+  private _buffer: ArrayBuffer;
+  private dataView: DataView;
   private _byteCursor: number = 0;
   public get byteCursor() { return this._byteCursor }
   public constructor(initialBuffer?: ArrayBuffer) {
-    this._buffer = initialBuffer ?? new ArrayBuffer(256)
+    this._buffer = initialBuffer ?? new ArrayBuffer(256);
+    this.dataView = new DataView(this._buffer);
     this.updateViews()
   }
   private updateViews() {
@@ -46,76 +47,133 @@ export class ByteBuffer {
     this._byteCursor += buffer.byteLength;
   }
 
-  public writeUInt8(value: number) {
+  public pushUint8(value: number) {
     assert.ok(Number.isInteger(value) && value >= 0 && value <= 0xff);
     this.extendIfNecessary(1);
     this.dataView.setUint8(this._byteCursor, value);
     this._byteCursor += 1;
   }
-  public writeUInt16(value: number) {
+  public pushUint16(value: number) {
     assert.ok(Number.isInteger(value) && value >= 0 && value <= 0xffff);
     this.extendIfNecessary(2);
     this.dataView.setUint16(this._byteCursor, value);
     this._byteCursor += 2;
   }
-  public writeUInt32(value: number) {
+  public pushUint32(value: number) {
     assert.ok(Number.isInteger(value) && value >= 0 && value <= 0xffffffff);
     this.extendIfNecessary(4);
     this.dataView.setUint32(this._byteCursor, value);
     this._byteCursor += 4;
   }
-  public writeInt8(value: number) {
+  public pushInt8(value: number) {
     assert.ok(Number.isInteger(value) && value >= -(2 ** 7) && value <= (2 ** 7) - 1);
     this.extendIfNecessary(1);
     this.dataView.setInt8(this._byteCursor, value);
     this._byteCursor += 1;
   }
-  public writeInt16(value: number) {
+  public pushInt16(value: number) {
     assert.ok(Number.isInteger(value) && value >= -(2 ** 15) && value <= (2 ** 15) - 1);
     this.extendIfNecessary(2);
     this.dataView.setInt16(this._byteCursor, value);
     this._byteCursor += 2;
   }
-  public writeInt32(value: number) {
+  public pushInt32(value: number) {
     assert.ok(Number.isInteger(value) && value >= -(2 ** 31) && value <= (2 ** 31) - 1);
     this.extendIfNecessary(4);
     this.dataView.setInt32(this._byteCursor, value);
     this._byteCursor += 4;
   }
-  public writeFloat32(value: number) {
+  public pushFloat32(value: number) {
     this.extendIfNecessary(4);
     this.dataView.setFloat32(this._byteCursor, value);
     this._byteCursor += 4;
   }
-  public writeFloat64(value: number) {
+  public pushFloat64(value: number) {
     this.extendIfNecessary(8);
     this.dataView.setFloat64(this._byteCursor, value);
     this._byteCursor += 8;
   }
+  public pushBool32(value: boolean) {
+    this.extendIfNecessary(4);
+    this.dataView.setFloat32(this._byteCursor, value ? 1 : 0);
+    this._byteCursor += 4;
+  }
+
+  public popUint8() {
+    const value = this.dataView.getUint8(this._byteCursor);
+    this._byteCursor += 1;
+    return value;
+  }
+  public popUint16() {
+    const value = this.dataView.getUint16(this._byteCursor);
+    this._byteCursor += 2;
+    return value;
+  }
+  public popUint32() {
+    const value = this.dataView.getUint32(this._byteCursor);
+    this._byteCursor += 4;
+    return value;
+  }
+  public popInt8() {
+    const value = this.dataView.getInt8(this._byteCursor);
+    this._byteCursor += 1;
+    return value;
+  }
+  public popInt16() {
+    const value = this.dataView.getInt16(this._byteCursor);
+    this._byteCursor += 2;
+    return value;
+  }
+  public popInt32() {
+    const value = this.dataView.getInt32(this._byteCursor);
+    this._byteCursor += 4;
+    return value;
+  }
+  public popFloat32() {
+    const value = this.dataView.getFloat32(this._byteCursor);
+    this._byteCursor += 4;
+    return value;
+  }
+  public popFloat64() {
+    const value = this.dataView.getFloat64(this._byteCursor);
+    this._byteCursor += 8;
+    return value;
+  }
+  public popBool32() {
+    const value = this.dataView.getFloat32(this._byteCursor);
+    this._byteCursor += 4;
+    if (value !== 0 && value !== 1) { throw new Error(`assertion failed: tried to popBool32 on value which is not 1.0 or 0.0`) }
+    return value === 1;
+  }
 
   public peekUint8(): number {
-    return this.dataView.getUint8(this._byteCursor);
+    return this.dataView.getUint8(this._byteCursor - 1);
   }
   public peekUint16(): number {
-    return this.dataView.getUint16(this._byteCursor);
+    return this.dataView.getUint16(this._byteCursor - 2);
   }
   public peekUint32(): number {
-    return this.dataView.getUint32(this._byteCursor);
+    return this.dataView.getUint32(this._byteCursor - 4);
   }
   public peekInt8(): number {
-    return this.dataView.getInt8(this._byteCursor);
+    return this.dataView.getInt8(this._byteCursor - 1);
   }
   public peekInt16(): number {
-    return this.dataView.getInt16(this._byteCursor);
+    return this.dataView.getInt16(this._byteCursor - 2);
   }
   public peekInt32(): number {
-    return this.dataView.getInt32(this._byteCursor);
+    return this.dataView.getInt32(this._byteCursor - 4);
   }
   public peekFloat32(): number {
-    return this.dataView.getFloat32(this._byteCursor);
+    return this.dataView.getFloat32(this._byteCursor - 4);
   }
   public peekFloat64(): number {
-    return this.dataView.getFloat64(this._byteCursor);
+    return this.dataView.getFloat64(this._byteCursor - 8);
+  }
+  public peekBool32(): boolean {
+    const value = this.dataView.getFloat32(this._byteCursor - 4);
+    if (value !== 0 && value !== 1) { throw new Error(`assertion failed: tried to popBool32 on value which is not 1.0 or 0.0`) }
+    return value === 1;
   }
 
   public readUint8(): number {
@@ -182,6 +240,31 @@ export class ByteBuffer {
   }
   public peekFloat64At(bytePos: number): number {
     return this.dataView.getFloat64(bytePos);
+  }
+
+  public pokeUint8At(bytePos: number, value: number) {
+    this.dataView.setUint8(bytePos, value);
+  }
+  public pokeUint16At(bytePos: number, value: number) {
+    this.dataView.setUint16(bytePos, value);
+  }
+  public pokeUint32At(bytePos: number, value: number) {
+    this.dataView.setUint32(bytePos, value);
+  }
+  public pokeInt8At(bytePos: number, value: number) {
+    this.dataView.setInt8(bytePos, value);
+  }
+  public pokeInt16At(bytePos: number, value: number) {
+    this.dataView.setInt16(bytePos, value);
+  }
+  public pokeInt32At(bytePos: number, value: number) {
+    this.dataView.setInt32(bytePos, value);
+  }
+  public pokeFloat32At(bytePos: number, value: number) {
+    this.dataView.setFloat32(bytePos, value);
+  }
+  public pokeFloat64At(bytePos: number, value: number) {
+    this.dataView.setFloat64(bytePos, value);
   }
 
 }

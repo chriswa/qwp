@@ -11,21 +11,22 @@ export enum OpCode {
   GTE,
   EQ,
   NEQ,
-  LOGICAL_OR,
-  LOGICAL_AND,
+  DEREF,
   PUSH_CONSTANT,
   JUMP_FORWARD_IF_POP_FALSE,
   JUMP_FORWARD,
   JUMP_BACKWARD,
-  JUMP_BOOLEAN_OR,  // if false, pop, else jump without popping
-  JUMP_BOOLEAN_AND, // if true, pop, else jump without popping
+  JUMP_BOOLEAN_OR,  // if peek false, pop, else jump without popping
+  JUMP_BOOLEAN_AND, // if peek true, pop, else jump without popping
   ASSIGN_CALLFRAME_VALUE,
-  PUSH_CALLFRAME_VALUE,
+  FETCH_CALLFRAME_VALUE,
+  ASSIGN_CALLFRAME_CLOSED_VAR,
+  FETCH_CALLFRAME_CLOSED_VAR,
   PUSH_CLOSURE,
   POP,
   CLOSE_VAR,
   CALL,
   RETURN,
-  PUSH_EXTERNAL,
-  CODESTOP, // used by decompiler!
+  PUSH_BUILTIN,
+  CODESTOP, // only used by decompiler!
 };

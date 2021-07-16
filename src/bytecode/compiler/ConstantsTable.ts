@@ -10,7 +10,7 @@ export class ConstantsTable {
     }
     const index = this.buffer.byteCursor / 4 | 0;
     this.index.set(uint32Value, index);
-    this.buffer.writeUInt32(uint32Value);
+    this.buffer.writeUint32(uint32Value);
     return index;
   }
   private scratchUint32 = new Uint32Array(1);
@@ -23,7 +23,7 @@ export class ConstantsTable {
     const index = this.buffer.byteCursor / 4 | 0;
     this.buffer.writeBuffer(buffer);
     while (this.buffer.byteCursor % 4 !== 0) {
-      this.buffer.writeUInt8(0); // pad to 32 bits!
+      this.buffer.writeUint8(0); // pad to 32 bits!
     }
     return index;
   }

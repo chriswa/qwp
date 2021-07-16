@@ -1,5 +1,6 @@
-import { OpCode } from "../opcodes"
-import { ByteBuffer } from "./ByteBuffer"
+import { builtinsById } from "../builtins/builtins"
+import { OpCode } from "./opcodes"
+import { ByteBuffer } from "./compiler/ByteBuffer"
 
 export function dumpDecompile(buffer: ByteBuffer) {
   buffer.setByteCursor(0);
@@ -32,8 +33,7 @@ export function dumpDecompile(buffer: ByteBuffer) {
         case OpCode.GTE:
         case OpCode.EQ:
         case OpCode.NEQ:
-        case OpCode.LOGICAL_OR:
-        case OpCode.LOGICAL_AND:
+        case OpCode.DEREF:
           break;
         case OpCode.PUSH_CONSTANT:
           const constantIndex = buffer.readUint32();
@@ -51,7 +51,9 @@ export function dumpDecompile(buffer: ByteBuffer) {
           line += ` ${buffer.readUint16()}`;
           break;
         case OpCode.ASSIGN_CALLFRAME_VALUE:
-        case OpCode.PUSH_CALLFRAME_VALUE:
+        case OpCode.FETCH_CALLFRAME_VALUE:
+        case OpCode.ASSIGN_CALLFRAME_CLOSED_VAR:
+        case OpCode.FETCH_CALLFRAME_CLOSED_VAR:
           line += ` call_frame[ ${buffer.readUint8()} ]`;
           break;
         case OpCode.PUSH_CLOSURE:
@@ -73,8 +75,10 @@ export function dumpDecompile(buffer: ByteBuffer) {
           break;
         case OpCode.RETURN:
           break;
-        case OpCode.PUSH_EXTERNAL:
-          line += ` ${buffer.readUint16().toString(16).padStart(4, "0")}`;
+        case OpCode.PUSH_BUILTIN:
+          const builtInId = buffer.readUint16();
+          const builtin = builtinsById.get(builtInId)!;
+          line += ` ${builtInId.toString(16).padStart(4, "0")} "${builtin.name}" consumes ${builtin.arity} args`;
           break;
         case OpCode.CODESTOP:
           return;

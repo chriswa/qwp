@@ -5,39 +5,56 @@ import { ByteBuffer } from "./ByteBuffer"
 import { OpCode } from "../opcodes"
 import { ValueType } from "../../sourcecode/syntax/ValueType"
 import { ConstantsTable } from "./ConstantsTable"
+import { builtinsByName } from "../../builtins/builtins"
 
 export function compile(ast: SyntaxNode, closedVarsByFunctionNode: Map<SyntaxNode, Array<string>>) {
-  return new Compiler(null, [], closedVarsByFunctionNode, new ConstantsTable()).compileModule(ast);
+  const context = new CompilerContext(closedVarsByFunctionNode, new ConstantsTable());
+  return new Compiler(null, context).compileModule(ast);
 }
 
-const EXTERNALS: Record<string, number> = {
-  println: 0xfeed,
+class CompilerContext {
+  public constructor(
+    public closedVarsByFunctionNode: Map<SyntaxNode, Array<string>>,
+    public constantsTable: ConstantsTable,
+  ) { }
 }
 
 class Compiler implements SyntaxNodeVisitor<void> {
   private functionScope: CompilerFunctionScope;
   private instructionBuffer: ByteBuffer = new ByteBuffer();
+  private closedVars: Set<string> = new Set();
   constructor(
     parentCompiler: Compiler | null,
-    closedVars: Array<string>,
-    private closedVarsByFunctionNode: Map<SyntaxNode, Array<string>>,
-    private constantsTable: ConstantsTable,
+    private context: CompilerContext,
   ) {
-    this.functionScope = new CompilerFunctionScope(parentCompiler?.functionScope ?? null, closedVars);
+    this.functionScope = new CompilerFunctionScope(parentCompiler?.functionScope ?? null);
   }
+  private get closedVarsByFunctionNode() { return this.context.closedVarsByFunctionNode }
+  private get constantsTable() { return this.context.constantsTable }
+
+  public declareParametersAndClosedVars(parameterIdentifiers: Array<string>, closedVarIdentifiers: Array<string>) {
+    parameterIdentifiers.forEach((identifier) => {
+      this.functionScope.currentBlockScope.declare(identifier);
+    });
+    closedVarIdentifiers.forEach((identifier) => {
+      this.functionScope.currentBlockScope.declare(identifier);
+      this.closedVars.add(identifier);
+    });
+  }
+
   public compileModule(ast: SyntaxNode) {
     const startJumpPos = 0;
-    this.constantsTable.buffer.writeUInt32(0);
+    this.constantsTable.buffer.pushUint32(0);
 
     // this.functionScope.currentBlockScope.declare
 
     this.compileNode(ast);
-    this.instructionBuffer.writeUInt8(OpCode.CODESTOP);
+    this.instructionBuffer.pushUint8(OpCode.CODESTOP);
     this.instructionBuffer.compact();
 
     const constantIndex = this.constantsTable.putBuffer(this.instructionBuffer.buffer);
     this.constantsTable.buffer.backpatch(startJumpPos, () => {
-      this.constantsTable.buffer.writeUInt32(constantIndex);
+      this.constantsTable.buffer.pushUint32(constantIndex);
     });
 
     this.constantsTable.buffer.compact();
@@ -74,7 +91,7 @@ class Compiler implements SyntaxNodeVisitor<void> {
     }
     this.compileNode(node.left);
     this.compileNode(node.right);
-    this.instructionBuffer.writeUInt8(opCode);
+    this.instructionBuffer.pushUint8(opCode);
   }
   private static readonly _unaryTokenTypeToOpCodeMap: Map<TokenType, OpCode> = new Map([
     [TokenType.OP_MINUS, OpCode.NEGATE],
@@ -86,7 +103,7 @@ class Compiler implements SyntaxNodeVisitor<void> {
       throw new Error(`impossible: unrecognized unary op token ${TokenType[node.op.type]}`);
     }
     this.compileNode(node.right);
-    this.instructionBuffer.writeUInt8(opCode);
+    this.instructionBuffer.pushUint8(opCode);
   }
   visitLiteral(node: LiteralSyntaxNode): void {
     let constantIndex = 0;
@@ -107,8 +124,8 @@ class Compiler implements SyntaxNodeVisitor<void> {
       throw new Error(`constantIndex too big to fit in opcode argument uint32! too many constants!`);
     }
 
-    this.instructionBuffer.writeUInt8(OpCode.PUSH_CONSTANT);
-    this.instructionBuffer.writeUInt32(constantIndex);
+    this.instructionBuffer.pushUint8(OpCode.PUSH_CONSTANT);
+    this.instructionBuffer.pushUint32(constantIndex);
   }
   visitGrouping(node: GroupingSyntaxNode): void {
     this.compileNode(node.expr);
@@ -118,21 +135,21 @@ class Compiler implements SyntaxNodeVisitor<void> {
     const dist = Math.abs(dest - (pos + 2)); // +2 to account for having read the uint16 dist
     if (dist > 2 ** 16 -1) { throw new Error("jump dist max size is 2 ** 16 - 1 bytes"); }
     this.instructionBuffer.backpatch(pos, () => {
-      this.instructionBuffer.writeUInt16(dist);
+      this.instructionBuffer.pushUint16(dist);
     });
   }
   visitIfStatement(node: IfStatementSyntaxNode): void {
     const IB = this.instructionBuffer;
     this.compileNode(node.cond);
-    IB.writeUInt8(OpCode.JUMP_FORWARD_IF_POP_FALSE);
+    IB.pushUint8(OpCode.JUMP_FORWARD_IF_POP_FALSE);
     const ifJumpPos = IB.byteCursor;
-    IB.writeUInt16(0);
+    IB.pushUint16(0);
     this.compileNode(node.thenBranch);
     let thenJumpPos = 0;
     if (node.elseBranch !== null) {
-      IB.writeUInt8(OpCode.JUMP_FORWARD)
+      IB.pushUint8(OpCode.JUMP_FORWARD)
       thenJumpPos = IB.byteCursor;
-      IB.writeUInt16(0);
+      IB.pushUint16(0);
     }
     this.backpatchRelativeJumpToHere(ifJumpPos);
     if (node.elseBranch !== null) {
@@ -144,28 +161,28 @@ class Compiler implements SyntaxNodeVisitor<void> {
     const IB = this.instructionBuffer;
     const whileStartPos = IB.byteCursor;
     this.compileNode(node.cond);
-    IB.writeUInt8(OpCode.JUMP_FORWARD_IF_POP_FALSE);
+    IB.pushUint8(OpCode.JUMP_FORWARD_IF_POP_FALSE);
     const skipLoopJumpPos = IB.byteCursor;
-    IB.writeUInt16(0);
+    IB.pushUint16(0);
     this.compileNode(node.loopBody);
-    IB.writeUInt8(OpCode.JUMP_BACKWARD);
-    IB.writeUInt16(whileStartPos);
+    IB.pushUint8(OpCode.JUMP_BACKWARD);
+    IB.pushUint16(whileStartPos);
     this.backpatchRelativeJumpToHere(skipLoopJumpPos);
   }
   visitLogicShortCircuit(node: LogicShortCircuitSyntaxNode): void {
     this.compileNode(node.left);
     const isOpOr = node.op.type === TokenType.OP_OR;
     const IB = this.instructionBuffer;
-    IB.writeUInt8(isOpOr ? OpCode.JUMP_BOOLEAN_OR : OpCode.JUMP_BOOLEAN_AND);
+    IB.pushUint8(isOpOr ? OpCode.JUMP_BOOLEAN_OR : OpCode.JUMP_BOOLEAN_AND);
     const skipRightJumpPos = IB.byteCursor;
-    IB.writeUInt16(0);
+    IB.pushUint16(0);
     this.compileNode(node.right);
     this.backpatchRelativeJumpToHere(skipRightJumpPos);
   }
 
   private popLocals() {
     this.functionScope.currentBlockScope.forEachLocalInReverse((isRequiredByClosure) => {
-      this.instructionBuffer.writeUInt8(isRequiredByClosure ? OpCode.CLOSE_VAR : OpCode.POP);
+      this.instructionBuffer.pushUint8(isRequiredByClosure ? OpCode.CLOSE_VAR : OpCode.POP);
     });
   }
   visitStatementBlock(node: StatementBlockSyntaxNode): void {
@@ -175,48 +192,47 @@ class Compiler implements SyntaxNodeVisitor<void> {
     this.functionScope.popBlockScope();
   }
   visitVariableAssignment(node: VariableAssignmentSyntaxNode): void {
-    const callFrameOffset = this.functionScope.declareOrAssign(node.identifier.lexeme, node.modifier !== null);
+    const identifier = node.identifier.lexeme;
+    const callFrameOffset = this.functionScope.declareOrAssign(identifier, node.modifier !== null);
     if (node.rvalue !== null) {
       this.compileNode(node.rvalue);
       // if declaring, the value is already where it needs to be on the stack! if not declaring, we'll need to copy the top stack value to the variable
       if (node.modifier === null) {
-        this.instructionBuffer.writeUInt8(OpCode.ASSIGN_CALLFRAME_VALUE); 
-        this.instructionBuffer.writeUInt8(callFrameOffset);
+        const isClosedVar = this.closedVars.has(identifier);
+        this.instructionBuffer.pushUint8(isClosedVar ? OpCode.ASSIGN_CALLFRAME_CLOSED_VAR : OpCode.ASSIGN_CALLFRAME_VALUE); 
+        this.instructionBuffer.pushUint8(callFrameOffset);
       }
     }
   }
   visitVariableLookup(node: VariableLookupSyntaxNode): void {
     const identifier = node.identifier.lexeme;
-    if (identifier in EXTERNALS) {
-      this.instructionBuffer.writeUInt8(OpCode.PUSH_EXTERNAL);
-      this.instructionBuffer.writeUInt16(EXTERNALS[identifier]);
+    const builtin = builtinsByName.get(identifier);
+    if (builtin !== undefined) {
+      this.instructionBuffer.pushUint8(OpCode.PUSH_BUILTIN);
+      this.instructionBuffer.pushUint16(builtin.id);
       return;
     }
+    const isClosedVar = this.closedVars.has(identifier);
     const callFrameOffset = this.functionScope.lookup(identifier);
-    this.instructionBuffer.writeUInt8(OpCode.PUSH_CALLFRAME_VALUE);
-    this.instructionBuffer.writeUInt8(callFrameOffset);
+    this.instructionBuffer.pushUint8(isClosedVar ? OpCode.FETCH_CALLFRAME_CLOSED_VAR : OpCode.FETCH_CALLFRAME_VALUE);
+    this.instructionBuffer.pushUint8(callFrameOffset);
   }
   visitFunctionDefinition(node: FunctionDefinitionSyntaxNode): void {
     const closedVars = this.closedVarsByFunctionNode.get(node) ?? [];
-    const fnCompiler = new Compiler(this, closedVars, this.closedVarsByFunctionNode, this.constantsTable);
-    node.parameterList.forEach((token) => {
-      fnCompiler.functionScope.currentBlockScope.declare(token.lexeme);
-    });
-    closedVars.forEach((closedVar) => {
-      fnCompiler.functionScope.currentBlockScope.declare(closedVar);
-    });
+    const fnCompiler = new Compiler(this, this.context);
+    fnCompiler.declareParametersAndClosedVars(node.parameterList.map(token => token.lexeme), closedVars);
     fnCompiler.compileNodeList(node.statementList);
     fnCompiler.popLocals();
-    fnCompiler.instructionBuffer.writeUInt8(OpCode.CODESTOP);
+    fnCompiler.instructionBuffer.pushUint8(OpCode.CODESTOP);
     fnCompiler.instructionBuffer.compact();
     const constantIndex = this.constantsTable.putBuffer(fnCompiler.instructionBuffer.buffer); // safe because all jumps are relative and all references to constants table have already been added
-    this.instructionBuffer.writeUInt8(OpCode.PUSH_CLOSURE);
-    this.instructionBuffer.writeUInt32(constantIndex);
-    this.instructionBuffer.writeUInt8(closedVars.length);
+    this.instructionBuffer.pushUint8(OpCode.PUSH_CLOSURE);
+    this.instructionBuffer.pushUint32(constantIndex);
+    this.instructionBuffer.pushUint8(closedVars.length);
     closedVars.forEach((closedVar) => {
       const callFrameOffset = this.functionScope.currentBlockScope.findIdentifierInStack(closedVar);
       if (callFrameOffset === null) { throw new Error(`closedVar not found!?`) }
-      this.instructionBuffer.writeUInt8(callFrameOffset);
+      this.instructionBuffer.pushUint8(callFrameOffset);
       this.functionScope.currentBlockScope.markVariableAsRequiredByClosure(closedVar);
     });
   }
@@ -225,13 +241,13 @@ class Compiler implements SyntaxNodeVisitor<void> {
       this.compileNode(argument);
     });
     this.compileNode(node.callee);
-    this.instructionBuffer.writeUInt8(OpCode.CALL); // responsible for pushing closed vars onto stack
+    this.instructionBuffer.pushUint8(OpCode.CALL); // responsible for pushing closed vars onto stack
   }
   visitReturnStatement(node: ReturnStatementSyntaxNode): void {
     if (node.retvalExpr !== null) {
       this.compileNode(node.retvalExpr);
     }
-    this.instructionBuffer.writeUInt8(OpCode.RETURN);
+    this.instructionBuffer.pushUint8(OpCode.RETURN);
   }
 }
 
@@ -245,7 +261,7 @@ class ClosedVar {
 class CompilerFunctionScope {
   public constructor(
     private parentFunctionScope: CompilerFunctionScope | null,
-    private closedVars: Array<string>,
+    // private closedVars: Array<string>,
   ) {
   }
   // private closedVars: Map<string, ClosedVar> = new Map();

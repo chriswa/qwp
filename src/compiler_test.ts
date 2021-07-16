@@ -1,7 +1,7 @@
 import chalk from "chalk"
 import fs from "fs";
 import { compile } from "./bytecode/compiler/compiler"
-import { dumpDecompile } from "./bytecode/compiler/decompiler"
+import { dumpDecompile } from "./bytecode/decompiler"
 import { printPositionInSource } from "./cliUtil"
 import { Interpreter } from "./interpreter/Interpreter"
 import { parse } from "./sourcecode/parser/parser"
