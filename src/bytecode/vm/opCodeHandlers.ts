@@ -66,8 +66,9 @@ opCodeHandlers[OpCode.PUSH_CONSTANT] = (vm: VM) => {
   vm.currentCallFrame.stackBuffer.pushFloat32(value);
 };
 
-opCodeHandlers[OpCode.POP] = (vm: VM) => {
-  vm.currentCallFrame.stackBuffer.popFloat32();
+opCodeHandlers[OpCode.POP_N] = (vm: VM) => {
+  const entries = vm.constantBuffer.readUint8();
+  vm.currentCallFrame.stackBuffer.discardStackBytes(4 * entries);
 };
 
 opCodeHandlers[OpCode.JUMP_FORWARD_IF_POP_FALSE] = (vm: VM) => {
@@ -118,28 +119,34 @@ opCodeHandlers[OpCode.FETCH_CALLFRAME_VALUE] = (vm: VM) => {
   vm.currentCallFrame.stackBuffer.pushFloat32(vm.currentCallFrame.stackBuffer.peekFloat32At(4 * callFrameOffsetIndex));
 };
 
-opCodeHandlers[OpCode.ASSIGN_CALLFRAME_CLOSED_VAR] = (vm: VM) => {
-  const callFrameOffsetIndex = vm.constantBuffer.readUint8();
-  const upvalueConstantIndex = vm.currentCallFrame.stackBuffer.peekUint32At(4 * callFrameOffsetIndex);
-  const variableConstantIndex = vm.ramBuffer.peekUint32At(4 * upvalueConstantIndex);
-  vm.ramBuffer.pokeFloat32At(variableConstantIndex, vm.currentCallFrame.stackBuffer.popFloat32());
+// opCodeHandlers[OpCode.ASSIGN_CALLFRAME_CLOSED_VAR] = (vm: VM) => {
+//   const callFrameOffsetIndex = vm.constantBuffer.readUint8();
+//   const upvalueConstantIndex = vm.currentCallFrame.stackBuffer.peekUint32At(4 * callFrameOffsetIndex);
+//   const variableConstantIndex = vm.ramBuffer.peekUint32At(4 * upvalueConstantIndex);
+//   vm.ramBuffer.pokeFloat32At(variableConstantIndex, vm.currentCallFrame.stackBuffer.popFloat32());
+// };
+// 
+// opCodeHandlers[OpCode.FETCH_CALLFRAME_CLOSED_VAR] = (vm: VM) => {
+//   const callFrameOffsetIndex = vm.constantBuffer.readUint8();
+//   const upvalueConstantIndex = vm.currentCallFrame.stackBuffer.peekUint32At(4 * callFrameOffsetIndex);
+//   const variableConstantIndex = vm.ramBuffer.peekUint32At(4 * upvalueConstantIndex);
+//   vm.currentCallFrame.stackBuffer.pushFloat32(vm.ramBuffer.peekFloat32At(4 * variableConstantIndex));
+// };
+// 
+// opCodeHandlers[OpCode.CLOSE_VAR] = (vm: VM) => {
+//   const valueToMove = vm.currentCallFrame.stackBuffer.popFloat32();
+//   const upvalueConstantIndex = throw new Error(`TODO: get the constantIndex of the upvalue which was allocated by DEFINE_FUNCTION`);
+//   vm.ramBuffer.pokeUint32At(4 * upvalueConstantIndex, upvalueConstantIndex + 1); // update the upvalue's ptr (at upvalue[0]) to point to the upvalue's storage upvalue[1]
+//   vm.ramBuffer.pokeFloat32At(4 * (upvalueConstantIndex + 1), valueToMove) // copy the stack value to the upvalue's storage
+// };
+
+opCodeHandlers[OpCode.ASSIGN_PTR] = (vm: VM) => {
+  const ptr = vm.currentCallFrame.stackBuffer.popUint32();
+  const value = vm.currentCallFrame.stackBuffer.peekFloat32();
+  vm.ramBuffer.pokeFloat32At(4 * ptr, value);
 };
 
-opCodeHandlers[OpCode.FETCH_CALLFRAME_CLOSED_VAR] = (vm: VM) => {
-  const callFrameOffsetIndex = vm.constantBuffer.readUint8();
-  const upvalueConstantIndex = vm.currentCallFrame.stackBuffer.peekUint32At(4 * callFrameOffsetIndex);
-  const variableConstantIndex = vm.ramBuffer.peekUint32At(4 * upvalueConstantIndex);
-  vm.currentCallFrame.stackBuffer.pushFloat32(vm.ramBuffer.peekFloat32At(4 * variableConstantIndex));
-};
-
-opCodeHandlers[OpCode.CLOSE_VAR] = (vm: VM) => {
-  const valueToMove = vm.currentCallFrame.stackBuffer.popFloat32();
-  const upvalueConstantIndex = throw new Error(`TODO: get the constantIndex of the upvalue which was allocated by PUSH_CLOSURE`);
-  vm.ramBuffer.pokeUint32At(4 * upvalueConstantIndex, upvalueConstantIndex + 1); // update the upvalue's ptr (at upvalue[0]) to point to the upvalue's storage upvalue[1]
-  vm.ramBuffer.pokeFloat32At(4 * (upvalueConstantIndex + 1), valueToMove) // copy the stack value to the upvalue's storage
-};
-
-opCodeHandlers[OpCode.PUSH_CLOSURE] = (vm: VM) => {
+opCodeHandlers[OpCode.DEFINE_FUNCTION] = (vm: VM) => {
   const functionConstantIndex = vm.constantBuffer.readUint32();
   const closedVarCount = vm.constantBuffer.readUint8();
   const closedVarCallFrameIndexes: Array<number> = [];

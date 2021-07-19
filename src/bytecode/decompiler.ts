@@ -34,14 +34,14 @@ export function dumpDecompile(buffer: ByteBuffer) {
         case OpCode.EQ:
         case OpCode.NEQ:
         case OpCode.DEREF:
+        case OpCode.ALLOC_SCALAR:
           break;
         case OpCode.PUSH_CONSTANT:
           const constantIndex = buffer.readUint32();
-          line += ` constant[ ${(constantIndex * 4).toString(16).padStart(4, "0")} ] (as float? ${buffer.peekFloat32At(constantIndex * 4)})`;
+          line += ` constant[ ${(constantIndex * 4).toString(16).padStart(4, "0")} ] => (float?) ${buffer.peekFloat32At(constantIndex * 4)}`;
           break;
-        case OpCode.POP:
-          break;
-        case OpCode.CLOSE_VAR:
+        case OpCode.POP_N:
+          line += ` count = ${buffer.readUint8()}`;
           break;
         case OpCode.JUMP_FORWARD_IF_POP_FALSE:
         case OpCode.JUMP_FORWARD:
@@ -52,37 +52,44 @@ export function dumpDecompile(buffer: ByteBuffer) {
           break;
         case OpCode.ASSIGN_CALLFRAME_VALUE:
         case OpCode.FETCH_CALLFRAME_VALUE:
-        case OpCode.ASSIGN_CALLFRAME_CLOSED_VAR:
-        case OpCode.FETCH_CALLFRAME_CLOSED_VAR:
+        // case OpCode.ASSIGN_CALLFRAME_CLOSED_VAR:
+        // case OpCode.FETCH_CALLFRAME_CLOSED_VAR:
           line += ` call_frame[ ${buffer.readUint8()} ]`;
           break;
-        case OpCode.PUSH_CLOSURE:
-          const functionConstantIndex = buffer.readUint32();
-          pendingDecompilation.push(functionConstantIndex);
-          const closedVarCount = buffer.readUint8();
-          line += ` at constant[ ${(functionConstantIndex * 4).toString(16).padStart(4, "0")} ]`;
+        case OpCode.ASSIGN_PTR:
+          line += ` (pops 2)`
+          break;
+        case OpCode.DEFINE_FUNCTION:
+          const functionConstantIndex = buffer.readUint32()
+          pendingDecompilation.push(functionConstantIndex)
+          const closedVarCount = buffer.readUint8()
+          line += ` at constant[ ${(functionConstantIndex * 4).toString(16).padStart(4, "0")} ]`
           if (closedVarCount > 0) {
-            line += ` capturing call_frame[`;
+            line += ` capturing call_frame[`
             for (let i = 0; i < closedVarCount; i += 1) {
               if (i > 0) {
                 line += `,`
               }
-              line += ` ${buffer.readUint8()}`;
+              line += ` ${buffer.readUint8()}`
             }
-            line += ` ]`;
+            line += ` ]`
           }
+          break;
         case OpCode.CALL:
+          const argCount = buffer.readUint8();
+          line += ` with ${argCount} args`;
           break;
         case OpCode.RETURN:
           break;
         case OpCode.PUSH_BUILTIN:
           const builtInId = buffer.readUint16();
           const builtin = builtinsById.get(builtInId)!;
-          line += ` ${builtInId.toString(16).padStart(4, "0")} "${builtin.name}" consumes ${builtin.arity} args`;
+          line += ` ${builtInId.toString(16).padStart(4, "0")} => ${builtin.name}/${builtin.arity}`;
           break;
         case OpCode.CODESTOP:
           return;
         default:
+          console.log(line);
           throw new Error(`unknown opcode ${opCode}`)
       }
       console.log(line);

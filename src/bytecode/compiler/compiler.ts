@@ -6,39 +6,41 @@ import { OpCode } from "../opcodes"
 import { ValueType } from "../../sourcecode/syntax/ValueType"
 import { ConstantsTable } from "./ConstantsTable"
 import { builtinsByName } from "../../builtins/builtins"
+import { ResolverOutput, ResolverVariableDetails } from "../../sourcecode/parser/resolver"
 
-export function compile(ast: SyntaxNode, closedVarsByFunctionNode: Map<SyntaxNode, Array<string>>) {
-  const context = new CompilerContext(closedVarsByFunctionNode, new ConstantsTable());
-  return new Compiler(null, context).compileModule(ast);
+export function compile(ast: SyntaxNode, resolverOutput: ResolverOutput) {
+  const context = new CompilerContext(new ConstantsTable(), resolverOutput);
+  return new Compiler(context, null, ast).compileModule(ast);
 }
 
 class CompilerContext {
   public constructor(
-    public closedVarsByFunctionNode: Map<SyntaxNode, Array<string>>,
     public constantsTable: ConstantsTable,
+    public resolverOutput: ResolverOutput,
   ) { }
 }
 
 class Compiler implements SyntaxNodeVisitor<void> {
   private functionScope: CompilerFunctionScope;
   private instructionBuffer: ByteBuffer = new ByteBuffer();
-  private closedVars: Set<string> = new Set();
   constructor(
-    parentCompiler: Compiler | null,
     private context: CompilerContext,
+    parentCompiler: Compiler | null,
+    private node: SyntaxNode,
   ) {
-    this.functionScope = new CompilerFunctionScope(parentCompiler?.functionScope ?? null);
+    this.functionScope = new CompilerFunctionScope(this.context, parentCompiler?.functionScope ?? null, this.node);
   }
-  private get closedVarsByFunctionNode() { return this.context.closedVarsByFunctionNode }
   private get constantsTable() { return this.context.constantsTable }
+  private get closedVarsByFunctionNode() { return this.context.resolverOutput.closedVarsByFunctionNode }
+  private get varDeclarationsByBlockOrFunctionNode() { return this.context.resolverOutput.varDeclarationsByBlockOrFunctionNode }
 
   public declareParametersAndClosedVars(parameterIdentifiers: Array<string>, closedVarIdentifiers: Array<string>) {
     parameterIdentifiers.forEach((identifier) => {
       this.functionScope.currentBlockScope.declare(identifier);
     });
     closedVarIdentifiers.forEach((identifier) => {
+      console.log(`declaring closed var ${identifier} for function's compiler`);
       this.functionScope.currentBlockScope.declare(identifier);
-      this.closedVars.add(identifier);
     });
   }
 
@@ -181,26 +183,37 @@ class Compiler implements SyntaxNodeVisitor<void> {
   }
 
   private popLocals() {
-    this.functionScope.currentBlockScope.forEachLocalInReverse((isRequiredByClosure) => {
-      this.instructionBuffer.pushUint8(isRequiredByClosure ? OpCode.CLOSE_VAR : OpCode.POP);
-    });
+    const localCount = this.functionScope.currentBlockScope.getLocalCount();
+    this.instructionBuffer.pushUint8(OpCode.POP_N);
+    this.instructionBuffer.pushUint8(localCount);
   }
   visitStatementBlock(node: StatementBlockSyntaxNode): void {
-    this.functionScope.pushBlockScope();
+    this.functionScope.pushBlockScope(node);
     this.compileNodeList(node.statementList);
     this.popLocals();
     this.functionScope.popBlockScope();
   }
   visitVariableAssignment(node: VariableAssignmentSyntaxNode): void {
     const identifier = node.identifier.lexeme;
-    const callFrameOffset = this.functionScope.declareOrAssign(identifier, node.modifier !== null);
+    const callFrameVarInfo = this.functionScope.declareOrAssign(identifier, node.modifier !== null);
     if (node.rvalue !== null) {
       this.compileNode(node.rvalue);
-      // if declaring, the value is already where it needs to be on the stack! if not declaring, we'll need to copy the top stack value to the variable
-      if (node.modifier === null) {
-        const isClosedVar = this.closedVars.has(identifier);
-        this.instructionBuffer.pushUint8(isClosedVar ? OpCode.ASSIGN_CALLFRAME_CLOSED_VAR : OpCode.ASSIGN_CALLFRAME_VALUE); 
-        this.instructionBuffer.pushUint8(callFrameOffset);
+      if (callFrameVarInfo.resolverVarDetails.isClosed) {
+        if (node.modifier !== null) {
+          // if declaring, we'll swap the top stack value with the location of the allocation
+          this.instructionBuffer.pushUint8(OpCode.ALLOC_SCALAR);
+        }
+        else {
+          this.instructionBuffer.pushUint8(OpCode.ASSIGN_PTR);
+          this.instructionBuffer.pushUint8(callFrameVarInfo.callFrameOffset);
+        }
+      }
+      else {
+        // if declaring, the value is already where it needs to be on the stack! if not declaring, we'll need to copy the top stack value to the variable
+        if (node.modifier === null) {
+          this.instructionBuffer.pushUint8(OpCode.ASSIGN_CALLFRAME_VALUE);
+          this.instructionBuffer.pushUint8(callFrameVarInfo.callFrameOffset);
+        }
       }
     }
   }
@@ -212,28 +225,30 @@ class Compiler implements SyntaxNodeVisitor<void> {
       this.instructionBuffer.pushUint16(builtin.id);
       return;
     }
-    const isClosedVar = this.closedVars.has(identifier);
-    const callFrameOffset = this.functionScope.lookup(identifier);
-    this.instructionBuffer.pushUint8(isClosedVar ? OpCode.FETCH_CALLFRAME_CLOSED_VAR : OpCode.FETCH_CALLFRAME_VALUE);
-    this.instructionBuffer.pushUint8(callFrameOffset);
+    const callFrameVarInfo = this.functionScope.lookup(identifier);
+    this.instructionBuffer.pushUint8(OpCode.FETCH_CALLFRAME_VALUE);
+    this.instructionBuffer.pushUint8(callFrameVarInfo.callFrameOffset);
+    if (callFrameVarInfo.resolverVarDetails.isClosed) {
+      this.instructionBuffer.pushUint8(OpCode.DEREF);
+    }
   }
   visitFunctionDefinition(node: FunctionDefinitionSyntaxNode): void {
     const closedVars = this.closedVarsByFunctionNode.get(node) ?? [];
-    const fnCompiler = new Compiler(this, this.context);
+    const fnCompiler = new Compiler(this.context, this, node);
     fnCompiler.declareParametersAndClosedVars(node.parameterList.map(token => token.lexeme), closedVars);
     fnCompiler.compileNodeList(node.statementList);
     fnCompiler.popLocals();
     fnCompiler.instructionBuffer.pushUint8(OpCode.CODESTOP);
     fnCompiler.instructionBuffer.compact();
     const constantIndex = this.constantsTable.putBuffer(fnCompiler.instructionBuffer.buffer); // safe because all jumps are relative and all references to constants table have already been added
-    this.instructionBuffer.pushUint8(OpCode.PUSH_CLOSURE);
+    this.instructionBuffer.pushUint8(OpCode.DEFINE_FUNCTION);
     this.instructionBuffer.pushUint32(constantIndex);
     this.instructionBuffer.pushUint8(closedVars.length);
     closedVars.forEach((closedVar) => {
-      const callFrameOffset = this.functionScope.currentBlockScope.findIdentifierInStack(closedVar);
-      if (callFrameOffset === null) { throw new Error(`closedVar not found!?`) }
-      this.instructionBuffer.pushUint8(callFrameOffset);
-      this.functionScope.currentBlockScope.markVariableAsRequiredByClosure(closedVar);
+      const callFrameVarInfo = this.functionScope.currentBlockScope.findIdentifierInStack(closedVar);
+      if (callFrameVarInfo === null) { throw new Error(`closedVar not found!?`) }
+      this.instructionBuffer.pushUint8(callFrameVarInfo.callFrameOffset);
+      // this.functionScope.currentBlockScope.markVariableAsRequiredByClosure(closedVar);
     });
   }
   visitFunctionCall(node: FunctionCallSyntaxNode): void {
@@ -242,6 +257,7 @@ class Compiler implements SyntaxNodeVisitor<void> {
     });
     this.compileNode(node.callee);
     this.instructionBuffer.pushUint8(OpCode.CALL); // responsible for pushing closed vars onto stack
+    this.instructionBuffer.pushUint8(node.argumentList.length);
   }
   visitReturnStatement(node: ReturnStatementSyntaxNode): void {
     if (node.retvalExpr !== null) {
@@ -251,26 +267,25 @@ class Compiler implements SyntaxNodeVisitor<void> {
   }
 }
 
-class ClosedVar {
+class CallFrameVarInfo {
   constructor(
-    public parentOffset: number,
-    public localOffset: number,
+    public callFrameOffset: number,
+    public resolverVarDetails: ResolverVariableDetails,
   ) { }
 }
 
 class CompilerFunctionScope {
+  private _currentBlockScope: CompilerBlockScope;
   public constructor(
+    private context: CompilerContext,
     private parentFunctionScope: CompilerFunctionScope | null,
-    // private closedVars: Array<string>,
+    private node: SyntaxNode,
   ) {
+    this._currentBlockScope = new CompilerBlockScope(this.context, null, 0, this.node);
   }
-  // private closedVars: Map<string, ClosedVar> = new Map();
-  // public get closedVarsCount() { return this.closedVars.size }
-  // public closedVarsForeach(callbackfn: (value: ClosedVar, key: string, map: Map<string, ClosedVar>) => void) { this.closedVars.forEach(callbackfn) }
-  private _currentBlockScope: CompilerBlockScope = new CompilerBlockScope(null, 0);
   public get currentBlockScope() { return this._currentBlockScope }
-  public pushBlockScope() {
-    this._currentBlockScope = new CompilerBlockScope(this._currentBlockScope, this._currentBlockScope.localsCount)
+  public pushBlockScope(node: SyntaxNode) {
+    this._currentBlockScope = new CompilerBlockScope(this.context, this._currentBlockScope, this._currentBlockScope.localsCount, node)
   }
   public popBlockScope() {
     const outerScope = this._currentBlockScope.parentScope;
@@ -281,33 +296,17 @@ class CompilerFunctionScope {
     this._currentBlockScope = outerScope;
     return blockSpecificLocalCount;
   }
-  // private maybeCloseVar(identifier: string) {
-  //   if (this.parentFunctionScope === null) { throw new Error(`cannot close var ${identifier} from top scope!`) }
-  //   const alreadyClosedOffset = this.closedVars.get(identifier);
-  //   if (alreadyClosedOffset !== undefined) { return alreadyClosedOffset.localOffset }
-  //   // if the variable is in local scope, we don't need to close over it
-  //   const localOffset = this._currentBlockScope.findIdentifierInStack(identifier);
-  //   if (localOffset !== null) {
-  //     return localOffset;
-  //   }
-  //   // get offset in parent function's locals (and recursively close it in parents, if necessary)
-  //   const parentOffset = this.parentFunctionScope.maybeCloseVar(identifier);
-  //   // register new closed var
-  //   const newClosedOffset = -1 - this.closedVars.size; // n.b. backwards from -1!
-  //   this.closedVars.set(identifier, new ClosedVar(parentOffset, newClosedOffset));
-  //   return newClosedOffset;
-  // }
-  public declareOrAssign(identifier: string, isDeclaration: boolean): number {
+  public declareOrAssign(identifier: string, isDeclaration: boolean): CallFrameVarInfo {
     if (isDeclaration) {
       return this._currentBlockScope.declare(identifier); // new local offset
     }
-    const localOffset = this._currentBlockScope.findIdentifierInStack(identifier);
-    if (localOffset !== null) { return localOffset }
+    const localVarInfo = this._currentBlockScope.findIdentifierInStack(identifier);
+    if (localVarInfo !== null) { return localVarInfo }
     throw new Error(`declareOrAssign cannot find var ${identifier}`);
   }
-  public lookup(identifier: string): number {
-    const localOffset = this._currentBlockScope.findIdentifierInStack(identifier);
-    if (localOffset !== null) { return localOffset }
+  public lookup(identifier: string): CallFrameVarInfo {
+    const localVarInfo = this._currentBlockScope.findIdentifierInStack(identifier);
+    if (localVarInfo !== null) { return localVarInfo }
     throw new Error(`lookup cannot find var ${identifier}`);
   }
 }
@@ -315,48 +314,66 @@ class CompilerFunctionScope {
 class CompilerBlockScope {
   private callFrameOffsets: Map<string, number> = new Map();
   public localIdentifiers: Array<string> = [];
-  private localsWhichNeedToBeClosed: Set<number> = new Set();
+  //private localsWhichNeedToBeClosed: Set<number> = new Set();
   public constructor(
+    private context: CompilerContext,
     public parentScope: CompilerBlockScope | null,
     public localsCount: number, // includes parameters and stack variables
+    private node: SyntaxNode,
   ) { }
-  public declare(identifier: string): number {
+  private findVarDetails(identifier: string): ResolverVariableDetails {
+    const resolverScopeOutput = this.context.resolverOutput.varDeclarationsByBlockOrFunctionNode.get(this.node)!;
+    const x = resolverScopeOutput.table[identifier];
+    console.dir(x);
+    return x ?? this.parentScope?.findVarDetails(identifier) // FUUUUCK. TODO: function scopes are not parents of CompilerBlockScopes, so this doesn't get up to the closure :(
+    // TODO: maybe i should have Resolver copy the closed vars into the function's top scope? then they would be available here...
+  }
+  public declare(identifier: string): CallFrameVarInfo {
+    console.log('???')
+    console.log('!!!')
+    const resolverVarDetails = this.findVarDetails(identifier);
+    if (resolverVarDetails === undefined) { throw new Error(`compiler could not find var declaration by resolver for ${identifier}`) }
     const callFrameOffset = this.localsCount;
     this.callFrameOffsets.set(identifier, callFrameOffset);
     this.localIdentifiers.push(identifier);
     this.localsCount += 1;
-    return callFrameOffset;
+    return new CallFrameVarInfo(callFrameOffset, resolverVarDetails);
   }
-  public findIdentifierInStack(identifier: string): number | null {
+  public findIdentifierInStack(identifier: string): CallFrameVarInfo | null {
     const callFrameOffset = this.callFrameOffsets.get(identifier);
     if (callFrameOffset !== undefined) {
-      return callFrameOffset;
+      const resolverVarDetails = this.findVarDetails(identifier);
+      if (resolverVarDetails === undefined) { throw new Error(`compiler could not find var declaration by resolver for ${identifier}`) }
+      return new CallFrameVarInfo(callFrameOffset, resolverVarDetails);
     }
     if (this.parentScope !== null) {
       return this.parentScope.findIdentifierInStack(identifier);
     }
     return null;
   }
-  public markVariableAsRequiredByClosure(identifier: string) {
-    const callFrameOffset = this.callFrameOffsets.get(identifier);
-    if (callFrameOffset !== undefined) {
-      this.localsWhichNeedToBeClosed.add(callFrameOffset);
-    }
-    else {
-      if (this.parentScope !== null) {
-        this.parentScope.markVariableAsRequiredByClosure(identifier);
-      }
-      else {
-        throw new Error(`could not mark variable as required by closure because it wasn't found in block scope`);
-      }
-    }
+  public getLocalCount() {
+    return this.localIdentifiers.length;
   }
-  public forEachLocalInReverse(callbackfn: (isRequiredByClosure: boolean) => void) {
-    for (let i = 0; i < this.callFrameOffsets.size; i += 1) {
-      const callFrameOffset = (this.localsCount - 1) - i;
-      const isRequiredByClosure = this.localsWhichNeedToBeClosed.has(callFrameOffset);
-      callbackfn(isRequiredByClosure);
-    }
-  }
+  // public markVariableAsRequiredByClosure(identifier: string) {
+  //   const callFrameOffset = this.callFrameOffsets.get(identifier);
+  //   if (callFrameOffset !== undefined) {
+  //     this.localsWhichNeedToBeClosed.add(callFrameOffset);
+  //   }
+  //   else {
+  //     if (this.parentScope !== null) {
+  //       this.parentScope.markVariableAsRequiredByClosure(identifier);
+  //     }
+  //     else {
+  //       throw new Error(`could not mark variable as required by closure because it wasn't found in block scope`);
+  //     }
+  //   }
+  // }
+  // public forEachLocalInReverse(callbackfn: (isRequiredByClosure: boolean) => void) {
+  //   for (let i = 0; i < this.callFrameOffsets.size; i += 1) {
+  //     const callFrameOffset = (this.localsCount - 1) - i;
+  //     const isRequiredByClosure = this.localsWhichNeedToBeClosed.has(callFrameOffset);
+  //     callbackfn(isRequiredByClosure);
+  //   }
+  // }
 }
 

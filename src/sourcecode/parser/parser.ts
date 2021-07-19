@@ -2,7 +2,7 @@ import { lex } from "./lexer";
 import { Token, TokenType } from "./Token";
 import { BinarySyntaxNode, LiteralSyntaxNode, UnarySyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode } from "../syntax/syntax";
 import { SyntaxError } from "./SyntaxError"
-import { Resolver, ResolverScope } from "./resolver"
+import { resolve, ResolverOutput } from "./resolver"
 import { ValueType } from "../syntax/ValueType"
 
 class TokenReader {
@@ -56,7 +56,7 @@ interface ISyntaxErrorParserResponse {
 interface ISuccessParserResponse {
   kind: "SUCCESS";
   topSyntaxNode: SyntaxNode;
-  closedVarsByFunctionNode: Map<SyntaxNode, Array<string>>; // map from FunctionDefinitionSyntaxNode to set of identifiers
+  resolverOutput: ResolverOutput,
 }
 type ParserResponse = ISyntaxErrorParserResponse | ISuccessParserResponse;
 
@@ -81,15 +81,20 @@ export function parse(input: string, path: string): ParserResponse {
     return { kind: "SYNTAX_ERROR", syntaxErrors: parserSyntaxErrors };
   }
 
-  const resolver = new Resolver();
-  const resolverErrors = resolver.resolve(ast);
-  if (resolverErrors.length > 0) {
-    return { kind: "SYNTAX_ERROR", syntaxErrors: resolverErrors };
+  // const resolver = new Resolver();
+  // const resolverErrors = resolver.resolve(ast);
+  // if (resolverErrors.length > 0) {
+  //   return { kind: "SYNTAX_ERROR", syntaxErrors: resolverErrors };
+  // }
+  // const closedVarsByFunctionNode = resolver.closedVarsByFunctionNode;
+  const resolverResponse = resolve(ast);
+  if (resolverResponse.kind === "SYNTAX_ERROR") {
+    return { kind: "SYNTAX_ERROR", syntaxErrors: resolverResponse.syntaxErrors };
   }
   return {
     kind: "SUCCESS",
     topSyntaxNode: ast,
-    closedVarsByFunctionNode: resolver.closedVarsByFunctionNode,
+    resolverOutput: resolverResponse.resolverOutput,
   };
 
   function generateSyntaxError(token: Token, message: string) {

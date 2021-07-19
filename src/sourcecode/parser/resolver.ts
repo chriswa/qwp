@@ -3,11 +3,64 @@ import { INTERPRETER_BUILTINS } from "../../interpreter/builtins"
 import { SyntaxError } from "./SyntaxError"
 import { TokenType } from "./Token"
 
-enum VariableStatusEnum {
-  BUILTIN_OR_PARAMETER,
-  DECLARED,
-  INITIALIZED,
-};
+interface ISyntaxErrorResolverResponse {
+  kind: "SYNTAX_ERROR";
+  syntaxErrors: Array<SyntaxError>;
+}
+interface ISuccessResolverResponse {
+  kind: "SUCCESS";
+  resolverOutput: ResolverOutput;
+}
+type ResolverResponse = ISyntaxErrorResolverResponse | ISuccessResolverResponse;
+
+export class ResolverOutput {
+  public varDeclarationsByBlockOrFunctionNode: Map<SyntaxNode, ResolverScopeOutput>;
+  constructor(
+    public closedVarsByFunctionNode: Map<SyntaxNode, Array<string>>, // map from FunctionDefinitionSyntaxNode to set of identifiers
+    varsByScope: Map<SyntaxNode, ResolverScope>,
+  ) {
+    this.varDeclarationsByBlockOrFunctionNode = new Map()
+    varsByScope.forEach((resolverScope, syntaxNode) => {
+      const resolverScopeOutput = new ResolverScopeOutput(resolverScope);
+      console.log(`syntaxNode =>`)
+      console.dir(syntaxNode)
+      console.log(`resolverScopeOutput =>`)
+      console.dir(resolverScopeOutput)
+      this.varDeclarationsByBlockOrFunctionNode.set(syntaxNode, resolverScopeOutput);
+    });
+  }
+}
+
+export class ResolverScopeOutput {
+  public table: Record<string, ResolverVariableDetails> = {};
+  public constructor(resolverScope: ResolverScope) {
+    for (const identifier in resolverScope.table) {
+      const varStatus = resolverScope.table[identifier];
+      if (varStatus.isDeclaredHere) { // only include declarations
+        this.table[identifier] = new ResolverVariableDetails(varStatus);
+      }
+    }
+  }
+}
+
+export class ResolverVariableDetails {
+  public isClosed: boolean;
+  public constructor(
+    varStatus: VariableStatus,
+  ) {
+    this.isClosed = varStatus.isClosed;
+  }
+}
+
+export function resolve(ast: SyntaxNode): ResolverResponse {
+  const resolver = new Resolver();
+  const resolverErrors = resolver.resolve(ast);
+  if (resolverErrors.length > 0) {
+    return { kind: "SYNTAX_ERROR", syntaxErrors: resolverErrors }
+  }
+  const resolverOutput = new ResolverOutput(resolver.closedVarsByFunctionNode, resolver.varsByScope);
+  return { kind: "SUCCESS", resolverOutput };
+}
 
 class VariableStatus {
   public isClosed = false;
@@ -20,7 +73,7 @@ class VariableStatus {
 }
 
 export class ResolverScope {
-  private table: Record<string, VariableStatus> = {};
+  public table: Record<string, VariableStatus> = {};
   public closedVars: Array<string> = []; // only used if !!this.isFunction
   public constructor(
     private isFunction: boolean,
@@ -33,14 +86,22 @@ export class ResolverScope {
       this.table[identifier] = variableStatus;
     }
   }
-  public getVariableStatusFromStack(identifier: string): VariableStatus | null {
+  public getVariableStatusFromStack(identifier: string, isClosed = false): VariableStatus | null {
     if (identifier in this.table) {
-      return this.table[identifier];
+      const varStatus = this.table[identifier];
+      if (varStatus.isDeclaredHere) {
+        if (isClosed) {
+          varStatus.isClosed = true;
+        }
+        return this.table[identifier]
+      }
     }
     if (this.parentScope !== null) {
-      const variableStatus = this.parentScope.getVariableStatusFromStack(identifier);
-      if (this.isFunction) {
+      const variableStatus = this.parentScope.getVariableStatusFromStack(identifier, isClosed || this.isFunction);
+      if (variableStatus !== null && this.isFunction) {
         this.closedVars.push(identifier);
+        this.table[identifier] = new VariableStatus(true, true, true, variableStatus.isReadOnly);
+        // this.table[identifier].isClosed = true;
       }
       return variableStatus;
     }
@@ -63,8 +124,9 @@ export class ResolverScope {
   }
 }
 
-export class Resolver implements SyntaxNodeVisitor<ResolverScope | null> {
+class Resolver implements SyntaxNodeVisitor<ResolverScope | null> {
   scope: ResolverScope;
+  varsByScope: Map<SyntaxNode, ResolverScope> = new Map();
   closedVarsByFunctionNode: Map<SyntaxNode, Array<string>> = new Map(); // map from FunctionDeclarationSyntaxNode to list of closed identifiers
   resolverErrors: Array<SyntaxError> = [];
   constructor() {
@@ -72,6 +134,7 @@ export class Resolver implements SyntaxNodeVisitor<ResolverScope | null> {
   }
   beginScope(isFunction: boolean, node: SyntaxNode, preinitializedIdentifiers: Array<string>) {
     this.scope = new ResolverScope(isFunction, this.scope, preinitializedIdentifiers);
+    this.varsByScope.set(node, this.scope);
   }
   endScope(): ResolverScope {
     if (this.scope.parentScope === null) {
@@ -121,13 +184,6 @@ export class Resolver implements SyntaxNodeVisitor<ResolverScope | null> {
   }
   visitStatementBlock(node: StatementBlockSyntaxNode): ResolverScope | null {
     this.beginScope(false, node, []);
-    // hoist declarations
-    // for (const statement of node.statementList) {
-    //   if (statement instanceof VariableAssignmentSyntaxNode && statement.modifier !== null) {
-    //     this.declareVariable(statement.identifier);
-    //   }
-    // }
-    // recurse resolution
     this.resolveList(node.statementList);
     return this.endScope();
   }

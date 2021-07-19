@@ -41,5 +41,5 @@ if (parserResponse.kind === "SYNTAX_ERROR") {
   process.exit(1);
 }
 
-const buffer = compile(parserResponse.topSyntaxNode, parserResponse.closedVarsByFunctionNode);
+const buffer = compile(parserResponse.topSyntaxNode, parserResponse.resolverOutput);
 dumpDecompile(buffer);

@@ -34,6 +34,9 @@ export class ByteBuffer {
   public setByteCursor(pos: number) {
     this._byteCursor = pos;
   }
+  public discardStackBytes(bytes: number) {
+    this._byteCursor -= bytes;
+  }
 
   public backpatch(targetPosition: number, callback: () => void) {
     const origPosition = this._byteCursor;
@@ -147,31 +150,31 @@ export class ByteBuffer {
   }
 
   public peekUint8(): number {
-    return this.dataView.getUint8(this._byteCursor - 1);
+    return this.dataView.getUint8(this._byteCursor);
   }
   public peekUint16(): number {
-    return this.dataView.getUint16(this._byteCursor - 2);
+    return this.dataView.getUint16(this._byteCursor);
   }
   public peekUint32(): number {
-    return this.dataView.getUint32(this._byteCursor - 4);
+    return this.dataView.getUint32(this._byteCursor);
   }
   public peekInt8(): number {
-    return this.dataView.getInt8(this._byteCursor - 1);
+    return this.dataView.getInt8(this._byteCursor);
   }
   public peekInt16(): number {
-    return this.dataView.getInt16(this._byteCursor - 2);
+    return this.dataView.getInt16(this._byteCursor);
   }
   public peekInt32(): number {
-    return this.dataView.getInt32(this._byteCursor - 4);
+    return this.dataView.getInt32(this._byteCursor);
   }
   public peekFloat32(): number {
-    return this.dataView.getFloat32(this._byteCursor - 4);
+    return this.dataView.getFloat32(this._byteCursor);
   }
   public peekFloat64(): number {
-    return this.dataView.getFloat64(this._byteCursor - 8);
+    return this.dataView.getFloat64(this._byteCursor);
   }
   public peekBool32(): boolean {
-    const value = this.dataView.getFloat32(this._byteCursor - 4);
+    const value = this.dataView.getFloat32(this._byteCursor);
     if (value !== 0 && value !== 1) { throw new Error(`assertion failed: tried to popBool32 on value which is not 1.0 or 0.0`) }
     return value === 1;
   }
