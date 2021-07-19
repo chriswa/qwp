@@ -45,10 +45,12 @@ export class ResolverScopeOutput {
 
 export class ResolverVariableDetails {
   public isClosed: boolean;
+  public isRef: boolean;
   public constructor(
     varStatus: VariableStatus,
   ) {
     this.isClosed = varStatus.isClosed;
+    this.isRef = varStatus.isRef;
   }
 }
 
@@ -64,6 +66,7 @@ export function resolve(ast: SyntaxNode): ResolverResponse {
 
 class VariableStatus {
   public isClosed = false;
+  public isRef = false;
   constructor(
     public isDeclaredHere: boolean,
     public isBuiltInOrParameter: boolean,
@@ -92,6 +95,7 @@ export class ResolverScope {
       if (varStatus.isDeclaredHere) {
         if (isClosed) {
           varStatus.isClosed = true;
+          varStatus.isRef = true;
         }
         return this.table[identifier]
       }
@@ -101,7 +105,7 @@ export class ResolverScope {
       if (variableStatus !== null && this.isFunction) {
         this.closedVars.push(identifier);
         this.table[identifier] = new VariableStatus(true, true, true, variableStatus.isReadOnly);
-        this.table[identifier].isClosed = true; // consumers will need to deref
+        this.table[identifier].isRef = true;
       }
       return variableStatus;
     }

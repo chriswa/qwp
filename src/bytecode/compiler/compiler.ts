@@ -228,7 +228,7 @@ class Compiler implements SyntaxNodeVisitor<void> {
     const callFrameVarInfo = this.functionScope.lookup(identifier);
     this.instructionBuffer.pushUint8(OpCode.FETCH_CALLFRAME_VALUE);
     this.instructionBuffer.pushUint8(callFrameVarInfo.callFrameOffset);
-    if (callFrameVarInfo.resolverVarDetails.isClosed) {
+    if (callFrameVarInfo.resolverVarDetails.isRef) {
       this.instructionBuffer.pushUint8(OpCode.DEREF);
     }
   }
