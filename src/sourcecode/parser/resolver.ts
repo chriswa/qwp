@@ -101,7 +101,7 @@ export class ResolverScope {
       if (variableStatus !== null && this.isFunction) {
         this.closedVars.push(identifier);
         this.table[identifier] = new VariableStatus(true, true, true, variableStatus.isReadOnly);
-        // this.table[identifier].isClosed = true;
+        this.table[identifier].isClosed = true; // consumers will need to deref
       }
       return variableStatus;
     }
