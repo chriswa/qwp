@@ -1,7 +1,9 @@
 import chalk from "chalk"
 import fs from "fs";
+import { ByteBuffer } from "./bytecode/compiler/ByteBuffer"
 import { compile } from "./bytecode/compiler/compiler"
-import { dumpDecompile } from "./bytecode/decompiler"
+import { decompileOneInstruction, dumpDecompile } from "./bytecode/decompiler"
+import { VM } from "./bytecode/vm/VM"
 import { printPositionInSource } from "./cliUtil"
 import { Interpreter } from "./interpreter/Interpreter"
 import { parse } from "./sourcecode/parser/parser"
@@ -41,5 +43,33 @@ if (parserResponse.kind === "SYNTAX_ERROR") {
   process.exit(1);
 }
 
-const buffer = compile(parserResponse.topSyntaxNode, parserResponse.resolverOutput);
-dumpDecompile(buffer);
+const constantBuffer = compile(parserResponse.topSyntaxNode, parserResponse.resolverOutput);
+dumpDecompile(constantBuffer);
+
+console.log(`VM START`);
+const vm = new VM(constantBuffer, 1024);
+while (!vm.isHalted) {
+  console.log(`---`);
+  
+  let stackView = '';
+  const stackLength = vm.ramBuffer.byteCursor / 4;
+  for (let i = 0; i < stackLength; i += 1) {
+    const bytePos = 4 * i;
+    if (i > 0) { stackView += ', ' }
+    if (i === vm.callFrameIndex) { stackView += '[ ' }
+    stackView += `${vm.ramBuffer.peekUint32At(bytePos)}`;
+  }
+  console.log(`STACK: ${stackView}`);
+
+  decompileOneInstructionAndRewind(vm.constantBuffer);
+  
+  vm.runOneInstruction();
+}
+
+function decompileOneInstructionAndRewind(byteBuffer: ByteBuffer) {
+  const origByteCursor = byteBuffer.byteCursor;
+  decompileOneInstruction(byteBuffer, []);
+  byteBuffer.setByteCursor(origByteCursor);
+}
+
+

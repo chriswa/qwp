@@ -42,6 +42,7 @@ class Compiler implements SyntaxNodeVisitor<void> {
       console.log(`declaring closed var ${identifier} for function's compiler`);
       this.functionScope.currentBlockScope.declare(identifier);
     });
+    this.functionScope.currentBlockScope.addPlaceholders();
   }
 
   public compileModule(ast: SyntaxNode) {
@@ -54,7 +55,7 @@ class Compiler implements SyntaxNodeVisitor<void> {
     this.instructionBuffer.pushUint8(OpCode.CODESTOP);
     this.instructionBuffer.compact();
 
-    const constantIndex = this.constantsTable.putBuffer(this.instructionBuffer.buffer);
+    const constantIndex = this.constantsTable.storeBuffer(this.instructionBuffer.buffer);
     this.constantsTable.buffer.backpatch(startJumpPos, () => {
       this.constantsTable.buffer.pushUint32(constantIndex);
     });
@@ -111,13 +112,13 @@ class Compiler implements SyntaxNodeVisitor<void> {
     let constantIndex = 0;
     switch (node.type) {
       case ValueType.NULL:
-        constantIndex = this.constantsTable.putUint32(0);
+        constantIndex = this.constantsTable.storeUniqueUint32(0);
         break;
       case ValueType.BOOLEAN:
-        constantIndex = this.constantsTable.putUint32((node.value as boolean) ? 1 : 0);
+        constantIndex = this.constantsTable.storeUniqueUint32((node.value as boolean) ? 1 : 0);
         break;
       case ValueType.NUMBER:
-        constantIndex = this.constantsTable.putFloat32((node.value as number));
+        constantIndex = this.constantsTable.storeUniqueFloat32((node.value as number));
         break;
       default:
         throw new Error("TODO: unsupported constant type");
@@ -240,7 +241,7 @@ class Compiler implements SyntaxNodeVisitor<void> {
     fnCompiler.popLocals();
     fnCompiler.instructionBuffer.pushUint8(OpCode.CODESTOP);
     fnCompiler.instructionBuffer.compact();
-    const constantIndex = this.constantsTable.putBuffer(fnCompiler.instructionBuffer.buffer); // safe because all jumps are relative and all references to constants table have already been added
+    const constantIndex = this.constantsTable.storeBuffer(fnCompiler.instructionBuffer.buffer); // safe because all jumps are relative and all references to constants table have already been added
     this.instructionBuffer.pushUint8(OpCode.DEFINE_FUNCTION);
     this.instructionBuffer.pushUint32(constantIndex);
     this.instructionBuffer.pushUint8(closedVars.length);
@@ -321,6 +322,9 @@ class CompilerBlockScope {
     public localsCount: number, // includes parameters and stack variables
     private node: SyntaxNode,
   ) { }
+  public addPlaceholders() {
+    this.localsCount += 2; // support return address and callframe jumpback distance in stack
+  }
   private findVarDetails(identifier: string): ResolverVariableDetails {
     const resolverScopeOutput = this.context.resolverOutput.varDeclarationsByBlockOrFunctionNode.get(this.node)!;
     const x = resolverScopeOutput.table[identifier];

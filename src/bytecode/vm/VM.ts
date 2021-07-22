@@ -2,74 +2,108 @@ import { ByteBuffer } from "../compiler/ByteBuffer"
 import { OpCode } from "../opcodes"
 import { opCodeHandlers } from "./opCodeHandlers"
 
-class CallFrame {
-  private stackTopRamByteIndex = 0;
-  private savedInstructionPointerByteIndex: number = -1;
-  public stackBuffer: ByteBuffer;
+/*
+class LegitHeap {
+  private ramWordCount: number;
   public constructor(
-    ramBuffer: ByteBuffer,
-    public outerCallFrame: CallFrame | undefined,
-    stackBaseRamByteIndex: number,
+    public vm: VM,
   ) {
-    this.stackBuffer = new ByteBuffer(ramBuffer.buffer);
-    this.stackBuffer.setByteCursor(stackBaseRamByteIndex);
+    this.ramWordCount = this.vm.ramBuffer.buffer.byteLength / 4;
+    this.heapBottom = this.ramWordCount - 2;
+    vm.setStackLimit(this.heapBottom);
   }
-  /*
-  public popUint32() {
-    this.stackTopRamByteIndex -= 4;
-    return this.ramBuffer.peekUint32At(this.stackTopRamByteIndex);
+  public get heapBottom() { return this.vm.ramBuffer.peekUint32At(4 * (this.ramWordCount - 1)); }
+  public set heapBottom(v) { this.vm.ramBuffer.pokeUint32At(4 * (this.ramWordCount - 1), v); }
+  public get heapHoleListStart() { return this.vm.ramBuffer.peekUint32At(4 * (this.ramWordCount - 2)); }
+  public set heapHoleListStart(v) { this.vm.ramBuffer.pokeUint32At(4 * (this.ramWordCount - 2), v); }
+  public allocScalar32(value: number): number {
+    let holeIndex = this.heapHoleListStart;
+    if (holeIndex === 0) {
+      this.heapBottom -= 1;
+      this.vm.setStackLimit(this.heapBottom);
+      holeIndex = this.heapBottom;
+    }
+    else {
+      let lastHoleIndex: number;
+      while (holeIndex !== 0) {
+        lastHoleIndex = holeIndex;
+        holeIndex = this.vm.ramBuffer.peekUint32At(4 * holeIndex);
+      }
+    }
+    this.vm.ramBuffer.pokeUint32At(4 * holeIndex, value);
+    return holeIndex;
   }
-  public pushUint32(uint32: number) {
-    this.ramBuffer.pokeUint32At(this.stackTopRamByteIndex, uint32);
-    this.stackTopRamByteIndex += 4;
+}
+*/
+
+class ClosureStruct {
+  constructor(
+    public functionIndex: number,
+    public closureValueCount: number,
+    public closureValues: Array<number>,
+  ) { }
+}
+
+class Heap {
+  private ptrMap: Map<number, unknown> = new Map();
+  private nextIndex = 0xffff;
+  private reusableIndexes: Array<number> = [];
+  public constructor(
+    public vm: VM,
+  ) {
   }
-  public pushFloat(float32: number) {
-    this.ramBuffer.pokeFloat32At(this.stackTopRamByteIndex, float32);
-    this.stackTopRamByteIndex += 4;
+  private acquireIndex() {
+    if (this.reusableIndexes.length > 0) {
+      return this.reusableIndexes.pop()!;
+    }
+    else {
+      const index = this.nextIndex;
+      this.nextIndex -= 1;
+      return index;
+    }
   }
-  public popFloat(): number {
-    this.stackTopRamByteIndex -= 4;
-    return this.ramBuffer.peekFloat32At(this.stackTopRamByteIndex);
+  public allocNumber(value: number): number {
+    const index = this.acquireIndex();
+    this.ptrMap.set(index, value);
+    return index;
   }
-  public peekFloatAt(index: number): number {
-    return this.ramBuffer.peekFloat32At(this.stackBaseRamByteIndex + index * 4);
+  public allocClosure(functionIndex: number, closureValues: Array<number>): number {
+    const index = this.acquireIndex();
+    this.ptrMap.set(index, new ClosureStruct(functionIndex, closureValues.length, closureValues));
+    return index;
   }
-  public peekUint32At(index: number): number {
-    return this.ramBuffer.peekUint32At(this.stackBaseRamByteIndex + index * 4);
+  public fetchNumber(ptr: number): number {
+    return this.ptrMap.get(ptr) as number;
   }
-  public pokeFloatAt(index: number, value: number) {
-    return this.ramBuffer.pokeFloat32At(this.stackBaseRamByteIndex + index * 4, value);
+  public fetchClosure(ptr: number): ClosureStruct {
+    return this.ptrMap.get(ptr) as ClosureStruct;
   }
-  public pokeUint32At(index: number, value: number) {
-    return this.ramBuffer.pokeUint32At(this.stackBaseRamByteIndex + index * 4, value);
+  public assignNumber(ptr: number, value: number) {
+    this.ptrMap.set(ptr, value);
   }
-  public pushBool(value: boolean) {
-    this.pushFloat(value ? 1 : 0);
-  }
-  public popBool(): boolean {
-    const value = this.popFloat();
-    if (value !== 0 && value !== 1) { throw new Error(`assertion failed: tried to do binary logic on non-binary value`) }
-    return value === 1;
-  }
-  public peekBool(): boolean {
-    const value = this.ramBuffer.peekFloat32At(this.stackTopRamByteIndex);
-    if (value !== 0 && value !== 1) { throw new Error(`assertion failed: tried to do binary logic on non-binary value`) }
-    return value === 1;
-  }
-  */
 }
 
 export class VM {
-  public ramBuffer: ByteBuffer;
-  public currentCallFrame: CallFrame;
+  public ramBuffer: ByteBuffer; // this.ramBuffer.byteCursor is our stack pointer!
+  public isHalted = false;
+  public callFrameIndex = 0; // for accessing locals (e.g. callFrameIndex + 0 => first function argument)
+  public returnInfoOffset = 0;
+  public heap: Heap;
   public constructor(
     public constantBuffer: ByteBuffer,
     ramBytesTotal: number, // includes stack and heap!
   ) {
     this.ramBuffer = new ByteBuffer(new ArrayBuffer(ramBytesTotal));
-    this.currentCallFrame = new CallFrame(this.ramBuffer, undefined, 0);
     const startConstantIndex = this.constantBuffer.peekUint32At(0);
     this.constantBuffer.setByteCursor(startConstantIndex * 4);
+    this.heap = new Heap(this); // TODO: figure out how to prevent conflicts between builtin Ids and closure indexes on the heap
+  }
+  public setStackLimit(wordLimit: number) {
+    const byteLength = 4 * wordLimit;
+    if (this.ramBuffer.byteCursor > byteLength) {
+      throw new Error(`Out of memory`);
+    }
+    this.ramBuffer.pushByteLimit = byteLength;
   }
   public runOneInstruction() {
     const opCode = this.constantBuffer.readUint8();

@@ -19,8 +19,6 @@ export enum OpCode {
   JUMP_BOOLEAN_AND, // if peek true, pop, else jump without popping
   ASSIGN_CALLFRAME_VALUE,
   FETCH_CALLFRAME_VALUE,
-  // ASSIGN_CALLFRAME_REF,
-  // FETCH_CALLFRAME_REF,
   ASSIGN_PTR, // pop ptr, assigns (peeked) value to that location in ram
   DEREF, // pop ptr, then pushes value found at that locaton in ram
   ALLOC_SCALAR, // value = pop stack; allocate single 32-bit, pushing ptr/index onto stack; write value into dest

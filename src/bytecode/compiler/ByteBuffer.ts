@@ -5,6 +5,7 @@ export class ByteBuffer {
   private dataView: DataView;
   private _byteCursor: number = 0;
   public get byteCursor() { return this._byteCursor }
+  public pushByteLimit = Infinity;
   public constructor(initialBuffer?: ArrayBuffer) {
     this._buffer = initialBuffer ?? new ArrayBuffer(256);
     this.dataView = new DataView(this._buffer);
@@ -21,7 +22,11 @@ export class ByteBuffer {
     this.updateViews();
   }
   private extendIfNecessary(extraBytes: number) {
-    if (this._byteCursor + extraBytes > this._buffer.byteLength) {
+    const newSize = this._byteCursor + extraBytes;
+    if (newSize > this.pushByteLimit) {
+      throw new Error(`Stack overflow!`)
+    }
+    if (newSize > this._buffer.byteLength) {
       this.resize(this._buffer.byteLength * 2);
     }
   }
@@ -103,119 +108,141 @@ export class ByteBuffer {
   }
 
   public popUint8() {
-    const value = this.dataView.getUint8(this._byteCursor);
-    this._byteCursor += 1;
-    return value;
+    this._byteCursor -= 1;
+    return this.dataView.getUint8(this._byteCursor);
   }
   public popUint16() {
-    const value = this.dataView.getUint16(this._byteCursor);
-    this._byteCursor += 2;
-    return value;
+    this._byteCursor -= 2;
+    return this.dataView.getUint16(this._byteCursor);
   }
   public popUint32() {
-    const value = this.dataView.getUint32(this._byteCursor);
-    this._byteCursor += 4;
-    return value;
+    this._byteCursor -= 4;
+    return this.dataView.getUint32(this._byteCursor);
   }
   public popInt8() {
-    const value = this.dataView.getInt8(this._byteCursor);
-    this._byteCursor += 1;
-    return value;
+    this._byteCursor -= 1;
+    return this.dataView.getInt8(this._byteCursor);
   }
   public popInt16() {
-    const value = this.dataView.getInt16(this._byteCursor);
-    this._byteCursor += 2;
-    return value;
+    this._byteCursor -= 2;
+    return this.dataView.getInt16(this._byteCursor);
   }
   public popInt32() {
-    const value = this.dataView.getInt32(this._byteCursor);
-    this._byteCursor += 4;
-    return value;
+    this._byteCursor -= 4;
+    return this.dataView.getInt32(this._byteCursor);
   }
   public popFloat32() {
-    const value = this.dataView.getFloat32(this._byteCursor);
-    this._byteCursor += 4;
-    return value;
+    this._byteCursor -= 4;
+    return this.dataView.getFloat32(this._byteCursor);
   }
   public popFloat64() {
-    const value = this.dataView.getFloat64(this._byteCursor);
-    this._byteCursor += 8;
-    return value;
+    this._byteCursor -= 8;
+    return this.dataView.getFloat64(this._byteCursor);
   }
   public popBool32() {
+    this._byteCursor -= 4;
     const value = this.dataView.getFloat32(this._byteCursor);
-    this._byteCursor += 4;
     if (value !== 0 && value !== 1) { throw new Error(`assertion failed: tried to popBool32 on value which is not 1.0 or 0.0`) }
     return value === 1;
   }
 
-  public peekUint8(): number {
+  public peekAheadUint8(): number {
     return this.dataView.getUint8(this._byteCursor);
   }
-  public peekUint16(): number {
+  public peekAheadUint16(): number {
     return this.dataView.getUint16(this._byteCursor);
   }
-  public peekUint32(): number {
+  public peekAheadUint32(): number {
     return this.dataView.getUint32(this._byteCursor);
   }
-  public peekInt8(): number {
+  public peekAheadInt8(): number {
     return this.dataView.getInt8(this._byteCursor);
   }
-  public peekInt16(): number {
+  public peekAheadInt16(): number {
     return this.dataView.getInt16(this._byteCursor);
   }
-  public peekInt32(): number {
+  public peekAheadInt32(): number {
     return this.dataView.getInt32(this._byteCursor);
   }
-  public peekFloat32(): number {
+  public peekAheadFloat32(): number {
     return this.dataView.getFloat32(this._byteCursor);
   }
-  public peekFloat64(): number {
+  public peekAheadFloat64(): number {
     return this.dataView.getFloat64(this._byteCursor);
   }
-  public peekBool32(): boolean {
+  public peekAheadBool32(): boolean {
     const value = this.dataView.getFloat32(this._byteCursor);
+    if (value !== 0 && value !== 1) { throw new Error(`assertion failed: tried to popBool32 on value which is not 1.0 or 0.0`) }
+    return value === 1;
+  }
+
+  public peekBehindUint8(): number {
+    return this.dataView.getUint8(this._byteCursor - 1);
+  }
+  public peekBehindUint16(): number {
+    return this.dataView.getUint16(this._byteCursor - 2);
+  }
+  public peekBehindUint32(): number {
+    return this.dataView.getUint32(this._byteCursor - 4);
+  }
+  public peekBehindInt8(): number {
+    return this.dataView.getInt8(this._byteCursor - 1);
+  }
+  public peekBehindInt16(): number {
+    return this.dataView.getInt16(this._byteCursor - 2);
+  }
+  public peekBehindInt32(): number {
+    return this.dataView.getInt32(this._byteCursor - 4);
+  }
+  public peekBehindFloat32(): number {
+    return this.dataView.getFloat32(this._byteCursor - 4);
+  }
+  public peekBehindFloat64(): number {
+    return this.dataView.getFloat64(this._byteCursor - 8);
+  }
+  public peekBehindBool32(): boolean {
+    const value = this.dataView.getFloat32(this._byteCursor - 4);
     if (value !== 0 && value !== 1) { throw new Error(`assertion failed: tried to popBool32 on value which is not 1.0 or 0.0`) }
     return value === 1;
   }
 
   public readUint8(): number {
-    const value = this.peekUint8();
+    const value = this.peekAheadUint8();
     this._byteCursor += 1;
     return value;
   }
   public readUint16(): number {
-    const value = this.peekUint16();
+    const value = this.peekAheadUint16();
     this._byteCursor += 2;
     return value;
   }
   public readUint32(): number {
-    const value = this.peekUint32();
+    const value = this.peekAheadUint32();
     this._byteCursor += 4;
     return value;
   }
   public readInt8(): number {
-    const value = this.peekInt8();
+    const value = this.peekAheadInt8();
     this._byteCursor += 1;
     return value;
   }
   public readInt16(): number {
-    const value = this.peekInt16();
+    const value = this.peekAheadInt16();
     this._byteCursor += 2;
     return value;
   }
   public readInt32(): number {
-    const value = this.peekInt32();
+    const value = this.peekAheadInt32();
     this._byteCursor += 4;
     return value;
   }
   public readFloat32(): number {
-    const value = this.peekFloat32();
+    const value = this.peekAheadFloat32();
     this._byteCursor += 4;
     return value;
   }
   public readFloat64(): number {
-    const value = this.peekFloat64();
+    const value = this.peekAheadFloat64();
     this._byteCursor += 8;
     return value;
   }
@@ -268,6 +295,16 @@ export class ByteBuffer {
   }
   public pokeFloat64At(bytePos: number, value: number) {
     this.dataView.setFloat64(bytePos, value);
+  }
+
+  public dumpStackTop(count = 3) {
+    const out: Array<string> = [];
+    for (let i = 0; i < count; i += 1) {
+      const bytePos = this._byteCursor - 4 * (i + 1);
+      if (bytePos < 0) { break }
+      out.push(`uint32? ${this.peekUint32At(bytePos)} || float32? ${this.peekFloat32At(bytePos)}`);
+    }
+    return out;
   }
 
 }

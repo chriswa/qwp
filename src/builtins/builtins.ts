@@ -21,7 +21,7 @@ function registerBuiltin(id: number, name: string, arity: number, handler: Built
   builtinsById.set(id, builtin);
 }
 
-registerBuiltin(0xf000, "println", 1, (arg) => {
-  console.log(arg);
+registerBuiltin(0x0000, "println", 1, (pushRetValCallback, args) => {
+  console.log(`Hello from println! => ${args}`)
 });
 
