@@ -1,79 +1,8 @@
-import { builtinsById } from "../../builtins/builtins"
+import { Builtin, builtinsById, Primitive } from "../../builtins/builtins"
 import { OpCode } from "../opcodes"
 import { VM } from "./VM"
 
 export const opCodeHandlers: Array<(vm: VM) => void> = [];
-
-opCodeHandlers[OpCode.ALLOC_SCALAR] = (vm: VM) => {
-  const value = vm.ramBuffer.popUint32();
-  const ptr = vm.heap.allocNumber(value);
-  vm.ramBuffer.pushUint32(ptr);
-};
-
-opCodeHandlers[OpCode.DEFINE_FUNCTION] = (vm: VM) => {
-  const functionConstantIndex = vm.constantBuffer.readUint32();
-  const closedVarCount = vm.constantBuffer.readUint8();
-  const closedValues: Array<number> = [];
-  for (let i = 0; i < closedVarCount; i += 1) {
-    const localIndex = vm.constantBuffer.readUint8();
-    closedValues.push(vm.ramBuffer.peekUint32At(4 * (vm.callFrameIndex + localIndex)));
-  }
-  const closurePtr = vm.heap.allocClosure(functionConstantIndex, closedValues);
-  vm.ramBuffer.pushUint32(closurePtr);
-};
-
-opCodeHandlers[OpCode.POP_N] = (vm: VM) => {
-  const entries = vm.constantBuffer.readUint8();
-  vm.ramBuffer.discardStackBytes(4 * entries);
-};
-
-opCodeHandlers[OpCode.CALL] = (vm: VM) => {
-  const argumentCount = vm.constantBuffer.readUint8();
-  const closureHeapIndex = vm.ramBuffer.popUint32();
-
-  const builtin = builtinsById.get(closureHeapIndex);
-  if (builtin !== undefined) {
-    const builtinArgs: Array<number> = [];
-    for (let i = 0; i < argumentCount; i += 1) {
-      builtinArgs.unshift(vm.ramBuffer.popFloat32()); // unshift to avoid reversing the list
-    }
-    builtin.handler((retval) => {
-      vm.ramBuffer.pushFloat32(retval);
-    }, builtinArgs);
-    return;
-  }
-
-  const closure = vm.heap.fetchClosure(closureHeapIndex);
-  const stackTop = vm.ramBuffer.byteCursor / 4;
-  const callFrameJumpSize = stackTop - argumentCount - vm.callFrameIndex;
-  console.log(`callFrameJumpSize = ${callFrameJumpSize}`);
-  const returnBytePosition = vm.constantBuffer.byteCursor;
-  for (let i = 0; i < closure.closureValueCount; i += 1) {
-    vm.ramBuffer.pushUint32(closure.closureValues[i]);
-  }
-  vm.ramBuffer.pushUint32(returnBytePosition);
-  vm.ramBuffer.pushUint32(callFrameJumpSize);
-  
-  vm.constantBuffer.setByteCursor(4 * closure.functionIndex); // jump
-  vm.callFrameIndex += callFrameJumpSize;
-
-  vm.returnInfoOffset = argumentCount + closure.closureValueCount;
-};
-
-opCodeHandlers[OpCode.RETURN] = (vm: VM) => {
-  console.log(`returnInfoOffset = ${vm.returnInfoOffset}`);
-  const returnBytePosition = vm.ramBuffer.peekUint32At(4 * (vm.callFrameIndex + vm.returnInfoOffset + 0));
-  const callFrameJumpSize = vm.ramBuffer.peekUint32At(4 * (vm.callFrameIndex + vm.returnInfoOffset + 1));
-  const retval = vm.ramBuffer.peekUint32At(4 * (vm.callFrameIndex + vm.returnInfoOffset + 2));
-
-  vm.constantBuffer.setByteCursor(returnBytePosition);
-  vm.ramBuffer.setByteCursor(4 * vm.callFrameIndex); // discard stack from function call (including args, closed vars, returnBytePosition, and callFrameJumpSize)
-  vm.callFrameIndex -= callFrameJumpSize;
-  vm.ramBuffer.pushUint32(retval);
-};
-
-
-
 
 opCodeHandlers[OpCode.NEGATE] = (vm: VM) => {
   const topValue = vm.ramBuffer.popFloat32();
@@ -193,26 +122,102 @@ opCodeHandlers[OpCode.DEREF] = (vm: VM) => {
   vm.ramBuffer.pushUint32(dereferencedValue); // should this be uint32?
 };
 
+opCodeHandlers[OpCode.ALLOC_SCALAR] = (vm: VM) => {
+  const value = vm.ramBuffer.popUint32();
+  const ptr = vm.heap.allocNumber(value);
+  vm.ramBuffer.pushUint32(ptr);
+};
 
+opCodeHandlers[OpCode.DEFINE_FUNCTION] = (vm: VM) => {
+  const functionConstantIndex = vm.constantBuffer.readUint32();
+  const closedVarCount = vm.constantBuffer.readUint8();
+  const closedValues: Array<number> = [];
+  for (let i = 0; i < closedVarCount; i += 1) {
+    const localIndex = vm.constantBuffer.readUint8();
+    closedValues.push(vm.ramBuffer.peekUint32At(4 * (vm.callFrameIndex + localIndex)));
+  }
+  const closurePtr = vm.heap.allocClosure(functionConstantIndex, closedValues);
+  vm.ramBuffer.pushUint32(closurePtr);
+};
 
+opCodeHandlers[OpCode.POP_N] = (vm: VM) => {
+  const entries = vm.constantBuffer.readUint8();
+  vm.ramBuffer.discardStackBytes(4 * entries);
+};
 
+opCodeHandlers[OpCode.CALL] = (vm: VM) => {
+  const argumentCount = vm.constantBuffer.readUint8()
+  const closureHeapIndex = vm.ramBuffer.popUint32()
 
+  const builtin = builtinsById.get(closureHeapIndex)
+  if (builtin !== undefined) {
+    callBuiltin(vm, builtin, argumentCount)
+  }
+  else {
+    callClosure(vm, closureHeapIndex, argumentCount)
+  }
+}
+function callBuiltin(vm: VM, builtin: Builtin, argumentCount: number) {
+  if (argumentCount !== builtin.parameterPrimitives.length) { throw new Error(`incorrect argument count for builtin`) }
+  const builtinArgs: Array<number> = [];
+  for (let i = argumentCount - 1; i >= 0; i -= 1) {
+    const argPrimitive = builtin.parameterPrimitives[i];
+    if (argPrimitive === Primitive.U32) {
+      builtinArgs.unshift(vm.ramBuffer.popUint32()); // unshift to avoid reversing the list
+    }
+    else if (argPrimitive === Primitive.F32) {
+      builtinArgs.unshift(vm.ramBuffer.popFloat32()); // unshift to avoid reversing the list
+    }
+  }
+  const retval = builtin.handler(builtinArgs);
+  if (builtin.returnPrimitives.length > 0) {
+    const retvalPrimitive = builtin.returnPrimitives[0]
+    if (retvalPrimitive === Primitive.U32) {
+      vm.ramBuffer.pushUint32(retval);
+    }
+    else if (retvalPrimitive === Primitive.F32) {
+      vm.ramBuffer.pushFloat32(retval);
+    }
+  }
+}
+function callClosure(vm: VM, closureHeapIndex: number, argumentCount: number) {
+  const closure = vm.heap.fetchClosure(closureHeapIndex);
+  const stackTop = vm.ramBuffer.byteCursor / 4;
+  const callFrameJumpSize = stackTop - argumentCount - vm.callFrameIndex;
+  // console.log(`callFrameJumpSize = ${callFrameJumpSize}`);
+  const returnBytePosition = vm.constantBuffer.byteCursor;
+  for (let i = 0; i < closure.closureValueCount; i += 1) {
+    vm.ramBuffer.pushUint32(closure.closureValues[i]);
+  }
+  vm.ramBuffer.pushUint32(returnBytePosition);
+  vm.ramBuffer.pushUint32(callFrameJumpSize);
+  
+  vm.constantBuffer.setByteCursor(4 * closure.functionIndex); // jump
+  vm.callFrameIndex += callFrameJumpSize;
+
+  vm.returnInfoOffset = argumentCount + closure.closureValueCount;
+};
+
+opCodeHandlers[OpCode.RETURN] = (vm: VM) => {
+  // console.log(`returnInfoOffset = ${vm.returnInfoOffset}`);
+  const returnBytePosition = vm.ramBuffer.peekUint32At(4 * (vm.callFrameIndex + vm.returnInfoOffset + 0));
+  const callFrameJumpSize = vm.ramBuffer.peekUint32At(4 * (vm.callFrameIndex + vm.returnInfoOffset + 1));
+  const retval = vm.ramBuffer.peekUint32At(4 * (vm.callFrameIndex + vm.returnInfoOffset + 2));
+
+  vm.constantBuffer.setByteCursor(returnBytePosition);
+  vm.ramBuffer.setByteCursor(4 * vm.callFrameIndex); // discard stack from function call (including args, closed vars, returnBytePosition, and callFrameJumpSize)
+  vm.callFrameIndex -= callFrameJumpSize;
+  vm.ramBuffer.pushUint32(retval);
+};
 
 opCodeHandlers[OpCode.PUSH_BUILTIN] = (vm: VM) => {
   const builtInId = vm.constantBuffer.readUint16();
-  // const builtin = builtinsById.get(builtInId);
-  // if (builtin === undefined) { throw new Error(`unknown builtin with ID ${builtInId}`) }
-  // const args: Array<number> = [];
-  // for (let i = 0; i < builtin.arity; i += 1) {
-  //   args.push(vm.ramBuffer.popFloat32());
-  // }
-  // builtin.handler((float32: number) => {
-  //   vm.ramBuffer.pushFloat32(float32);
-  // }, args);
   vm.ramBuffer.pushUint32(builtInId);
 };
 
 opCodeHandlers[OpCode.CODESTOP] = (vm: VM) => {
-  vm.isHalted = true; // TODO: ?
-  throw new Error(`CODESTOP opcode should never be reached!`)
+  vm.isHalted = true;
+  if (vm.callFrameIndex > 0) {
+    throw new Error(`CODESTOP opcode reached while executing a function!`);
+  }
 };

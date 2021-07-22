@@ -1,5 +1,5 @@
 import { BinarySyntaxNode, FunctionCallSyntaxNode, FunctionDefinitionSyntaxNode, GroupingSyntaxNode, IfStatementSyntaxNode, LiteralSyntaxNode, LogicShortCircuitSyntaxNode, ReturnStatementSyntaxNode, StatementBlockSyntaxNode, SyntaxNode, SyntaxNodeVisitor, UnarySyntaxNode, VariableAssignmentSyntaxNode, VariableLookupSyntaxNode, WhileStatementSyntaxNode } from "../syntax/syntax"
-import { INTERPRETER_BUILTINS } from "../../interpreter/builtins"
+import { builtinsByName } from "../../builtins/builtins"
 import { SyntaxError } from "./SyntaxError"
 import { TokenType } from "./Token"
 
@@ -22,10 +22,10 @@ export class ResolverOutput {
     this.varDeclarationsByBlockOrFunctionNode = new Map()
     varsByScope.forEach((resolverScope, syntaxNode) => {
       const resolverScopeOutput = new ResolverScopeOutput(resolverScope);
-      console.log(`syntaxNode =>`)
-      console.dir(syntaxNode)
-      console.log(`resolverScopeOutput =>`)
-      console.dir(resolverScopeOutput)
+      // console.log(`syntaxNode =>`)
+      // console.dir(syntaxNode)
+      // console.log(`resolverScopeOutput =>`)
+      // console.dir(resolverScopeOutput)
       this.varDeclarationsByBlockOrFunctionNode.set(syntaxNode, resolverScopeOutput);
     });
   }
@@ -51,6 +51,9 @@ export class ResolverVariableDetails {
   ) {
     this.isClosed = varStatus.isClosed;
     this.isRef = varStatus.isRef;
+  }
+  public toString() {
+    return `${this.isRef ? 'isRef' : ''}, ${this.isClosed ? 'isClosed' : ''}`;
   }
 }
 
@@ -134,7 +137,7 @@ class Resolver implements SyntaxNodeVisitor<ResolverScope | null> {
   closedVarsByFunctionNode: Map<SyntaxNode, Array<string>> = new Map(); // map from FunctionDeclarationSyntaxNode to list of closed identifiers
   resolverErrors: Array<SyntaxError> = [];
   constructor() {
-    this.scope = new ResolverScope(false, null, Object.keys(INTERPRETER_BUILTINS));
+    this.scope = new ResolverScope(false, null, Array.from(builtinsByName.keys()));
   }
   beginScope(isFunction: boolean, node: SyntaxNode, preinitializedIdentifiers: Array<string>) {
     this.scope = new ResolverScope(isFunction, this.scope, preinitializedIdentifiers);

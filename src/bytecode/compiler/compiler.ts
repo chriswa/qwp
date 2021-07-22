@@ -39,7 +39,6 @@ class Compiler implements SyntaxNodeVisitor<void> {
       this.functionScope.currentBlockScope.declare(identifier);
     });
     closedVarIdentifiers.forEach((identifier) => {
-      console.log(`declaring closed var ${identifier} for function's compiler`);
       this.functionScope.currentBlockScope.declare(identifier);
     });
     this.functionScope.currentBlockScope.addPlaceholders();
@@ -328,13 +327,9 @@ class CompilerBlockScope {
   private findVarDetails(identifier: string): ResolverVariableDetails {
     const resolverScopeOutput = this.context.resolverOutput.varDeclarationsByBlockOrFunctionNode.get(this.node)!;
     const x = resolverScopeOutput.table[identifier];
-    console.dir(x);
-    return x ?? this.parentScope?.findVarDetails(identifier) // FUUUUCK. TODO: function scopes are not parents of CompilerBlockScopes, so this doesn't get up to the closure :(
-    // TODO: maybe i should have Resolver copy the closed vars into the function's top scope? then they would be available here...
+    return x ?? this.parentScope?.findVarDetails(identifier);
   }
   public declare(identifier: string): CallFrameVarInfo {
-    console.log('???')
-    console.log('!!!')
     const resolverVarDetails = this.findVarDetails(identifier);
     if (resolverVarDetails === undefined) { throw new Error(`compiler could not find var declaration by resolver for ${identifier}`) }
     const callFrameOffset = this.localsCount;
@@ -358,26 +353,5 @@ class CompilerBlockScope {
   public getLocalCount() {
     return this.localIdentifiers.length;
   }
-  // public markVariableAsRequiredByClosure(identifier: string) {
-  //   const callFrameOffset = this.callFrameOffsets.get(identifier);
-  //   if (callFrameOffset !== undefined) {
-  //     this.localsWhichNeedToBeClosed.add(callFrameOffset);
-  //   }
-  //   else {
-  //     if (this.parentScope !== null) {
-  //       this.parentScope.markVariableAsRequiredByClosure(identifier);
-  //     }
-  //     else {
-  //       throw new Error(`could not mark variable as required by closure because it wasn't found in block scope`);
-  //     }
-  //   }
-  // }
-  // public forEachLocalInReverse(callbackfn: (isRequiredByClosure: boolean) => void) {
-  //   for (let i = 0; i < this.callFrameOffsets.size; i += 1) {
-  //     const callFrameOffset = (this.localsCount - 1) - i;
-  //     const isRequiredByClosure = this.localsWhichNeedToBeClosed.has(callFrameOffset);
-  //     callbackfn(isRequiredByClosure);
-  //   }
-  // }
 }
 

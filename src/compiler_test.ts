@@ -20,19 +20,19 @@ import { parse } from "./sourcecode/parser/parser"
 const path = "sample.dog";
 const source = `
 const foo := 123;
-println(foo + foo);
+// printFloat32(foo + foo);
 
 const f := fn(a, b) {
   // return a + b;
-  return a + b + foo;
-  // return fn() {
-  //   return a + b + foo;
-  // };
+  // return a + b + foo;
+  return fn() {
+    return a + b + foo;
+  };
 };
 
-println(f(1, 2));
-println(f(3, 4));
-println(456);
+printFloat32(f(1, 2)());
+// printFloat32(f(3, 4)());
+// printFloat32(456);
 `.trim() + "\n";
 
 const parserResponse = parse(source, path);
@@ -43,27 +43,43 @@ if (parserResponse.kind === "SYNTAX_ERROR") {
   process.exit(1);
 }
 
+console.log(`--- RESOLVER ---`)
+parserResponse.resolverOutput.varDeclarationsByBlockOrFunctionNode.forEach((resolverScopeOutput, node) => {
+  printPositionInSource(path, source, node.referenceToken.charPos)
+  for (const identifier in resolverScopeOutput.table) {
+    const resolverVariableDetails = resolverScopeOutput.table[identifier]
+    console.log(`  ${identifier}: ${resolverVariableDetails.toString()}`)
+  }
+});
+
 const constantBuffer = compile(parserResponse.topSyntaxNode, parserResponse.resolverOutput);
 dumpDecompile(constantBuffer);
 
-console.log(`VM START`);
+const VM_DEBUG = true;
+
+if (VM_DEBUG) { console.log(`VM START`) }
 const vm = new VM(constantBuffer, 1024);
 while (!vm.isHalted) {
-  console.log(`---`);
-  
-  let stackView = '';
-  const stackLength = vm.ramBuffer.byteCursor / 4;
-  for (let i = 0; i < stackLength; i += 1) {
-    const bytePos = 4 * i;
-    if (i > 0) { stackView += ', ' }
-    if (i === vm.callFrameIndex) { stackView += '[ ' }
-    stackView += `${vm.ramBuffer.peekUint32At(bytePos)}`;
-  }
-  console.log(`STACK: ${stackView}`);
+  if (VM_DEBUG) {
+    console.log(`---`)
+    let stackView = ''
+    const stackLength = vm.ramBuffer.byteCursor / 4
+    for (let i = 0; i < stackLength; i += 1) {
+      const bytePos = 4 * i
+      if (i > 0) { stackView += ', ' }
+      if (i === vm.callFrameIndex) { stackView += '[ ' }
+      stackView += `${vm.ramBuffer.peekUint32At(bytePos)}`
+    }
+    console.log(`STACK: ${stackView}`)
 
-  decompileOneInstructionAndRewind(vm.constantBuffer);
+    decompileOneInstructionAndRewind(vm.constantBuffer)
+  }
   
   vm.runOneInstruction();
+}
+if (VM_DEBUG) {
+  console.log(`---`)
+  console.log(`VM HALTED`)
 }
 
 function decompileOneInstructionAndRewind(byteBuffer: ByteBuffer) {
