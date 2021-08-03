@@ -1,11 +1,9 @@
 import chalk from "chalk"
-import fs from "fs";
 import { ByteBuffer } from "./bytecode/compiler/ByteBuffer"
 import { compile } from "./bytecode/compiler/compiler"
 import { decompileOneInstruction, dumpDecompile } from "./bytecode/decompiler"
 import { VM } from "./bytecode/vm/VM"
 import { printPositionInSource } from "./cliUtil"
-import { Interpreter } from "./interpreter/Interpreter"
 import { parse } from "./sourcecode/parser/parser"
 
 // var myArgs = process.argv.slice(2);

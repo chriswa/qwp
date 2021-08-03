@@ -4,8 +4,7 @@
   "description": "",
   "main": "lexer.js",
   "scripts": {
-    "test": "tsc && node bin/interpreter_tests.js",
-    "compiler_test": "tsc && node bin/compiler_test.js"
+    "test": "tsc && node bin/test.js"
   },
   "author": "",
   "license": "UNLICENSED",
