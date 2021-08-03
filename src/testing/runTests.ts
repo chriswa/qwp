@@ -9,7 +9,7 @@ import { ErrorWithSourcePos } from "../ErrorWithSourcePos"
 import { testExpectedKindStringToEnum, TestResult, TestResultKind } from "./results"
 import { printFailedTestHeader, printTestsRunnerHeader, printTestsRunnerSuccess, reportFailedTest, reportSuccessfulTest } from "./reporting"
 import { setBuiltinPrintFunction } from "../builtins/builtins"
-import { CompileError } from "../CompileError"
+import { CompileError } from "../compiler/CompileError"
 
 const VM_DEBUG = false;
 

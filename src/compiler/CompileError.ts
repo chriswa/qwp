@@ -1,4 +1,4 @@
-import { ErrorWithSourcePos } from "./ErrorWithSourcePos"
+import { ErrorWithSourcePos } from "../ErrorWithSourcePos"
 
 export class CompileError {
   public constructor(

@@ -3,7 +3,7 @@ import { Token, TokenType } from "../Token";
 import { BinarySyntaxNode, LiteralSyntaxNode, UnarySyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode } from "../syntax/syntax";
 import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
 import { ValueType } from "../syntax/ValueType"
-import { CompileError } from "../../CompileError"
+import { CompileError } from "../CompileError"
 
 class TokenReader {
   private index = 0;

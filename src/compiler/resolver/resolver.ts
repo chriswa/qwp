@@ -3,7 +3,7 @@ import { builtinsByName } from "../../builtins/builtins"
 import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
 import { TokenType } from "../Token"
 import { parse } from "../parser/parser"
-import { CompileError } from "../../CompileError"
+import { CompileError } from "../CompileError"
 
 interface IResolverResponse {
   ast: SyntaxNode;
