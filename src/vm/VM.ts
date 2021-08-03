@@ -1,5 +1,5 @@
-import { ByteBuffer } from "../compiler/ByteBuffer"
-import { OpCode } from "../opcodes"
+import { ByteBuffer } from "../bytecode/ByteBuffer"
+import { OpCode } from "../bytecode/opcodes"
 import { opCodeHandlers } from "./opCodeHandlers"
 
 /*

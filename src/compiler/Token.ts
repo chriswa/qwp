@@ -1,4 +1,4 @@
-import { GenericLexerToken } from "./GenericLexer";
+import { GenericLexerToken } from "./lexer/GenericLexer";
 
 export enum TokenType {
   EOF,

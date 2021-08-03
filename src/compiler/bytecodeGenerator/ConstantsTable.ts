@@ -1,4 +1,4 @@
-import { ByteBuffer } from "./ByteBuffer"
+import { ByteBuffer } from "../../bytecode/ByteBuffer"
 
 export class ConstantsTable {
   public readonly buffer: ByteBuffer = new ByteBuffer();

@@ -1,8 +1,8 @@
 import { BinarySyntaxNode, FunctionCallSyntaxNode, FunctionDefinitionSyntaxNode, GroupingSyntaxNode, IfStatementSyntaxNode, LiteralSyntaxNode, LogicShortCircuitSyntaxNode, ReturnStatementSyntaxNode, StatementBlockSyntaxNode, SyntaxNode, SyntaxNodeVisitor, UnarySyntaxNode, VariableAssignmentSyntaxNode, VariableLookupSyntaxNode, WhileStatementSyntaxNode } from "../syntax/syntax"
 import { builtinsByName } from "../../builtins/builtins"
 import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
-import { TokenType } from "./Token"
-import { parse } from "./parser"
+import { TokenType } from "../Token"
+import { parse } from "../parser/parser"
 import { CompileError } from "../../CompileError"
 
 interface IResolverResponse {

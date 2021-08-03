@@ -1,5 +1,5 @@
 import { GenericLexer } from './GenericLexer';
-import { Token, TokenType } from './Token';
+import { Token, TokenType } from '../Token';
 
 class LexerState {
   // public foo: string = "";

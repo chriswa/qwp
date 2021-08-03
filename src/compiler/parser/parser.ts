@@ -1,8 +1,7 @@
-import { lex } from "./lexer";
-import { Token, TokenType } from "./Token";
+import { lex } from "../lexer/lexer";
+import { Token, TokenType } from "../Token";
 import { BinarySyntaxNode, LiteralSyntaxNode, UnarySyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode } from "../syntax/syntax";
 import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
-import { resolve, ResolverOutput } from "./resolver"
 import { ValueType } from "../syntax/ValueType"
 import { CompileError } from "../../CompileError"
 

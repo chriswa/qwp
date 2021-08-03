@@ -1,5 +1,5 @@
-import { TokenType } from "../parser/Token"
-import { SyntaxNodeVisitor, BinarySyntaxNode, UnarySyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode } from "./syntax"
+import { TokenType } from "../Token"
+import { SyntaxNodeVisitor, BinarySyntaxNode, UnarySyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionCallSyntaxNode, FunctionDefinitionSyntaxNode, ReturnStatementSyntaxNode } from "./syntax"
 
 /*
 export class AstPrinter implements SyntaxNodeVisitor<string> {
@@ -45,6 +45,15 @@ export class AstPrinter implements SyntaxNodeVisitor<string> {
   }
   visitVariableAssignment(node: VariableAssignmentSyntaxNode): string {
     return (node.modifier === null ? "" : `${node.modifier.lexeme} `) + node.lvalue.lexeme + " := " + node.rvalue.acc;
+  }
+  visitReturnStatement(node: ReturnStatementSyntaxNode): string {
+    return ``;
+  }
+  visitFunctionDefinition(node: FunctionDefinitionSyntaxNode): string {
+    return ``;
+  }
+  visitFunctionCall(node: FunctionCallSyntaxNode): string {
+    return ``;
   }
 }
 */

@@ -1,35 +1,35 @@
 import assert from "assert"
-import { Token, TokenType } from "../../sourcecode/parser/Token"
-import { SyntaxNodeVisitor, SyntaxNode, BinarySyntaxNode, UnarySyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode } from "../../sourcecode/syntax/syntax"
-import { ByteBuffer } from "./ByteBuffer"
-import { OpCode } from "../opcodes"
-import { ValueType } from "../../sourcecode/syntax/ValueType"
+import { Token, TokenType } from "../Token"
+import { SyntaxNodeVisitor, SyntaxNode, BinarySyntaxNode, UnarySyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode } from "../syntax/syntax"
+import { ByteBuffer } from "../../bytecode/ByteBuffer"
+import { OpCode } from "../../bytecode/opcodes"
+import { ValueType } from "../syntax/ValueType"
 import { ConstantsTable } from "./ConstantsTable"
 import { builtinsByName } from "../../builtins/builtins"
-import { resolve, ResolverOutput, ResolverVariableDetails } from "../../sourcecode/parser/resolver"
+import { resolve, ResolverOutput, ResolverVariableDetails } from "../resolver/resolver"
 
-export function compile(source: string, path: string) {
+export function generateBytecode(source: string, path: string) {
   const { ast, resolverOutput } = resolve(source, path);
-  const context = new CompilerContext(new ConstantsTable(), resolverOutput);
-  return new Compiler(context, null, ast).compileModule(ast);
+  const context = new BytecodeGeneratorContext(new ConstantsTable(), resolverOutput);
+  return new BytecodeGenerator(context, null, ast).compileModule(ast);
 }
 
-class CompilerContext {
+class BytecodeGeneratorContext {
   public constructor(
     public constantsTable: ConstantsTable,
     public resolverOutput: ResolverOutput,
   ) { }
 }
 
-class Compiler implements SyntaxNodeVisitor<void> {
-  private functionScope: CompilerFunctionScope;
+class BytecodeGenerator implements SyntaxNodeVisitor<void> {
+  private functionScope: BytecodeGeneratorFunctionScope;
   private instructionBuffer: ByteBuffer = new ByteBuffer();
   constructor(
-    private context: CompilerContext,
-    parentCompiler: Compiler | null,
+    private context: BytecodeGeneratorContext,
+    parentBytecodeGenerator: BytecodeGenerator | null,
     private node: SyntaxNode,
   ) {
-    this.functionScope = new CompilerFunctionScope(this.context, parentCompiler?.functionScope ?? null, this.node);
+    this.functionScope = new BytecodeGeneratorFunctionScope(this.context, parentBytecodeGenerator?.functionScope ?? null, this.node);
   }
   private get constantsTable() { return this.context.constantsTable }
   private get closedVarsByFunctionNode() { return this.context.resolverOutput.closedVarsByFunctionNode }
@@ -95,7 +95,7 @@ class Compiler implements SyntaxNodeVisitor<void> {
     [TokenType.OP_NEQ, OpCode.NEQ],
   ])
   visitBinary(node: BinarySyntaxNode): void {
-    const opCode = Compiler._binaryTokenTypeToOpCodeMap.get(node.op.type)
+    const opCode = BytecodeGenerator._binaryTokenTypeToOpCodeMap.get(node.op.type)
     if (opCode === undefined) {
       throw new Error(`impossible: unrecognized binary op token ${TokenType[node.op.type]}`)
     }
@@ -108,7 +108,7 @@ class Compiler implements SyntaxNodeVisitor<void> {
     [TokenType.OP_BANG, OpCode.LOGICAL_NOT],
   ])
   visitUnary(node: UnarySyntaxNode): void {
-    const opCode = Compiler._unaryTokenTypeToOpCodeMap.get(node.op.type);
+    const opCode = BytecodeGenerator._unaryTokenTypeToOpCodeMap.get(node.op.type);
     if (opCode === undefined) {
       throw new Error(`impossible: unrecognized unary op token ${TokenType[node.op.type]}`);
     }
@@ -242,13 +242,13 @@ class Compiler implements SyntaxNodeVisitor<void> {
   }
   visitFunctionDefinition(node: FunctionDefinitionSyntaxNode): void {
     const closedVars = this.closedVarsByFunctionNode.get(node) ?? [];
-    const fnCompiler = new Compiler(this.context, this, node);
-    fnCompiler.declareParametersAndClosedVars(node.parameterList.map(token => token.lexeme), closedVars);
-    fnCompiler.compileNodeList(node.statementList);
-    fnCompiler.popLocals();
-    fnCompiler.instructionBuffer.pushUint8(OpCode.CODESTOP);
-    fnCompiler.instructionBuffer.compact();
-    const constantIndex = this.constantsTable.storeBuffer(fnCompiler.instructionBuffer.buffer); // safe because all jumps are relative and all references to constants table have already been added
+    const fnBytecodeGenerator = new BytecodeGenerator(this.context, this, node);
+    fnBytecodeGenerator.declareParametersAndClosedVars(node.parameterList.map(token => token.lexeme), closedVars);
+    fnBytecodeGenerator.compileNodeList(node.statementList);
+    fnBytecodeGenerator.popLocals();
+    fnBytecodeGenerator.instructionBuffer.pushUint8(OpCode.CODESTOP);
+    fnBytecodeGenerator.instructionBuffer.compact();
+    const constantIndex = this.constantsTable.storeBuffer(fnBytecodeGenerator.instructionBuffer.buffer); // safe because all jumps are relative and all references to constants table have already been added
     this.instructionBuffer.pushUint8(OpCode.DEFINE_FUNCTION);
     this.instructionBuffer.pushUint32(constantIndex);
     this.instructionBuffer.pushUint8(closedVars.length);
@@ -282,18 +282,18 @@ class CallFrameVarInfo {
   ) { }
 }
 
-class CompilerFunctionScope {
-  private _currentBlockScope: CompilerBlockScope;
+class BytecodeGeneratorFunctionScope {
+  private _currentBlockScope: BytecodeGeneratorBlockScope;
   public constructor(
-    private context: CompilerContext,
-    private parentFunctionScope: CompilerFunctionScope | null,
+    private context: BytecodeGeneratorContext,
+    private parentFunctionScope: BytecodeGeneratorFunctionScope | null,
     private node: SyntaxNode,
   ) {
-    this._currentBlockScope = new CompilerBlockScope(this.context, null, 0, this.node);
+    this._currentBlockScope = new BytecodeGeneratorBlockScope(this.context, null, 0, this.node);
   }
   public get currentBlockScope() { return this._currentBlockScope }
   public pushBlockScope(node: SyntaxNode) {
-    this._currentBlockScope = new CompilerBlockScope(this.context, this._currentBlockScope, this._currentBlockScope.localsCount, node)
+    this._currentBlockScope = new BytecodeGeneratorBlockScope(this.context, this._currentBlockScope, this._currentBlockScope.localsCount, node)
   }
   public popBlockScope() {
     const outerScope = this._currentBlockScope.parentScope;
@@ -319,13 +319,13 @@ class CompilerFunctionScope {
   }
 }
 
-class CompilerBlockScope {
+class BytecodeGeneratorBlockScope {
   private callFrameOffsets: Map<string, number> = new Map();
   public localIdentifiers: Array<string> = [];
   //private localsWhichNeedToBeClosed: Set<number> = new Set();
   public constructor(
-    private context: CompilerContext,
-    public parentScope: CompilerBlockScope | null,
+    private context: BytecodeGeneratorContext,
+    public parentScope: BytecodeGeneratorBlockScope | null,
     public localsCount: number, // includes parameters and stack variables
     private node: SyntaxNode,
   ) { }
@@ -339,7 +339,7 @@ class CompilerBlockScope {
   }
   public declare(identifier: string): CallFrameVarInfo {
     const resolverVarDetails = this.findVarDetails(identifier);
-    if (resolverVarDetails === undefined) { throw new Error(`compiler could not find var declaration by resolver for ${identifier}`) }
+    if (resolverVarDetails === undefined) { throw new Error(`BytecodeGenerator could not find var declaration by resolver for ${identifier}`) }
     const callFrameOffset = this.localsCount;
     this.callFrameOffsets.set(identifier, callFrameOffset);
     this.localIdentifiers.push(identifier);
@@ -350,7 +350,7 @@ class CompilerBlockScope {
     const callFrameOffset = this.callFrameOffsets.get(identifier);
     if (callFrameOffset !== undefined) {
       const resolverVarDetails = this.findVarDetails(identifier);
-      if (resolverVarDetails === undefined) { throw new Error(`compiler could not find var declaration by resolver for ${identifier}`) }
+      if (resolverVarDetails === undefined) { throw new Error(`BytecodeGenerator could not find var declaration by resolver for ${identifier}`) }
       return new CallFrameVarInfo(callFrameOffset, resolverVarDetails);
     }
     if (this.parentScope !== null) {

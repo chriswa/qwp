@@ -1,5 +1,5 @@
-import { Builtin, builtinsById, Primitive } from "../../builtins/builtins"
-import { OpCode } from "../opcodes"
+import { Builtin, builtinsById, Primitive } from "../builtins/builtins"
+import { OpCode } from "../bytecode/opcodes"
 import { VM } from "./VM"
 
 export const opCodeHandlers: Array<(vm: VM) => void> = [];

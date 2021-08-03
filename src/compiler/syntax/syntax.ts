@@ -1,4 +1,4 @@
-import { Token } from "../parser/Token"
+import { Token } from "../Token"
 import { ValueType } from "./ValueType"
 
 export interface SyntaxNodeVisitor<T> {

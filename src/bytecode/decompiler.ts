@@ -1,6 +1,6 @@
 import { builtinsById } from "../builtins/builtins"
 import { OpCode } from "./opcodes"
-import { ByteBuffer } from "./compiler/ByteBuffer"
+import { ByteBuffer } from "./ByteBuffer"
 
 export function dumpDecompile(buffer: ByteBuffer) {
   buffer.setByteCursor(0); // redundant, we're about to "jump" to whatever is in [0]

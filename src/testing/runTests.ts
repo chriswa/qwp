@@ -1,10 +1,10 @@
 import fs from "fs"
-import { ByteBuffer } from "../bytecode/compiler/ByteBuffer"
-import { compile } from "../bytecode/compiler/compiler"
+import { ByteBuffer } from "../bytecode/ByteBuffer"
+import { generateBytecode } from "../compiler/bytecodeGenerator/bytecodeGenerator"
 import { decompileOneInstruction, dumpDecompile } from "../bytecode/decompiler"
-import { VM } from "../bytecode/vm/VM"
+import { VM } from "../vm/VM"
 import { getPositionInSource, printPositionInSource } from "../cliUtil"
-import { parse } from "../sourcecode/parser/parser"
+import { parse } from "../compiler/parser/parser"
 import { ErrorWithSourcePos } from "../ErrorWithSourcePos"
 import { testExpectedKindStringToEnum, TestResult, TestResultKind } from "./results"
 import { printFailedTestHeader, printTestsRunnerHeader, printTestsRunnerSuccess, reportFailedTest, reportSuccessfulTest } from "./reporting"
@@ -79,7 +79,7 @@ function runSource(path: string, source: string): TestResult {
   // const constantBuffer = compile(parserResponse.topSyntaxNode, parserResponse.resolverOutput);
   let constantBuffer: ByteBuffer;
   try {
-    constantBuffer = compile(source, path)
+    constantBuffer = generateBytecode(source, path)
   }
   catch (err) {
     if (err instanceof CompileError) {
