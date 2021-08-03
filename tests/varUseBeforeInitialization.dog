@@ -1,6 +1,8 @@
 let a;
-print(a);
+printFloat32(a);
 a := 1;
 
-__SYNTAX_ERROR__
-Resolver: Uninitialized variable cannot be substituted at line 2, col 7
+/*
+EXPECT COMPILE ERROR
+Resolver: Uninitialized variable cannot be substituted at line 2, col 14
+*/

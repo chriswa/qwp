@@ -1,4 +1,4 @@
-import { SyntaxError } from "./SyntaxError"
+import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
 
 export class GenericLexerToken {
   private _path: string = "";
@@ -71,7 +71,7 @@ export class GenericLexer<T_TOKEN extends GenericLexerToken, T_STATE> {
         const remainderOfLineMatches = input.match(/^[^\n]*/);
         if (remainderOfLineMatches === null) { throw new Error("impossible, since an empty string is valid for this pattern"); } // appease typescript
         const snippet = currentLine + remainderOfLineMatches[0];
-        throw new SyntaxError("Lexer: Lexeme not recognized", path, charPos);
+        throw new ErrorWithSourcePos("Lexer: Lexeme not recognized", path, charPos);
       }
     }
     eofToken.setInternals(path, charPos, "");

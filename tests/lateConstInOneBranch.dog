@@ -11,5 +11,7 @@ else {
 }
 print(a);
 
-__SYNTAX_ERROR__
+/*
+EXPECT COMPILE ERROR
 Resolver: Late const assignment of variable "a" must occur in all branches at line 6, col 3
+*/

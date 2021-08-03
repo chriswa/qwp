@@ -1,0 +1,19 @@
+const foo := 123;
+// printFloat32(foo + foo);
+
+const f := fn(a, b) {
+  // return a + b;
+  // return a + b + foo;
+  return fn() {
+    return a + b + foo;
+  };
+};
+
+printFloat32(f(1, 2)());
+// printFloat32(f(3, 4)());
+// printFloat32(456);
+
+/*
+EXPECT COMPLETION
+printFloat32: 126
+*/

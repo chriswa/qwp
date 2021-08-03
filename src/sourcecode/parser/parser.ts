@@ -1,7 +1,7 @@
 import { lex } from "./lexer";
 import { Token, TokenType } from "./Token";
 import { BinarySyntaxNode, LiteralSyntaxNode, UnarySyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode } from "../syntax/syntax";
-import { SyntaxError } from "./SyntaxError"
+import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
 import { resolve, ResolverOutput } from "./resolver"
 import { ValueType } from "../syntax/ValueType"
 
@@ -9,7 +9,7 @@ class TokenReader {
   private index = 0;
   public constructor(
     private tokens: Array<Token>,
-    private parseErrorGenerator: (token: Token, message: string) => SyntaxError,
+    private parseErrorGenerator: (token: Token, message: string) => ErrorWithSourcePos,
   ) {
   }
   public peek() {
@@ -49,36 +49,36 @@ class TokenReader {
   }
 }
 
-interface ISyntaxErrorParserResponse {
+interface IErrorWithSourcePosParserResponse {
   kind: "SYNTAX_ERROR";
-  syntaxErrors: Array<SyntaxError>;
+  syntaxErrors: Array<ErrorWithSourcePos>;
 }
 interface ISuccessParserResponse {
   kind: "SUCCESS";
   topSyntaxNode: SyntaxNode;
   resolverOutput: ResolverOutput,
 }
-type ParserResponse = ISyntaxErrorParserResponse | ISuccessParserResponse;
+type ParserResponse = IErrorWithSourcePosParserResponse | ISuccessParserResponse;
 
 export function parse(input: string, path: string): ParserResponse {
   const tokens = lex(input, path);
-  const reader = new TokenReader(tokens, generateSyntaxError);
+  const reader = new TokenReader(tokens, generateErrorWithSourcePos);
 
-  const parserSyntaxErrors: Array<SyntaxError> = [];
+  const parserErrorWithSourcePoss: Array<ErrorWithSourcePos> = [];
   let ast: SyntaxNode | null = null;
   try {
     ast = module();
   }
   catch (error) {
-    if (!(error instanceof SyntaxError)) {
+    if (!(error instanceof ErrorWithSourcePos)) {
       throw error;
     }
   }
   if (ast === null) {
-    if (parserSyntaxErrors.length === 0) {
+    if (parserErrorWithSourcePoss.length === 0) {
       throw new Error(`Internal error: ast not set but no parsererrors set`);
     }
-    return { kind: "SYNTAX_ERROR", syntaxErrors: parserSyntaxErrors };
+    return { kind: "SYNTAX_ERROR", syntaxErrors: parserErrorWithSourcePoss };
   }
 
   // const resolver = new Resolver();
@@ -97,13 +97,13 @@ export function parse(input: string, path: string): ParserResponse {
     resolverOutput: resolverResponse.resolverOutput,
   };
 
-  function generateSyntaxError(token: Token, message: string) {
-    const parseError = new SyntaxError("Parser: " + message, token.path, token.charPos);
-    parserSyntaxErrors.push(parseError);
+  function generateErrorWithSourcePos(token: Token, message: string) {
+    const parseError = new ErrorWithSourcePos("Parser: " + message, token.path, token.charPos);
+    parserErrorWithSourcePoss.push(parseError);
     return parseError;
   }
 
-  function synchronizeAfterSyntaxError() {
+  function synchronizeAfterErrorWithSourcePos() {
     reader.advance();
     while (!reader.isAtEnd()) {
       if (reader.previous().type === TokenType.SEMICOLON) {
@@ -243,7 +243,7 @@ export function parse(input: string, path: string): ParserResponse {
         }
         isFirst = false;
         if (!reader.match([TokenType.IDENTIFIER])) {
-          throw generateSyntaxError(reader.peek(), `identifier expected in function argument list`);
+          throw generateErrorWithSourcePos(reader.peek(), `identifier expected in function argument list`);
         }
         parameterList.push(reader.previous());
       }
@@ -341,7 +341,7 @@ export function parse(input: string, path: string): ParserResponse {
       reader.consume(TokenType.CLOSE_PAREN, "Expect ')' after expression.");
       return expr;
     }
-    throw generateSyntaxError(reader.peek(), `expecting expression`);
+    throw generateErrorWithSourcePos(reader.peek(), `expecting expression`);
   }
 }
 

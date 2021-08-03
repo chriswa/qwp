@@ -1,3 +1,9 @@
+let printFunction: (str: string) => void = console.log;
+
+export function setBuiltinPrintFunction(f: typeof printFunction) {
+  printFunction = f;
+}
+
 export enum Primitive {
   U32,
   F32,
@@ -28,12 +34,12 @@ function registerBuiltin(id: number, name: string, parameterPrimitives: Array<Pr
 }
 
 registerBuiltin(0x0000, "printFloat32", [Primitive.F32], [], (args) => {
-  console.log(`printFloat32: ${args}`)
+  printFunction(`printFloat32: ${args}`)
   return 0;
 });
 
 registerBuiltin(0x0001, "printUint32", [Primitive.U32], [], (args) => {
-  console.log(`printUint32: ${args}`)
+  printFunction(`printUint32: ${args}`)
   return 0;
 });
 

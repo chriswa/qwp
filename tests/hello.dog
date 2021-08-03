@@ -1,15 +1,15 @@
-const foo := "bar";
-foo + foo;
+// const foo := "bar";
+// foo + foo;
 
 const f := fn(a, b) {
   return a + b;
 };
 
-println(f(1, 2));
-println(f(3, 4));
-println("hello world");
+printFloat32(f(1, 2));
+printFloat32(f(3, 4));
 
-__OUTPUT__
-3
-7
-hello world
+/*
+EXPECT COMPLETION
+printFloat32: 3
+printFloat32: 7
+*/

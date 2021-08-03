@@ -3,5 +3,8 @@ while (true) {
   a := 4;
 }
 print(a);
-__SYNTAX_ERROR__
+
+/*
+EXPECT COMPILE ERROR
 Resolver: Late const assignment of variable "a" may not occur in a loop at line 2, col 1
+*/

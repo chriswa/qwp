@@ -1,17 +1,17 @@
 import { BinarySyntaxNode, FunctionCallSyntaxNode, FunctionDefinitionSyntaxNode, GroupingSyntaxNode, IfStatementSyntaxNode, LiteralSyntaxNode, LogicShortCircuitSyntaxNode, ReturnStatementSyntaxNode, StatementBlockSyntaxNode, SyntaxNode, SyntaxNodeVisitor, UnarySyntaxNode, VariableAssignmentSyntaxNode, VariableLookupSyntaxNode, WhileStatementSyntaxNode } from "../syntax/syntax"
 import { builtinsByName } from "../../builtins/builtins"
-import { SyntaxError } from "./SyntaxError"
+import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
 import { TokenType } from "./Token"
 
-interface ISyntaxErrorResolverResponse {
+interface IErrorWithSourcePosResolverResponse {
   kind: "SYNTAX_ERROR";
-  syntaxErrors: Array<SyntaxError>;
+  syntaxErrors: Array<ErrorWithSourcePos>;
 }
 interface ISuccessResolverResponse {
   kind: "SUCCESS";
   resolverOutput: ResolverOutput;
 }
-type ResolverResponse = ISyntaxErrorResolverResponse | ISuccessResolverResponse;
+type ResolverResponse = IErrorWithSourcePosResolverResponse | ISuccessResolverResponse;
 
 export class ResolverOutput {
   public varDeclarationsByBlockOrFunctionNode: Map<SyntaxNode, ResolverScopeOutput>;
@@ -135,7 +135,7 @@ class Resolver implements SyntaxNodeVisitor<ResolverScope | null> {
   scope: ResolverScope;
   varsByScope: Map<SyntaxNode, ResolverScope> = new Map();
   closedVarsByFunctionNode: Map<SyntaxNode, Array<string>> = new Map(); // map from FunctionDeclarationSyntaxNode to list of closed identifiers
-  resolverErrors: Array<SyntaxError> = [];
+  resolverErrors: Array<ErrorWithSourcePos> = [];
   constructor() {
     this.scope = new ResolverScope(false, null, Array.from(builtinsByName.keys()));
   }
@@ -153,13 +153,13 @@ class Resolver implements SyntaxNodeVisitor<ResolverScope | null> {
   }
 
   generateResolverError(node: SyntaxNode, message: string) {
-    const resolverError = new SyntaxError("Resolver: " + message, node.referenceToken.path, node.referenceToken.charPos);
+    const resolverError = new ErrorWithSourcePos("Resolver: " + message, node.referenceToken.path, node.referenceToken.charPos);
     this.resolverErrors.push(resolverError);
     return resolverError;
   }
 
 
-  resolve(node: SyntaxNode): Array<SyntaxError> {
+  resolve(node: SyntaxNode): Array<ErrorWithSourcePos> {
     this.resolverErrors = [];
     this.resolveSyntaxNode(node);
     return this.resolverErrors;

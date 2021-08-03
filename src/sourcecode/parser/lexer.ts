@@ -22,7 +22,7 @@ function addRule(filter: FilterType, regexp: RegExp, tokenType: TokenType | null
 addRule(filters.ALWAYS, /^\n/, null); // NEWLINE
 addRule(filters.ALWAYS, /^[ \t]+/, null); // WHITESPACE
 addRule(filters.ALWAYS, /^\/\/[^\n]*/, null); // LINE_COMMENT
-addRule(filters.ALWAYS, /^\/\*.*?\*\//, null); // BLOCK_COMMENT
+addRule(filters.ALWAYS, /^\/\*.*?\*\//s, null); // BLOCK_COMMENT
 addRule(filters.ALWAYS, /^"(\\.|[^"\\])*"/, TokenType.STRING);
 addRule(filters.ALWAYS, /^;/, TokenType.SEMICOLON);
 addRule(filters.ALWAYS, /^#[a-zA-Z][a-zA-Z0-9_]*/, TokenType.ANCHOR);

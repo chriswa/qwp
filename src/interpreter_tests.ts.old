@@ -2,7 +2,7 @@ import fs from "fs";
 import chalk from "chalk";
 import { Interpreter } from "./interpreter/Interpreter";
 import { parse } from "./sourcecode/parser/parser";
-import { SyntaxError } from "./sourcecode/parser/SyntaxError"
+import { ErrorWithSourcePos } from "./ErrorWithSourcePos"
 import { InterpreterRuntimeError } from "./interpreter/InterpreterRuntimeError"
 import { getPositionInSource, printPositionInSource } from "./cliUtil"
 
@@ -54,7 +54,7 @@ function performTest(path: string): boolean {
   return false
 }
 
-function generateErrorMessageWithLineNumber(path: string, source: string, error: SyntaxError | InterpreterRuntimeError) {
+function generateErrorMessageWithLineNumber(path: string, source: string, error: ErrorWithSourcePos | InterpreterRuntimeError) {
   const { row, col } = getPositionInSource(path, source, error.charPos);
   return `${error.message} at line ${row}, col ${col}`;
 }
@@ -76,9 +76,9 @@ function reportFailedTest(path: string, source: string, testInput: ITestDetails,
   console.log(chalk.red(drawBox(`Result ${runResult.kind}`)));
   switch (runResult.kind) {
     case "SYNTAX_ERROR":
-      const firstSyntaxError = runResult.syntaxErrors[0];
-      console.log(chalk.red(generateErrorMessageWithLineNumber(path, source, firstSyntaxError)));
-      printPositionInSource(firstSyntaxError.path, source, firstSyntaxError.charPos);
+      const firstErrorWithSourcePos = runResult.syntaxErrors[0];
+      console.log(chalk.red(generateErrorMessageWithLineNumber(path, source, firstErrorWithSourcePos)));
+      printPositionInSource(firstErrorWithSourcePos.path, source, firstErrorWithSourcePos.charPos);
       break;
     case "RUNTIME_ERROR":
       const runtimeError = runResult.runtimeError;
@@ -107,9 +107,9 @@ function loadTestFile(path: string): ITestDetails {
   return { source, expectedResultType, expectedResultContent };
 }
 
-interface ISyntaxErrorRunResult {
+interface IErrorWithSourcePosRunResult {
   kind: "SYNTAX_ERROR";
-  syntaxErrors: Array<SyntaxError>;
+  syntaxErrors: Array<ErrorWithSourcePos>;
 }
 interface IRuntimeErrorRunResult {
   kind: "RUNTIME_ERROR";
@@ -119,7 +119,7 @@ interface ICompletedRunResult {
   kind: "COMPLETED";
   output: string;
 }
-type RunResult = ISyntaxErrorRunResult | IRuntimeErrorRunResult | ICompletedRunResult;
+type RunResult = IErrorWithSourcePosRunResult | IRuntimeErrorRunResult | ICompletedRunResult;
 function runSource(path: string, source: string): RunResult {
   const parserResponse = parse(source, path);
   if (parserResponse.kind === "SYNTAX_ERROR") {
