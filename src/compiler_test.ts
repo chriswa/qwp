@@ -55,7 +55,7 @@ parserResponse.resolverOutput.varDeclarationsByBlockOrFunctionNode.forEach((reso
 const constantBuffer = compile(parserResponse.topSyntaxNode, parserResponse.resolverOutput);
 dumpDecompile(constantBuffer);
 
-const VM_DEBUG = true;
+const VM_DEBUG = false;
 
 if (VM_DEBUG) { console.log(`VM START`) }
 const vm = new VM(constantBuffer, 1024);

@@ -100,7 +100,7 @@ opCodeHandlers[OpCode.JUMP_BOOLEAN_AND] = (vm: VM) => { // if peek true, pop, el
 
 opCodeHandlers[OpCode.ASSIGN_CALLFRAME_VALUE] = (vm: VM) => {
   const callFrameOffsetIndex = vm.constantBuffer.readUint8();
-  vm.ramBuffer.pokeFloat32At(4 * callFrameOffsetIndex, vm.ramBuffer.popFloat32());
+  vm.ramBuffer.pokeFloat32At(4 * (vm.callFrameIndex + callFrameOffsetIndex), vm.ramBuffer.popFloat32());
 };
 
 opCodeHandlers[OpCode.FETCH_CALLFRAME_VALUE] = (vm: VM) => {
@@ -126,6 +126,13 @@ opCodeHandlers[OpCode.ALLOC_SCALAR] = (vm: VM) => {
   const value = vm.ramBuffer.popUint32();
   const ptr = vm.heap.allocNumber(value);
   vm.ramBuffer.pushUint32(ptr);
+};
+
+opCodeHandlers[OpCode.PROMOTE_PARAM_TO_HEAP] = (vm: VM) => {
+  const callFrameOffsetIndex = vm.constantBuffer.readUint8();
+  const value = vm.ramBuffer.peekUint32At(4 * (vm.callFrameIndex + callFrameOffsetIndex));
+  const ptr = vm.heap.allocNumber(value);
+  vm.ramBuffer.pokeUint32At(4 * (vm.callFrameIndex + callFrameOffsetIndex), ptr);
 };
 
 opCodeHandlers[OpCode.DEFINE_FUNCTION] = (vm: VM) => {

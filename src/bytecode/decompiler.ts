@@ -44,6 +44,9 @@ export function decompileOneInstruction(buffer: ByteBuffer, pendingDecompilation
     case OpCode.DEREF:
     case OpCode.ALLOC_SCALAR:
       break;
+    case OpCode.PROMOTE_PARAM_TO_HEAP:
+      line += ` call_frame[ ${buffer.readUint8()} ]`;
+      break;
     case OpCode.PUSH_CONSTANT:
       const constantIndex = buffer.readUint32();
       line += ` constant[ ${(constantIndex * 4).toString(16).padStart(4, "0")} ] => (float?) ${buffer.peekFloat32At(constantIndex * 4)}`;
@@ -60,8 +63,6 @@ export function decompileOneInstruction(buffer: ByteBuffer, pendingDecompilation
       break;
     case OpCode.ASSIGN_CALLFRAME_VALUE:
     case OpCode.FETCH_CALLFRAME_VALUE:
-    // case OpCode.ASSIGN_CALLFRAME_CLOSED_VAR:
-    // case OpCode.FETCH_CALLFRAME_CLOSED_VAR:
       line += ` call_frame[ ${buffer.readUint8()} ]`;
       break;
     case OpCode.ASSIGN_PTR:

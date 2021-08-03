@@ -22,6 +22,7 @@ export enum OpCode {
   ASSIGN_PTR, // pop ptr, assigns (peeked) value to that location in ram
   DEREF, // pop ptr, then pushes value found at that locaton in ram
   ALLOC_SCALAR, // value = pop stack; allocate single 32-bit, pushing ptr/index onto stack; write value into dest
+  PROMOTE_PARAM_TO_HEAP,
   DEFINE_FUNCTION,
   POP_N,
   CALL,

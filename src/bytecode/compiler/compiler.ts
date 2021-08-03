@@ -35,8 +35,15 @@ class Compiler implements SyntaxNodeVisitor<void> {
   private get varDeclarationsByBlockOrFunctionNode() { return this.context.resolverOutput.varDeclarationsByBlockOrFunctionNode }
 
   public declareParametersAndClosedVars(parameterIdentifiers: Array<string>, closedVarIdentifiers: Array<string>) {
+    // const parameterOffsetsToPromoteToHeap: Array<number> = [];
     parameterIdentifiers.forEach((identifier) => {
-      this.functionScope.currentBlockScope.declare(identifier);
+      const callFrameVarInfo = this.functionScope.currentBlockScope.declare(identifier);
+      if (callFrameVarInfo.resolverVarDetails.isClosed) {
+        // console.log(`  PARAMETER TO BE PROMOTED TO HEAP: ${identifier}`)
+        // parameterOffsetsToPromoteToHeap.push(callFrameVarInfo.callFrameOffset);
+        this.instructionBuffer.pushUint8(OpCode.PROMOTE_PARAM_TO_HEAP);
+        this.instructionBuffer.pushUint8(callFrameVarInfo.callFrameOffset);
+      }
     });
     closedVarIdentifiers.forEach((identifier) => {
       this.functionScope.currentBlockScope.declare(identifier);
