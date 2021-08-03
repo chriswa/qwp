@@ -9,12 +9,14 @@ export function reportSuccessfulTest(path: string) {
 export function reportFailedTest(path: string, source: string, expectedResult: TestResult, actualResult: TestResult) {
   console.log(chalk.red(` X ${path}`));
   console.log();
-  console.log(chalk.white(drawBox(`Expected: ${TestResultKind[expectedResult.kind]}`)));
-  console.log(chalk.white(`${expectedResult.detail}`));
-  console.log(chalk.red(drawBox(`Actual: ${TestResultKind[actualResult.kind]}`)));
-  console.log(chalk.red(actualResult.detail));
-  if (actualResult.errorWithSourcePos !== undefined) {
-    printPositionInSource(actualResult.errorWithSourcePos.path, source, actualResult.errorWithSourcePos.charPos);
+  console.log(chalk.cyan(drawBox(`Expected: ${TestResultKind[expectedResult.kind]}`)));
+  console.log(chalk.cyan(`${expectedResult.detail}`));
+  console.log(chalk.yellow(drawBox(`Actual: ${TestResultKind[actualResult.kind]}`)));
+  console.log(chalk.yellow(actualResult.detail));
+  if (actualResult.errorsWithSourcePos !== undefined) {
+    actualResult.errorsWithSourcePos.forEach((errorWithSourcePos) => {
+      printPositionInSource(errorWithSourcePos.path, source, errorWithSourcePos.charPos);
+    });
   }
 }
 

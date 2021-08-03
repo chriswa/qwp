@@ -2,9 +2,10 @@ const a;
 while (true) {
   a := 4;
 }
-print(a);
+printFloat32(a);
 
 /*
 EXPECT COMPILE ERROR
 Resolver: Late const assignment of variable "a" may not occur in a loop at line 2, col 1
+Resolver: Uninitialized variable cannot be substituted at line 5, col 14
 */

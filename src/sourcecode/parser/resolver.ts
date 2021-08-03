@@ -2,16 +2,24 @@ import { BinarySyntaxNode, FunctionCallSyntaxNode, FunctionDefinitionSyntaxNode,
 import { builtinsByName } from "../../builtins/builtins"
 import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
 import { TokenType } from "./Token"
+import { parse } from "./parser"
+import { CompileError } from "../../CompileError"
 
-interface IErrorWithSourcePosResolverResponse {
-  kind: "SYNTAX_ERROR";
-  syntaxErrors: Array<ErrorWithSourcePos>;
-}
-interface ISuccessResolverResponse {
-  kind: "SUCCESS";
+interface IResolverResponse {
+  ast: SyntaxNode;
   resolverOutput: ResolverOutput;
 }
-type ResolverResponse = IErrorWithSourcePosResolverResponse | ISuccessResolverResponse;
+
+export function resolve(source: string, path: string): IResolverResponse {
+  const ast = parse(source, path);
+  const resolver = new Resolver();
+  const resolverErrors = resolver.resolve(ast);
+  if (resolverErrors.length > 0) {
+    throw new CompileError(resolverErrors);
+  }
+  const resolverOutput = new ResolverOutput(resolver.closedVarsByFunctionNode, resolver.varsByScope);
+  return { ast, resolverOutput };
+}
 
 export class ResolverOutput {
   public varDeclarationsByBlockOrFunctionNode: Map<SyntaxNode, ResolverScopeOutput>;
@@ -55,16 +63,6 @@ export class ResolverVariableDetails {
   public toString() {
     return `${this.isRef ? 'isRef' : ''}, ${this.isClosed ? 'isClosed' : ''}`;
   }
-}
-
-export function resolve(ast: SyntaxNode): ResolverResponse {
-  const resolver = new Resolver();
-  const resolverErrors = resolver.resolve(ast);
-  if (resolverErrors.length > 0) {
-    return { kind: "SYNTAX_ERROR", syntaxErrors: resolverErrors }
-  }
-  const resolverOutput = new ResolverOutput(resolver.closedVarsByFunctionNode, resolver.varsByScope);
-  return { kind: "SUCCESS", resolverOutput };
 }
 
 class VariableStatus {

@@ -6,9 +6,10 @@ import { OpCode } from "../opcodes"
 import { ValueType } from "../../sourcecode/syntax/ValueType"
 import { ConstantsTable } from "./ConstantsTable"
 import { builtinsByName } from "../../builtins/builtins"
-import { ResolverOutput, ResolverVariableDetails } from "../../sourcecode/parser/resolver"
+import { resolve, ResolverOutput, ResolverVariableDetails } from "../../sourcecode/parser/resolver"
 
-export function compile(ast: SyntaxNode, resolverOutput: ResolverOutput) {
+export function compile(source: string, path: string) {
+  const { ast, resolverOutput } = resolve(source, path);
   const context = new CompilerContext(new ConstantsTable(), resolverOutput);
   return new Compiler(context, null, ast).compileModule(ast);
 }

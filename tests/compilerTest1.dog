@@ -10,10 +10,11 @@ const f := fn(a, b) {
 };
 
 printFloat32(f(1, 2)());
-// printFloat32(f(3, 4)());
+printFloat32(f(3, 4)());
 // printFloat32(456);
 
 /*
 EXPECT COMPLETION
 printFloat32: 126
+printFloat32: 130
 */

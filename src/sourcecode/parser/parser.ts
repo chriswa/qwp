@@ -4,6 +4,7 @@ import { BinarySyntaxNode, LiteralSyntaxNode, UnarySyntaxNode, SyntaxNode, State
 import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
 import { resolve, ResolverOutput } from "./resolver"
 import { ValueType } from "../syntax/ValueType"
+import { CompileError } from "../../CompileError"
 
 class TokenReader {
   private index = 0;
@@ -49,22 +50,11 @@ class TokenReader {
   }
 }
 
-interface IErrorWithSourcePosParserResponse {
-  kind: "SYNTAX_ERROR";
-  syntaxErrors: Array<ErrorWithSourcePos>;
-}
-interface ISuccessParserResponse {
-  kind: "SUCCESS";
-  topSyntaxNode: SyntaxNode;
-  resolverOutput: ResolverOutput,
-}
-type ParserResponse = IErrorWithSourcePosParserResponse | ISuccessParserResponse;
-
-export function parse(input: string, path: string): ParserResponse {
-  const tokens = lex(input, path);
+export function parse(source: string, path: string): SyntaxNode {
+  const tokens = lex(source, path);
   const reader = new TokenReader(tokens, generateErrorWithSourcePos);
 
-  const parserErrorWithSourcePoss: Array<ErrorWithSourcePos> = [];
+  const parserErrorsWithSourcePos: Array<ErrorWithSourcePos> = [];
   let ast: SyntaxNode | null = null;
   try {
     ast = module();
@@ -75,31 +65,16 @@ export function parse(input: string, path: string): ParserResponse {
     }
   }
   if (ast === null) {
-    if (parserErrorWithSourcePoss.length === 0) {
+    if (parserErrorsWithSourcePos.length === 0) {
       throw new Error(`Internal error: ast not set but no parsererrors set`);
     }
-    return { kind: "SYNTAX_ERROR", syntaxErrors: parserErrorWithSourcePoss };
+    throw new CompileError(parserErrorsWithSourcePos);
   }
-
-  // const resolver = new Resolver();
-  // const resolverErrors = resolver.resolve(ast);
-  // if (resolverErrors.length > 0) {
-  //   return { kind: "SYNTAX_ERROR", syntaxErrors: resolverErrors };
-  // }
-  // const closedVarsByFunctionNode = resolver.closedVarsByFunctionNode;
-  const resolverResponse = resolve(ast);
-  if (resolverResponse.kind === "SYNTAX_ERROR") {
-    return { kind: "SYNTAX_ERROR", syntaxErrors: resolverResponse.syntaxErrors };
-  }
-  return {
-    kind: "SUCCESS",
-    topSyntaxNode: ast,
-    resolverOutput: resolverResponse.resolverOutput,
-  };
+  return ast;
 
   function generateErrorWithSourcePos(token: Token, message: string) {
     const parseError = new ErrorWithSourcePos("Parser: " + message, token.path, token.charPos);
-    parserErrorWithSourcePoss.push(parseError);
+    parserErrorsWithSourcePos.push(parseError);
     return parseError;
   }
 

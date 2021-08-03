@@ -9,9 +9,11 @@ else {
   else {
   }
 }
-print(a);
+printFloat32(a);
 
 /*
 EXPECT COMPILE ERROR
 Resolver: Late const assignment of variable "a" must occur in all branches at line 6, col 3
+Resolver: Late const assignment of variable "a" must occur in all branches at line 2, col 1
+Resolver: Uninitialized variable cannot be substituted at line 12, col 14
 */

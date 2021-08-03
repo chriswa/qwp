@@ -14,7 +14,7 @@ export class TestResult {
   constructor(
     public kind: TestResultKind,
     public detail: string,
-    public errorWithSourcePos: ErrorWithSourcePos | undefined,
+    public errorsWithSourcePos: Array<ErrorWithSourcePos> | undefined,
   ) { }
   matchesKind(other: TestResult): boolean {
     return this.constructor === other.constructor;

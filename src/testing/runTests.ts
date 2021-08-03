@@ -9,6 +9,7 @@ import { ErrorWithSourcePos } from "../ErrorWithSourcePos"
 import { testExpectedKindStringToEnum, TestResult, TestResultKind } from "./results"
 import { printFailedTestHeader, printTestsRunnerHeader, printTestsRunnerSuccess, reportFailedTest, reportSuccessfulTest } from "./reporting"
 import { setBuiltinPrintFunction } from "../builtins/builtins"
+import { CompileError } from "../CompileError"
 
 const VM_DEBUG = false;
 
@@ -63,19 +64,32 @@ function performTest(path: string): boolean {
 }
 
 function runSource(path: string, source: string): TestResult {
-  const parserResponse = parse(source, path);
-  if (parserResponse.kind === "SYNTAX_ERROR") {
-    const firstError = parserResponse.syntaxErrors[0];
-    return new TestResult(TestResultKind.COMPILE_ERROR, generateErrorMessageWithLineNumber(path, source, firstError) + "\n", firstError);
+  // const parserResponse = parse(source, path);
+  // if (parserResponse.kind === "SYNTAX_ERROR") {
+  //   const firstError = parserResponse.syntaxErrors[0];
+  //   return new TestResult(TestResultKind.COMPILE_ERROR, generateErrorMessageWithLineNumber(path, source, firstError) + "\n", firstError);
+  // }
+  // // parserResponse.resolverOutput.varDeclarationsByBlockOrFunctionNode.forEach((resolverScopeOutput, node) => {
+  // //   printPositionInSource(path, source, node.referenceToken.charPos)
+  // //   for (const identifier in resolverScopeOutput.table) {
+  // //     const resolverVariableDetails = resolverScopeOutput.table[identifier]
+  // //     console.log(`  ${identifier}: ${resolverVariableDetails.toString()}`)
+  // //   }
+  // // });
+  // const constantBuffer = compile(parserResponse.topSyntaxNode, parserResponse.resolverOutput);
+  let constantBuffer: ByteBuffer;
+  try {
+    constantBuffer = compile(source, path)
   }
-  // parserResponse.resolverOutput.varDeclarationsByBlockOrFunctionNode.forEach((resolverScopeOutput, node) => {
-  //   printPositionInSource(path, source, node.referenceToken.charPos)
-  //   for (const identifier in resolverScopeOutput.table) {
-  //     const resolverVariableDetails = resolverScopeOutput.table[identifier]
-  //     console.log(`  ${identifier}: ${resolverVariableDetails.toString()}`)
-  //   }
-  // });
-  const constantBuffer = compile(parserResponse.topSyntaxNode, parserResponse.resolverOutput);
+  catch (err) {
+    if (err instanceof CompileError) {
+      const errOutput = err.errorsWithSourcePos.map((errorWithSourcePos) => generateErrorMessageWithLineNumber(path, source, errorWithSourcePos)).join("\n") + "\n";
+      return new TestResult(TestResultKind.COMPILE_ERROR, errOutput, err.errorsWithSourcePos);
+    }
+    else {
+      throw err
+    }
+  }
 
   // dumpDecompile(constantBuffer);
 
