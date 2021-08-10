@@ -6,7 +6,8 @@ import { OpCode } from "../../bytecode/opcodes"
 import { ValueType } from "../syntax/ValueType"
 import { ConstantsTable } from "./ConstantsTable"
 import { builtinsByName } from "../../builtins/builtins"
-import { resolve, ResolverOutput, ResolverVariableDetails } from "../resolver/resolver"
+import { resolve } from "../resolver/resolver"
+import { ResolverOutput, ResolverVariableDetails } from "../resolver/resolverOutput"
 
 export function generateBytecode(source: string, path: string) {
   const { ast, resolverOutput } = resolve(source, path);
@@ -32,8 +33,7 @@ class BytecodeGenerator implements SyntaxNodeVisitor<void> {
     this.functionScope = new BytecodeGeneratorFunctionScope(this.context, parentBytecodeGenerator?.functionScope ?? null, this.node);
   }
   private get constantsTable() { return this.context.constantsTable }
-  private get closedVarsByFunctionNode() { return this.context.resolverOutput.closedVarsByFunctionNode }
-  private get varDeclarationsByBlockOrFunctionNode() { return this.context.resolverOutput.varDeclarationsByBlockOrFunctionNode }
+  private getClosedVarsByFunctionNode(node: SyntaxNode) { return this.context.resolverOutput.decoratedNodes.get(node)?.closedVars ?? [] }
 
   public declareParametersAndClosedVars(parameterIdentifiers: Array<string>, closedVarIdentifiers: Array<string>) {
     // const parameterOffsetsToPromoteToHeap: Array<number> = [];
@@ -128,7 +128,7 @@ class BytecodeGenerator implements SyntaxNodeVisitor<void> {
         constantIndex = this.constantsTable.storeUniqueFloat32((node.value as number));
         break;
       default:
-        throw new Error("TODO: unsupported constant type");
+        throw new Error("unsupported constant type");
     }
     if (constantIndex > 2 ** 32 - 1) {
       throw new Error(`constantIndex too big to fit in opcode argument uint32! too many constants!`);
@@ -241,7 +241,7 @@ class BytecodeGenerator implements SyntaxNodeVisitor<void> {
     }
   }
   visitFunctionDefinition(node: FunctionDefinitionSyntaxNode): void {
-    const closedVars = this.closedVarsByFunctionNode.get(node) ?? [];
+    const closedVars = this.getClosedVarsByFunctionNode(node);
     const fnBytecodeGenerator = new BytecodeGenerator(this.context, this, node);
     fnBytecodeGenerator.declareParametersAndClosedVars(node.parameterList.map(token => token.lexeme), closedVars);
     fnBytecodeGenerator.compileNodeList(node.statementList);
@@ -333,8 +333,8 @@ class BytecodeGeneratorBlockScope {
     this.localsCount += 2; // support return address and callframe jumpback distance in stack
   }
   private findVarDetails(identifier: string): ResolverVariableDetails {
-    const resolverScopeOutput = this.context.resolverOutput.varDeclarationsByBlockOrFunctionNode.get(this.node)!;
-    const x = resolverScopeOutput.table[identifier];
+    const declaredVars = this.context.resolverOutput.decoratedNodes.get(this.node)?.declaredVars!;
+    const x = declaredVars[identifier];
     return x ?? this.parentScope?.findVarDetails(identifier);
   }
   public declare(identifier: string): CallFrameVarInfo {

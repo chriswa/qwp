@@ -197,7 +197,7 @@ export function parse(source: string, path: string): SyntaxNode {
         return new VariableAssignmentSyntaxNode(referenceToken, null, expr.identifier, rvalue);
       }
       else {
-        throw new Error("TODO: support object assignment");
+        throw new Error("TODO: support object member assignment");
       }
     }
     return expr;

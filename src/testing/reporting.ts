@@ -1,5 +1,5 @@
 import chalk from "chalk"
-import { printPositionInSource } from "../cliUtil"
+import { printPositionInSource } from "../errorReporting"
 import { TestResult, TestResultKind } from "./results"
 
 export function reportSuccessfulTest(path: string) {

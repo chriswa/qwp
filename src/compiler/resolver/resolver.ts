@@ -4,6 +4,7 @@ import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
 import { TokenType } from "../Token"
 import { parse } from "../parser/parser"
 import { CompileError } from "../CompileError"
+import { ResolverOutput } from "./resolverOutput"
 
 interface IResolverResponse {
   ast: SyntaxNode;
@@ -21,51 +22,7 @@ export function resolve(source: string, path: string): IResolverResponse {
   return { ast, resolverOutput };
 }
 
-export class ResolverOutput {
-  public varDeclarationsByBlockOrFunctionNode: Map<SyntaxNode, ResolverScopeOutput>;
-  constructor(
-    public closedVarsByFunctionNode: Map<SyntaxNode, Array<string>>, // map from FunctionDefinitionSyntaxNode to set of identifiers
-    varsByScope: Map<SyntaxNode, ResolverScope>,
-  ) {
-    this.varDeclarationsByBlockOrFunctionNode = new Map()
-    varsByScope.forEach((resolverScope, syntaxNode) => {
-      const resolverScopeOutput = new ResolverScopeOutput(resolverScope);
-      // console.log(`syntaxNode =>`)
-      // console.dir(syntaxNode)
-      // console.log(`resolverScopeOutput =>`)
-      // console.dir(resolverScopeOutput)
-      this.varDeclarationsByBlockOrFunctionNode.set(syntaxNode, resolverScopeOutput);
-    });
-  }
-}
-
-export class ResolverScopeOutput {
-  public table: Record<string, ResolverVariableDetails> = {};
-  public constructor(resolverScope: ResolverScope) {
-    for (const identifier in resolverScope.table) {
-      const varStatus = resolverScope.table[identifier];
-      if (varStatus.isDeclaredHere) { // only include declarations
-        this.table[identifier] = new ResolverVariableDetails(varStatus);
-      }
-    }
-  }
-}
-
-export class ResolverVariableDetails {
-  public isClosed: boolean;
-  public isRef: boolean;
-  public constructor(
-    varStatus: VariableStatus,
-  ) {
-    this.isClosed = varStatus.isClosed;
-    this.isRef = varStatus.isRef;
-  }
-  public toString() {
-    return `${this.isRef ? 'isRef' : ''}, ${this.isClosed ? 'isClosed' : ''}`;
-  }
-}
-
-class VariableStatus {
+export class VariableStatus {
   public isClosed = false;
   public isRef = false;
   constructor(
