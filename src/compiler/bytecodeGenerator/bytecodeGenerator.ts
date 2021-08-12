@@ -1,6 +1,6 @@
 import assert from "assert"
 import { Token, TokenType } from "../Token"
-import { SyntaxNodeVisitor, SyntaxNode, BinarySyntaxNode, UnarySyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode } from "../syntax/syntax"
+import { SyntaxNodeVisitor, SyntaxNode, BinarySyntaxNode, UnarySyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode, TypeDeclarationSyntaxNode } from "../syntax/syntax"
 import { ByteBuffer } from "../../bytecode/ByteBuffer"
 import { OpCode } from "../../bytecode/opcodes"
 import { ValueType } from "../syntax/ValueType"
@@ -81,18 +81,18 @@ class BytecodeGenerator implements SyntaxNodeVisitor<void> {
   }
 
   private static readonly _binaryTokenTypeToOpCodeMap: Map<TokenType, OpCode> = new Map([
-    [TokenType.OP_MINUS, OpCode.NEGATE],
-    [TokenType.OP_BANG, OpCode.LOGICAL_NOT],
-    [TokenType.OP_PLUS, OpCode.ADD],
-    [TokenType.OP_MINUS, OpCode.SUBTRACT],
-    [TokenType.OP_MULT, OpCode.MULTIPLY],
-    [TokenType.OP_DIV, OpCode.DIVIDE],
-    [TokenType.OP_LT, OpCode.LT],
-    [TokenType.OP_LTE, OpCode.LTE],
-    [TokenType.OP_GT, OpCode.GT],
-    [TokenType.OP_GTE, OpCode.GTE],
-    [TokenType.OP_EQ, OpCode.EQ],
-    [TokenType.OP_NEQ, OpCode.NEQ],
+    [TokenType.MINUS, OpCode.NEGATE],
+    [TokenType.BANG, OpCode.LOGICAL_NOT],
+    [TokenType.PLUS, OpCode.ADD],
+    [TokenType.MINUS, OpCode.SUBTRACT],
+    [TokenType.ASTERISK, OpCode.MULTIPLY],
+    [TokenType.FORWARD_SLASH, OpCode.DIVIDE],
+    [TokenType.LESS_THAN, OpCode.LT],
+    [TokenType.LESS_THAN_OR_EQUAL, OpCode.LTE],
+    [TokenType.GREATER_THAN, OpCode.GT],
+    [TokenType.GREATER_THAN_OR_EQUAL, OpCode.GTE],
+    [TokenType.DOUBLE_EQUAL, OpCode.EQ],
+    [TokenType.BANG_EQUAL, OpCode.NEQ],
   ])
   visitBinary(node: BinarySyntaxNode): void {
     const opCode = BytecodeGenerator._binaryTokenTypeToOpCodeMap.get(node.op.type)
@@ -104,8 +104,8 @@ class BytecodeGenerator implements SyntaxNodeVisitor<void> {
     this.instructionBuffer.pushUint8(opCode);
   }
   private static readonly _unaryTokenTypeToOpCodeMap: Map<TokenType, OpCode> = new Map([
-    [TokenType.OP_MINUS, OpCode.NEGATE],
-    [TokenType.OP_BANG, OpCode.LOGICAL_NOT],
+    [TokenType.MINUS, OpCode.NEGATE],
+    [TokenType.BANG, OpCode.LOGICAL_NOT],
   ])
   visitUnary(node: UnarySyntaxNode): void {
     const opCode = BytecodeGenerator._unaryTokenTypeToOpCodeMap.get(node.op.type);
@@ -181,7 +181,7 @@ class BytecodeGenerator implements SyntaxNodeVisitor<void> {
   }
   visitLogicShortCircuit(node: LogicShortCircuitSyntaxNode): void {
     this.compileNode(node.left);
-    const isOpOr = node.op.type === TokenType.OP_OR;
+    const isOpOr = node.op.type === TokenType.DOUBLE_PIPE;
     const IB = this.instructionBuffer;
     IB.pushUint8(isOpOr ? OpCode.JUMP_BOOLEAN_OR : OpCode.JUMP_BOOLEAN_AND);
     const skipRightJumpPos = IB.byteCursor;
@@ -200,6 +200,9 @@ class BytecodeGenerator implements SyntaxNodeVisitor<void> {
     this.compileNodeList(node.statementList);
     this.popLocals();
     this.functionScope.popBlockScope();
+  }
+  visitTypeDeclaration(_node: TypeDeclarationSyntaxNode): void {
+    // pass
   }
   visitVariableAssignment(node: VariableAssignmentSyntaxNode): void {
     const identifier = node.identifier.lexeme;

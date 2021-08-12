@@ -1,0 +1,9 @@
+type Bar = Baaz<Quux<int>>;
+
+const foo : Bar := 123;
+printFloat32(foo);
+
+/*
+EXPECT COMPLETION
+printFloat32: 123
+*/

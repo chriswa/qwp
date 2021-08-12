@@ -1,8 +1,9 @@
 import { lex } from "../lexer/lexer";
 import { Token, TokenType } from "../Token";
-import { BinarySyntaxNode, LiteralSyntaxNode, UnarySyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode } from "../syntax/syntax";
+import { BinarySyntaxNode, LiteralSyntaxNode, UnarySyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode, TypeDeclarationSyntaxNode } from "../syntax/syntax";
 import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
 import { ValueType } from "../syntax/ValueType"
+import { TypeExpression } from "../syntax/TypeExpression"
 import { CompileError } from "../CompileError"
 
 class TokenReader {
@@ -116,6 +117,9 @@ export function parse(source: string, path: string): SyntaxNode {
       reader.consume(TokenType.CLOSE_BRACE, `explicit block must end with "}"`);
       return blockNode;
     }
+    else if (reader.match([TokenType.KEYWORD_TYPE])) {
+      return typeDeclarationStatement();
+    }
     else if (reader.match([TokenType.KEYWORD_CONST, TokenType.KEYWORD_LET])) {
       return variableDeclarationStatement();
     }
@@ -132,15 +136,40 @@ export function parse(source: string, path: string): SyntaxNode {
     reader.consume(TokenType.SEMICOLON, `Semicolon expected after expression/assignment statement`);
     return expr;
   }
+  function typeDeclarationStatement() {
+    const typeKeywordToken = reader.previous();
+    const newTypeName = reader.consume(TokenType.IDENTIFIER, `expected identifier after type keyword`);
+    reader.consume(TokenType.EQUAL, `expected equal sign (=) after type identifier`);
+    const newTypeExpression = typeExpression();
+    reader.consume(TokenType.SEMICOLON, `Semicolon expected after type declaration statement`);
+    return new TypeDeclarationSyntaxNode(typeKeywordToken, newTypeName, newTypeExpression);
+  }
   function variableDeclarationStatement() {
     const modifier = reader.previous();
     const identifier = reader.consume(TokenType.IDENTIFIER, `lvalue in variable declaration statement must be an identifier`);
+    let type = null;
+    if (reader.match([TokenType.COLON])) {
+      type = typeExpression();
+    }
     let rvalue: SyntaxNode | null = null;
-    if (reader.match([TokenType.OP_ASSIGN])) {
+    if (reader.match([TokenType.COLON_EQUAL])) {
       rvalue = expression();
     }
     reader.consume(TokenType.SEMICOLON, `Semicolon expected after variable assignment statement`);
-    return new VariableAssignmentSyntaxNode(modifier, modifier, identifier, rvalue);
+    return new VariableAssignmentSyntaxNode(modifier, modifier, identifier, type, rvalue);
+  }
+  function typeExpression(): TypeExpression {
+    const typeName = reader.consume(TokenType.IDENTIFIER, `type expression expecting identifier`)
+    let typeParameters: Array<TypeExpression> = [];
+    if (reader.match([TokenType.LESS_THAN])) {
+      let isStillExpectingParameters = true;
+      while (isStillExpectingParameters) {
+        typeParameters.push(typeExpression());
+        isStillExpectingParameters = reader.match([TokenType.COMMA]);
+      }
+      reader.consume(TokenType.GREATER_THAN, `type expression expecting closing angle brace for parameter list`);
+    }
+    return new TypeExpression(typeName, typeParameters);
   }
   function ifStatement() {
     const referenceToken = reader.previous();
@@ -190,11 +219,11 @@ export function parse(source: string, path: string): SyntaxNode {
   }
   function assignment() {
     const expr = anonymousFunction();
-    if (reader.match([TokenType.OP_ASSIGN])) {
+    if (reader.match([TokenType.COLON_EQUAL])) {
       const referenceToken = reader.previous();
       const rvalue = expression();
       if (expr instanceof VariableLookupSyntaxNode) {
-        return new VariableAssignmentSyntaxNode(referenceToken, null, expr.identifier, rvalue);
+        return new VariableAssignmentSyntaxNode(referenceToken, null, expr.identifier, null, rvalue);
       }
       else {
         throw new Error("TODO: support object member assignment");
@@ -230,7 +259,7 @@ export function parse(source: string, path: string): SyntaxNode {
   }
   function or() {
     let expr = and();
-    while (reader.match([TokenType.OP_OR])) {
+    while (reader.match([TokenType.DOUBLE_PIPE])) {
       const op = reader.previous();
       const right = and();
       expr = new LogicShortCircuitSyntaxNode(op, expr, op, right);
@@ -239,7 +268,7 @@ export function parse(source: string, path: string): SyntaxNode {
   }
   function and() {
     let expr = equality();
-    while (reader.match([TokenType.OP_AND])) {
+    while (reader.match([TokenType.DOUBLE_AMPERSAND])) {
       const op = reader.previous();
       const right = equality();
       expr = new LogicShortCircuitSyntaxNode(op, expr, op, right);
@@ -247,19 +276,19 @@ export function parse(source: string, path: string): SyntaxNode {
     return expr;
   }
   function equality() {
-    return metaBinary(comparison, [TokenType.OP_EQ, TokenType.OP_NEQ]);
+    return metaBinary(comparison, [TokenType.DOUBLE_EQUAL, TokenType.BANG_EQUAL]);
   }
   function comparison() {
-    return metaBinary(addSubExpr, [TokenType.OP_GT, TokenType.OP_GTE, TokenType.OP_LT, TokenType.OP_LTE]);
+    return metaBinary(addSubExpr, [TokenType.GREATER_THAN, TokenType.GREATER_THAN_OR_EQUAL, TokenType.LESS_THAN, TokenType.LESS_THAN_OR_EQUAL]);
   }
   function addSubExpr() {
-    return metaBinary(multDivExpr, [TokenType.OP_PLUS, TokenType.OP_MINUS]);
+    return metaBinary(multDivExpr, [TokenType.PLUS, TokenType.MINUS]);
   }
   function multDivExpr() {
-    return metaBinary(unary, [TokenType.OP_MULT, TokenType.OP_DIV]);
+    return metaBinary(unary, [TokenType.ASTERISK, TokenType.FORWARD_SLASH]);
   }
   function unary(): SyntaxNode {
-    if (reader.match([TokenType.OP_BANG, TokenType.OP_MINUS])) {
+    if (reader.match([TokenType.BANG, TokenType.MINUS])) {
       const op = reader.previous();
       const right = unary();
       return new UnarySyntaxNode(op, op, right);
@@ -290,13 +319,13 @@ export function parse(source: string, path: string): SyntaxNode {
     return new FunctionCallSyntaxNode(referenceToken, callee, argumentList);
   }
   function primary() {
-    if (reader.match([TokenType.LITERAL_FALSE])) {
+    if (reader.match([TokenType.KEYWORD_FALSE])) {
       return new LiteralSyntaxNode(reader.previous(), false, ValueType.BOOLEAN);
     }
-    if (reader.match([TokenType.LITERAL_TRUE])) {
+    if (reader.match([TokenType.KEYWORD_TRUE])) {
       return new LiteralSyntaxNode(reader.previous(), true, ValueType.BOOLEAN);
     }
-    if (reader.match([TokenType.LITERAL_NULL])) {
+    if (reader.match([TokenType.KEYWORD_NULL])) {
       return new LiteralSyntaxNode(reader.previous(), null, ValueType.NULL); // ?
     }
     if (reader.match([TokenType.NUMBER])) {

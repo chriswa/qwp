@@ -1,5 +1,6 @@
 import { Token } from "../Token"
 import { ValueType } from "./ValueType"
+import { TypeExpression } from "./TypeExpression"
 
 export interface SyntaxNodeVisitor<T> {
   visitBinary(node: BinarySyntaxNode): T;
@@ -12,6 +13,7 @@ export interface SyntaxNodeVisitor<T> {
   visitReturnStatement(node: ReturnStatementSyntaxNode): T;
   visitLogicShortCircuit(node: LogicShortCircuitSyntaxNode): T;
   visitVariableLookup(node: VariableLookupSyntaxNode): T;
+  visitTypeDeclaration(node: TypeDeclarationSyntaxNode): T;
   visitVariableAssignment(node: VariableAssignmentSyntaxNode): T;
   visitFunctionDefinition(node: FunctionDefinitionSyntaxNode): T;
   visitFunctionCall(node: FunctionCallSyntaxNode): T;
@@ -153,11 +155,25 @@ export class VariableLookupSyntaxNode extends SyntaxNode {
   }
 }
 
+export class TypeDeclarationSyntaxNode extends SyntaxNode {
+  constructor(
+    referenceToken: Token,
+    newTypeName: Token,
+    newTypeExpression: TypeExpression,
+  ) {
+    super(referenceToken)
+  }
+  accept<R>(visitor: SyntaxNodeVisitor<R>) {
+    return visitor.visitTypeDeclaration(this);
+  }
+}
+
 export class VariableAssignmentSyntaxNode extends SyntaxNode {
   constructor(
     referenceToken: Token,
     public modifier: Token | null,
     public identifier: Token,
+    public type: TypeExpression | null,
     public rvalue: SyntaxNode | null,
   ) {
     super(referenceToken);

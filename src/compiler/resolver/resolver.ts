@@ -1,4 +1,4 @@
-import { BinarySyntaxNode, FunctionCallSyntaxNode, FunctionDefinitionSyntaxNode, GroupingSyntaxNode, IfStatementSyntaxNode, LiteralSyntaxNode, LogicShortCircuitSyntaxNode, ReturnStatementSyntaxNode, StatementBlockSyntaxNode, SyntaxNode, SyntaxNodeVisitor, UnarySyntaxNode, VariableAssignmentSyntaxNode, VariableLookupSyntaxNode, WhileStatementSyntaxNode } from "../syntax/syntax"
+import { BinarySyntaxNode, FunctionCallSyntaxNode, FunctionDefinitionSyntaxNode, GroupingSyntaxNode, IfStatementSyntaxNode, LiteralSyntaxNode, LogicShortCircuitSyntaxNode, ReturnStatementSyntaxNode, StatementBlockSyntaxNode, SyntaxNode, SyntaxNodeVisitor, TypeDeclarationSyntaxNode, UnarySyntaxNode, VariableAssignmentSyntaxNode, VariableLookupSyntaxNode, WhileStatementSyntaxNode } from "../syntax/syntax"
 import { builtinsByName } from "../../builtins/builtins"
 import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
 import { TokenType } from "../Token"
@@ -194,6 +194,10 @@ class Resolver implements SyntaxNodeVisitor<ResolverScope | null> {
   visitLogicShortCircuit(node: LogicShortCircuitSyntaxNode): ResolverScope | null {
     this.resolveSyntaxNode(node.left);
     this.resolveSyntaxNode(node.right);
+    return null;
+  }
+  visitTypeDeclaration(node: TypeDeclarationSyntaxNode): ResolverScope | null {
+    // TODO: write a type system
     return null;
   }
   visitVariableLookup(node: VariableLookupSyntaxNode): ResolverScope | null {
