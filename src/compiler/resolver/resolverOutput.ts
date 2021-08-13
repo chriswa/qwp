@@ -1,5 +1,5 @@
 import { SyntaxNode } from "../syntax/syntax"
-import { ResolverScope, VariableStatus } from "./resolver"
+import { ResolverScope, VariableDefinition } from "./resolver"
 
 export class ResolverOutput {
   public decoratedNodes: Map<SyntaxNode, ResolverScopeOutput> = new Map();
@@ -20,12 +20,9 @@ export class ResolverScopeOutput {
     resolverScope: ResolverScope,
     public closedVars: Array<string> | undefined
   ) {
-    for (const identifier in resolverScope.table) {
-      const varStatus = resolverScope.table[identifier];
-      if (varStatus.isDeclaredHere) { // only include declarations
-        this.declaredVars[identifier] = new ResolverVariableDetails(varStatus);
-      }
-    }
+    resolverScope.variableDefinitions.forEach((varDef, identifier) => {
+      this.declaredVars[identifier] = new ResolverVariableDetails(varDef);
+    });
   }
 }
 
@@ -33,7 +30,7 @@ export class ResolverVariableDetails {
   public isClosed: boolean;
   public isRef: boolean;
   public constructor(
-    varStatus: VariableStatus,
+    varStatus: VariableDefinition,
   ) {
     this.isClosed = varStatus.isClosed;
     this.isRef = varStatus.isRef;

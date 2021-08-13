@@ -7,15 +7,18 @@ export function dumpDecompile(buffer: ByteBuffer) {
   const pendingDecompilation: Array<number> = []; // constantIndexes
   pendingDecompilation.push(buffer.peekUint32At(0));
 
+  let isFirst = true;
   while (pendingDecompilation.length > 0) {
     const codeStartConstantIndex = pendingDecompilation.shift()!;
-    buffer.setByteCursor(codeStartConstantIndex * 4); // constant elements are (at least) 32 bits
+    buffer.setByteCursor(codeStartConstantIndex * 4) // constant elements are (at least) 32 bits
+    if (isFirst === false) {
+      console.log(`=================================`);
+    }
+    isFirst = false;
     decompileCodeEntry();
   }
-  console.log(`================================= END OF DECOMPILE`);
 
   function decompileCodeEntry() {
-    console.log(`=================================`);
     while (true) {
       const isMoreInstructions = decompileOneInstruction(buffer, pendingDecompilation);
       if (!isMoreInstructions) { return }
@@ -56,7 +59,13 @@ export function decompileOneInstruction(buffer: ByteBuffer, pendingDecompilation
       break;
     case OpCode.JUMP_FORWARD_IF_POP_FALSE:
     case OpCode.JUMP_FORWARD:
+      const delta0 = buffer.readUint16();
+      line += ` ${delta0} (to ${(buffer.byteCursor + delta0).toString(16).padStart(4, "0")})`;
+      break;
     case OpCode.JUMP_BACKWARD:
+      const delta1 = buffer.readUint16();
+      line += ` ${delta1} (to ${(buffer.byteCursor - delta1).toString(16).padStart(4, "0")})`;
+      break;
     case OpCode.JUMP_BOOLEAN_OR:
     case OpCode.JUMP_BOOLEAN_AND:
       line += ` ${buffer.readUint16()}`;

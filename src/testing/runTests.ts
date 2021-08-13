@@ -7,11 +7,10 @@ import { getPositionInSource, printPositionInSource } from "../errorReporting"
 import { parse } from "../compiler/parser/parser"
 import { ErrorWithSourcePos } from "../ErrorWithSourcePos"
 import { testExpectedKindStringToEnum, TestResult, TestResultKind } from "./results"
-import { printFailedTestHeader, printTestsRunnerHeader, printTestsRunnerSuccess, reportFailedTest, reportSuccessfulTest } from "./reporting"
+import { drawBox, printFailedTestHeader, printTestsRunnerHeader, printTestsRunnerSuccess, reportFailedTest, reportSuccessfulTest } from "./reporting"
 import { setBuiltinPrintFunction } from "../builtins/builtins"
 import { CompileError } from "../compiler/CompileError"
-
-const VM_DEBUG = false;
+import chalk from "chalk"
 
 var myArgs = process.argv.slice(2);
 
@@ -20,6 +19,8 @@ function isTestFileSpecified(candidateFilename: string) {
   const basename = candidateFilename.replace(/\.\w+$/, '');
   return userSpecifiedTestFile === basename || userSpecifiedTestFile === undefined;
 }
+
+const DEBUG_MODE = userSpecifiedTestFile !== undefined;
 
 printTestsRunnerHeader();
 
@@ -91,35 +92,43 @@ function runSource(path: string, source: string): TestResult {
     }
   }
 
-  // dumpDecompile(constantBuffer);
+  if (DEBUG_MODE) {
+    console.log(chalk.magenta(drawBox(`Decompilation of ${path}`)));
+    dumpDecompile(constantBuffer);
+  }
 
   let output = '';
   setBuiltinPrintFunction((str: string) => {
     output += str + "\n";
+    if (DEBUG_MODE) {
+      console.log(chalk.white(drawBox("BUILTIN PRINT: " + str)));
+    }
   });
 
-  if (VM_DEBUG) { console.log(`VM START`) }
+  if (DEBUG_MODE) {
+    console.log(chalk.cyan(drawBox("VM START")));
+  }
   const vm = new VM(constantBuffer, 1024);
   while (!vm.isHalted) {
-    // if (VM_DEBUG) {
-    //   console.log(`---`)
-    //   let stackView = ''
-    //   const stackLength = vm.ramBuffer.byteCursor / 4
-    //   for (let i = 0; i < stackLength; i += 1) {
-    //     const bytePos = 4 * i
-    //     if (i > 0) { stackView += ', ' }
-    //     if (i === vm.callFrameIndex) { stackView += '[ ' }
-    //     stackView += `${vm.ramBuffer.peekUint32At(bytePos)}`
-    //   }
-    //   console.log(`STACK: ${stackView}`)
-    //   decompileOneInstructionAndRewind(vm.constantBuffer)
-    // }
+    if (DEBUG_MODE) {
+      console.log(`---`)
+      let stackView = ''
+      const stackLength = vm.ramBuffer.byteCursor / 4
+      for (let i = 0; i < stackLength; i += 1) {
+        const bytePos = 4 * i
+        if (i > 0) { stackView += ', ' }
+        if (i === vm.callFrameIndex) { stackView += '[ ' }
+        stackView += `${vm.ramBuffer.peekUint32At(bytePos)}`
+      }
+      console.log(`STACK: ${stackView}`)
+      decompileOneInstructionAndRewind(vm.constantBuffer)
+    }
     vm.runOneInstruction();
   }
-  // if (VM_DEBUG) {
-  //   console.log(`---`)
-  //   console.log(`VM HALTED`)
-  // }
+  if (DEBUG_MODE) {
+    console.log(`---`)
+    console.log(`VM HALTED`)
+  }
   return new TestResult(TestResultKind.COMPLETION, output, undefined);
 }
 

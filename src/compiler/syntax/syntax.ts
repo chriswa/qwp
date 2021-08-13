@@ -95,7 +95,7 @@ export class IfStatementSyntaxNode extends SyntaxNode {
     referenceToken: Token,
     public cond: SyntaxNode,
     public thenBranch: StatementBlockSyntaxNode,
-    public elseBranch: SyntaxNode | null,
+    public elseBranch: StatementBlockSyntaxNode | null,
   ) {
     super(referenceToken);
   }

@@ -18,77 +18,82 @@ export function resolve(source: string, path: string): IResolverResponse {
   if (resolverErrors.length > 0) {
     throw new CompileError(resolverErrors);
   }
-  const resolverOutput = new ResolverOutput(resolver.closedVarsByFunctionNode, resolver.varsByScope);
+  const resolverOutput = new ResolverOutput(resolver.closedVarsByFunctionNode, resolver.scopesByNode);
   return { ast, resolverOutput };
 }
 
-export class VariableStatus {
+export class VariableDefinition {
   public isClosed = false;
   public isRef = false;
   constructor(
-    public isDeclaredHere: boolean,
+    // public isDeclaredHere: boolean,
     public isBuiltInOrParameter: boolean,
-    public isInitialized: boolean,
+    // public isInitialized: boolean,
     public isReadOnly: boolean,
   ) { }
 }
 
 export class ResolverScope {
-  public table: Record<string, VariableStatus> = {};
-  public closedVars: Array<string> = []; // only used if !!this.isFunction
+  public variableDefinitions: Map<string, VariableDefinition> = new Map();
+  public initializedVars: Set<string> = new Set();
+  public closedVars: Array<string> = []; // only used if this.isFunction === true
   public constructor(
     private isFunction: boolean,
     public parentScope: ResolverScope | null = null,
     preinitializedIdentifiers: Array<string>,
   ) {
     for (const identifier of preinitializedIdentifiers) {
-      const variableStatus = new VariableStatus(true, true, true, true);
-      variableStatus.isBuiltInOrParameter = true;
-      this.table[identifier] = variableStatus;
+      const variableStatus = new VariableDefinition(true, true);
+      this.initializedVars.add(identifier);
+      this.variableDefinitions.set(identifier, variableStatus);
     }
   }
-  public getVariableStatusFromStack(identifier: string, isClosed = false): VariableStatus | null {
-    if (identifier in this.table) {
-      const varStatus = this.table[identifier];
-      if (varStatus.isDeclaredHere) {
-        if (isClosed) {
-          varStatus.isClosed = true;
-          varStatus.isRef = true;
-        }
-        return this.table[identifier]
-      }
+  public getVariableDefinitionFromStack(identifier: string): VariableDefinition | null {
+    const localVarDef = this.variableDefinitions.get(identifier);
+    if (localVarDef !== undefined) {
+      return localVarDef;
     }
     if (this.parentScope !== null) {
-      const variableStatus = this.parentScope.getVariableStatusFromStack(identifier, isClosed || this.isFunction);
-      if (variableStatus !== null && this.isFunction) {
+      const ancestorVarDef = this.parentScope.getVariableDefinitionFromStack(identifier);
+      if (ancestorVarDef !== null && this.isFunction) {
+        ancestorVarDef.isClosed = true;
+        ancestorVarDef.isRef = true;
         this.closedVars.push(identifier);
-        this.table[identifier] = new VariableStatus(true, true, true, variableStatus.isReadOnly);
-        this.table[identifier].isRef = true;
+        const newVarDef = new VariableDefinition(true, ancestorVarDef.isReadOnly);
+        newVarDef.isRef = true;
+        this.initializedVars.add(identifier); // necessary?
+        this.variableDefinitions.set(identifier, newVarDef);
       }
-      return variableStatus;
+      return ancestorVarDef;
     }
     return null;
   }
-  public declareVariable(identifier: string, isReadOnly: boolean): VariableStatus {
-    const variableStatus = new VariableStatus(true, false, false, isReadOnly);
-    this.table[identifier] = variableStatus;
+  public declareVariable(identifier: string, isReadOnly: boolean): VariableDefinition {
+    const variableStatus = new VariableDefinition(false, isReadOnly);
+    this.variableDefinitions.set(identifier, variableStatus);
     return variableStatus;
   }
   public assignVariable(identifier: string) {
-    const existingVariableInStack = this.getVariableStatusFromStack(identifier);
-    if (existingVariableInStack === null) { throw new Error("logic error in resolver"); }
-    if (existingVariableInStack.isBuiltInOrParameter) { throw new Error("logic error in resolver") }
-    const isDeclaredHere = existingVariableInStack.isDeclaredHere && existingVariableInStack === this.table[identifier];
-    this.table[identifier] = new VariableStatus(isDeclaredHere, false, true, existingVariableInStack.isReadOnly);
+    this.initializedVars.add(identifier);
   }
-  public getInitializedVariables(): Set<string> {
-    return new Set(Object.keys(this.table).filter(id => this.table[id].isInitialized));
+  public isVarInitialized(identifier: string): boolean {
+    if (this.initializedVars.has(identifier)) {
+      return true;
+    }
+    else {
+      if (this.parentScope !== null) {
+        return this.parentScope.isVarInitialized(identifier);
+      }
+      else {
+        return false;
+      }
+    }
   }
 }
 
-class Resolver implements SyntaxNodeVisitor<ResolverScope | null> {
+class Resolver implements SyntaxNodeVisitor<void> {
   scope: ResolverScope;
-  varsByScope: Map<SyntaxNode, ResolverScope> = new Map();
+  scopesByNode: Map<SyntaxNode, ResolverScope> = new Map();
   closedVarsByFunctionNode: Map<SyntaxNode, Array<string>> = new Map(); // map from FunctionDeclarationSyntaxNode to list of closed identifiers
   resolverErrors: Array<ErrorWithSourcePos> = [];
   constructor() {
@@ -96,15 +101,13 @@ class Resolver implements SyntaxNodeVisitor<ResolverScope | null> {
   }
   beginScope(isFunction: boolean, node: SyntaxNode, preinitializedIdentifiers: Array<string>) {
     this.scope = new ResolverScope(isFunction, this.scope, preinitializedIdentifiers);
-    this.varsByScope.set(node, this.scope);
+    this.scopesByNode.set(node, this.scope);
   }
-  endScope(): ResolverScope {
+  endScope() {
     if (this.scope.parentScope === null) {
       throw new Error("internal logic error: attempted to leave global scope");
     }
-    const closedScope = this.scope;
     this.scope = this.scope.parentScope;
-    return closedScope;
   }
 
   generateResolverError(node: SyntaxNode, message: string) {
@@ -120,130 +123,122 @@ class Resolver implements SyntaxNodeVisitor<ResolverScope | null> {
     return this.resolverErrors;
   }
 
-  resolveSyntaxNode(node: SyntaxNode): ResolverScope | null {
-    return node.accept(this);
+  resolveSyntaxNode(node: SyntaxNode) {
+    node.accept(this);
   }
   resolveList(nodeList: Array<SyntaxNode>) {
     for (const node of nodeList) {
       this.resolveSyntaxNode(node);
     }
   }
-  visitBinary(node: BinarySyntaxNode): ResolverScope | null {
+  visitBinary(node: BinarySyntaxNode) {
     this.resolveSyntaxNode(node.left);
     this.resolveSyntaxNode(node.right);
-    return null;
   }
-  visitUnary(node: UnarySyntaxNode): ResolverScope | null {
+  visitUnary(node: UnarySyntaxNode) {
     this.resolveSyntaxNode(node.right);
-    return null;
   }
-  visitLiteral(node: LiteralSyntaxNode): ResolverScope | null {
-    return null;
+  visitLiteral(node: LiteralSyntaxNode) {
+    // pass
   }
-  visitGrouping(node: GroupingSyntaxNode): ResolverScope | null {
+  visitGrouping(node: GroupingSyntaxNode) {
     this.resolveSyntaxNode(node.expr);
-    return null;
   }
-  visitStatementBlock(node: StatementBlockSyntaxNode): ResolverScope | null {
+  visitStatementBlock(node: StatementBlockSyntaxNode) {
     this.beginScope(false, node, []);
     this.resolveList(node.statementList);
-    return this.endScope();
+    this.endScope();
   }
-  visitIfStatement(node: IfStatementSyntaxNode): ResolverScope | null {
+  visitIfStatement(node: IfStatementSyntaxNode) {
     this.resolveSyntaxNode(node.cond);
-    const thenScope = this.resolveSyntaxNode(node.thenBranch);
-    let elseScope: ResolverScope | null = null;
+    this.resolveSyntaxNode(node.thenBranch);
     if (node.elseBranch !== null) {
-      elseScope = this.resolveSyntaxNode(node.elseBranch)
+      this.resolveSyntaxNode(node.elseBranch);
     }
-    // branch initialization feature!
-    if (thenScope !== null && elseScope !== null) {
-      const thenInitializedVars = thenScope.getInitializedVariables();
-      const elseInitializedVars = elseScope.getInitializedVariables();
-      const bothInitializedVars = new Set([...thenInitializedVars].filter(x => elseInitializedVars.has(x))); // intersection
-      const xorInitializedVars = new Set([...thenInitializedVars].filter(x => !elseInitializedVars.has(x)));
-      bothInitializedVars.forEach((identifier) => {
-        const parentVarStatus = this.scope.getVariableStatusFromStack(identifier);
-        if (parentVarStatus !== null) {
-          this.scope.assignVariable(identifier);
-        }
-      });
-      xorInitializedVars.forEach((identifier) => {
-        const parentVarStatus = this.scope.getVariableStatusFromStack(identifier);
-        if (parentVarStatus !== null && parentVarStatus.isReadOnly) {
-          this.generateResolverError(node, `Late const assignment of variable "${identifier}" must occur in all branches`);
-        }
-      });
-    }
-    return null;
+
+    // late-const branch initialization feature
+    const thenInitializedVars = this.scopesByNode.get(node.thenBranch)!.initializedVars;
+    const elseInitializedVars: Set<string> = node.elseBranch !== null ? this.scopesByNode.get(node.elseBranch)!.initializedVars : new Set();
+    const bothInitializedVars = new Set([...thenInitializedVars, ...elseInitializedVars]);
+    const xorInitializedVars = new Set([
+      ...[...thenInitializedVars].filter(x => !elseInitializedVars.has(x)),
+      ...[...elseInitializedVars].filter(x => !thenInitializedVars.has(x)),
+    ]);
+    bothInitializedVars.forEach((identifier) => {
+      const parentVarStatus = this.scope.getVariableDefinitionFromStack(identifier);
+      if (parentVarStatus !== null) {
+        this.scope.assignVariable(identifier);
+      }
+    });
+    xorInitializedVars.forEach((identifier) => {
+      const parentVarStatus = this.scope.getVariableDefinitionFromStack(identifier);
+      if (parentVarStatus !== null && parentVarStatus.isReadOnly) {
+        this.generateResolverError(node, `Late const assignment of variable "${identifier}" must occur in all branches`);
+      }
+    });
   }
-  visitWhileStatement(node: WhileStatementSyntaxNode): ResolverScope | null {
+  visitWhileStatement(node: WhileStatementSyntaxNode) {
     this.resolveSyntaxNode(node.cond);
-    const loopScope = this.resolveSyntaxNode(node.loopBody);
-    if (loopScope !== null) {
-      const loopInitializedVars = loopScope.getInitializedVariables();
-      loopInitializedVars.forEach((identifier) => {
-        const parentVarStatus = this.scope.getVariableStatusFromStack(identifier);
-        if (parentVarStatus !== null && parentVarStatus.isReadOnly) {
-          this.generateResolverError(node, `Late const assignment of variable "${identifier}" may not occur in a loop`);
-        }
-      });
-    }
-    return null;
+    this.resolveSyntaxNode(node.loopBody);
+    const loopInitializedVars = this.scopesByNode.get(node.loopBody)!.initializedVars;
+    loopInitializedVars.forEach((identifier) => {
+      const parentVarStatus = this.scope.getVariableDefinitionFromStack(identifier);
+      if (parentVarStatus !== null && parentVarStatus.isReadOnly) {
+        this.generateResolverError(node, `Late const assignment of variable "${identifier}" may not occur in a loop`);
+      }
+    });
   }
-  visitLogicShortCircuit(node: LogicShortCircuitSyntaxNode): ResolverScope | null {
+  visitLogicShortCircuit(node: LogicShortCircuitSyntaxNode) {
     this.resolveSyntaxNode(node.left);
     this.resolveSyntaxNode(node.right);
-    return null;
   }
-  visitTypeDeclaration(node: TypeDeclarationSyntaxNode): ResolverScope | null {
+  visitTypeDeclaration(node: TypeDeclarationSyntaxNode) {
     // TODO: write a type system
-    return null;
   }
-  visitVariableLookup(node: VariableLookupSyntaxNode): ResolverScope | null {
-    const variableName = node.identifier.lexeme;
-    const existingVariableStatusInStack = this.scope.getVariableStatusFromStack(variableName);
+  visitVariableLookup(node: VariableLookupSyntaxNode) {
+    const identifier = node.identifier.lexeme;
+    const existingVariableStatusInStack = this.scope.getVariableDefinitionFromStack(identifier);
     if (existingVariableStatusInStack === null) {
-      this.generateResolverError(node, `Undeclared variable cannot be substituted`);
+      this.generateResolverError(node, `Undeclared variable "${identifier}" cannot be substituted`);
     }
-    else if (!existingVariableStatusInStack.isInitialized) {
-      this.generateResolverError(node, `Uninitialized variable cannot be substituted`);
+    else {
+      if (!this.scope.isVarInitialized(identifier)) {
+        this.generateResolverError(node, `Uninitialized variable "${identifier}" cannot be substituted`)
+      }
     }
-    return null;
   }
-  visitVariableAssignment(node: VariableAssignmentSyntaxNode): ResolverScope | null {
+  visitVariableAssignment(node: VariableAssignmentSyntaxNode) {
     if (node.rvalue !== null) {
       this.resolveSyntaxNode(node.rvalue);
     }
     const declarationModifier = node.modifier;
-    const variableName = node.identifier.lexeme;
-    let existingVariableStatusInStack = this.scope.getVariableStatusFromStack(variableName);
+    const identifier = node.identifier.lexeme;
+    let existingVariableStatusInStack = this.scope.getVariableDefinitionFromStack(identifier);
     if (declarationModifier !== null) {
       if (existingVariableStatusInStack !== null) {
         this.generateResolverError(node, `Variable/parameter shadowing is not allowed`);
-        return null;
+        return;
       }
-      existingVariableStatusInStack = this.scope.declareVariable(variableName, declarationModifier.type === TokenType.KEYWORD_CONST);
+      existingVariableStatusInStack = this.scope.declareVariable(identifier, declarationModifier.type === TokenType.KEYWORD_CONST);
     }
     else {
       if (existingVariableStatusInStack === null) {
         this.generateResolverError(node, `Undeclared variable cannot be assigned to`);
-        return null;
+        return;
       }
     }
     if (node.rvalue !== null) {
-      if (existingVariableStatusInStack?.isInitialized && existingVariableStatusInStack.isReadOnly) {
+      if (this.scope.isVarInitialized(identifier) && existingVariableStatusInStack.isReadOnly) {
         this.generateResolverError(node, `Constant variable cannot be re-assigned to`);
-        return null;
+        return;
       }
-      this.scope.assignVariable(variableName);
+      this.scope.assignVariable(identifier);
     }
-    return null;
   }
-  visitFunctionDefinition(node: FunctionDefinitionSyntaxNode): ResolverScope | null {
+  visitFunctionDefinition(node: FunctionDefinitionSyntaxNode) {
     for (const parameter of node.parameterList) {
       const parameterName = parameter.lexeme;
-      if (this.scope.getVariableStatusFromStack(parameterName) !== null) {
+      if (this.scope.getVariableDefinitionFromStack(parameterName) !== null) {
         this.generateResolverError(node, `Variable/parameter shadowing is not allowed`);
       }
     }
@@ -253,19 +248,16 @@ class Resolver implements SyntaxNodeVisitor<ResolverScope | null> {
     this.closedVarsByFunctionNode.set(node, this.scope.closedVars);
 
     this.endScope();
-    return null;
   }
-  visitFunctionCall(node: FunctionCallSyntaxNode): ResolverScope | null {
+  visitFunctionCall(node: FunctionCallSyntaxNode) {
     this.resolveSyntaxNode(node.callee);
     for (const argument of node.argumentList) {
       this.resolveSyntaxNode(argument);
     }
-    return null;
   }
-  visitReturnStatement(node: ReturnStatementSyntaxNode): ResolverScope | null {
+  visitReturnStatement(node: ReturnStatementSyntaxNode) {
     if (node.retvalExpr) {
       this.resolveSyntaxNode(node.retvalExpr);
     }
-    return null;
   }
 }

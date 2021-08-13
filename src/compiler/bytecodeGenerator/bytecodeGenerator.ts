@@ -122,7 +122,7 @@ class BytecodeGenerator implements SyntaxNodeVisitor<void> {
         constantIndex = this.constantsTable.storeUniqueUint32(0);
         break;
       case ValueType.BOOLEAN:
-        constantIndex = this.constantsTable.storeUniqueUint32((node.value as boolean) ? 1 : 0);
+        constantIndex = this.constantsTable.storeUniqueFloat32((node.value as boolean) ? 1 : 0);
         break;
       case ValueType.NUMBER:
         constantIndex = this.constantsTable.storeUniqueFloat32((node.value as number));
