@@ -133,15 +133,9 @@ export class Parser {
     const typeName = this.reader.consume(TokenType.IDENTIFIER, `type expression expecting identifier`)
     let typeParameters: Array<TypeExpression> = [];
     if (this.reader.match(TokenType.LESS_THAN)) {
-      // let isStillExpectingParameters = true;
-      // while (isStillExpectingParameters) {
-      //   typeParameters.push(typeExpression());
-      //   isStillExpectingParameters = this.reader.match(TokenType.COMMA);
-      // }
-      this.helper.parseDelimitedListWithAtLeastOneItem(TokenType.COMMA, () => {
+      this.helper.parseDelimitedList(TokenType.COMMA, TokenType.GREATER_THAN, 1, () => {
         typeParameters.push(this.parseTypeExpression());
       });
-      this.reader.consume(TokenType.GREATER_THAN, `type expression expecting closing angle brace for parameter list`);
     }
     return new TypeExpression(typeName, typeParameters);
   }
@@ -210,20 +204,12 @@ export class Parser {
       const referenceToken = this.reader.previous();
       this.reader.consume(TokenType.OPEN_PAREN, `definition must start with "(" for parameterList`);
       const parameterList: Array<Token> = [];
-      let isFirst = true;
-      while (true) {
-        if (this.reader.match(TokenType.CLOSE_PAREN)) {
-          break;
-        }
-        if (!isFirst) {
-          this.reader.consume(TokenType.COMMA, `arguments must be separated by commas`);
-        }
-        isFirst = false;
+      this.helper.parseDelimitedList(TokenType.COMMA, TokenType.CLOSE_PAREN, 0, () => {
         if (!this.reader.match(TokenType.IDENTIFIER)) {
           throw this.generateError(this.reader.peek(), `identifier expected in argument list`);
         }
         parameterList.push(this.reader.previous());
-      }
+      });
       this.reader.consume(TokenType.OPEN_BRACE, `body must start with "{"`);
       const temporaryBlockNode = this.parseStatementBlock();
       this.reader.consume(TokenType.CLOSE_BRACE, `body must end with "}"`);
@@ -284,12 +270,9 @@ export class Parser {
   parseCallParens(callee: SyntaxNode) {
     const referenceToken = this.reader.previous();
     const argumentList: Array<SyntaxNode> = [];
-    if (!this.reader.check(TokenType.CLOSE_PAREN)) {
-      do {
-        argumentList.push(this.parseExpression());
-      } while (this.reader.match(TokenType.COMMA));
-    }
-    const _closingParen = this.reader.consume(TokenType.CLOSE_PAREN, `Expect ')' after arguments.`);
+    this.helper.parseDelimitedList(TokenType.COMMA, TokenType.CLOSE_PAREN, 0, () => {
+      argumentList.push(this.parseExpression());
+    });
     return new FunctionCallSyntaxNode(referenceToken, callee, argumentList);
   }
   parsePrimaryExpression() {

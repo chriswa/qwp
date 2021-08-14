@@ -16,11 +16,21 @@ export class ParserHelper {
     }
     return expr;
   }
-  parseDelimitedListWithAtLeastOneItem<T>(separatorToken: TokenType, itemCallback: () => T): Array<T> {
+  parseDelimitedList<T>(separatorToken: TokenType, endOfListToken: TokenType, minItems: number, itemCallback: () => T): Array<T> {
     const list: Array<T> = [];
-    do {
-      list.push(itemCallback());
-    } while (this.reader.match(separatorToken))
+    if (!this.reader.match(endOfListToken)) {
+      do {
+        list.push(itemCallback());
+      } while (this.reader.match(separatorToken))
+      this.reader.consume(endOfListToken, 'expected end-of-list token after delimited list');
+    }
+    if (list.length < minItems) {
+      throw this.generateError(this.reader.previous(), `delimited list must have at least ${minItems} item(s)`);
+    }
     return list;
   }
 }
+
+//       this.helper.parseDelimitedListWithAtLeastOneItem(TokenType.COMMA, () => {
+//         typeParameters.push(this.parseTypeExpression());
+//       });
