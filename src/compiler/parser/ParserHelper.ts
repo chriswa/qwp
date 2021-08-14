@@ -22,13 +22,15 @@ export class ParserHelper {
     }
     return expr;
   }
-  parseDelimitedList<T>(separatorToken: TokenType, endOfListToken: TokenType, minItems: number, itemCallback: () => T): Array<T> {
+  parseDelimitedList<T>(separatorToken: TokenType, endOfListToken: TokenType | null, minItems: number, itemCallback: () => T): Array<T> {
     const list: Array<T> = [];
-    if (!this.reader.match(endOfListToken)) {
+    if (endOfListToken === null || this.reader.match(endOfListToken) === false) {
       do {
         list.push(itemCallback());
       } while (this.reader.match(separatorToken))
-      this.reader.consume(endOfListToken, 'expected end-of-list token after delimited list');
+      if (endOfListToken !== null) {
+        this.reader.consume(endOfListToken, 'expected end-of-list token after delimited list')
+      }
     }
     if (list.length < minItems) {
       throw this.generateError(this.reader.previous(), `delimited list must have at least ${minItems} item(s)`);

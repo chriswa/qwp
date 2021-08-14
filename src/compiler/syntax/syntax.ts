@@ -13,6 +13,7 @@ export interface SyntaxNodeVisitor<T> {
   visitReturnStatement(node: ReturnStatementSyntaxNode): T;
   visitLogicShortCircuit(node: LogicShortCircuitSyntaxNode): T;
   visitVariableLookup(node: VariableLookupSyntaxNode): T;
+  visitClassDeclaration(node: ClassDeclarationSyntaxNode): T;
   visitTypeDeclaration(node: TypeDeclarationSyntaxNode): T;
   visitVariableAssignment(node: VariableAssignmentSyntaxNode): T;
   visitFunctionDefinition(node: FunctionDefinitionSyntaxNode): T;
@@ -165,6 +166,22 @@ export class TypeDeclarationSyntaxNode extends SyntaxNode {
   }
   accept<R>(visitor: SyntaxNodeVisitor<R>) {
     return visitor.visitTypeDeclaration(this);
+  }
+}
+
+export class ClassDeclarationSyntaxNode extends SyntaxNode {
+  constructor(
+    referenceToken: Token,
+    public newClassName: Token,
+    public baseClassName: Token | null,
+    public implementedInterfaceNames: Array<Token>,
+    public methods: Map<string, FunctionDefinitionSyntaxNode>,
+    public fields: Map<string, TypeExpression | null>,
+  ) {
+    super(referenceToken);
+  }
+  accept<R>(visitor: SyntaxNodeVisitor<R>) {
+    return visitor.visitClassDeclaration(this);
   }
 }
 

@@ -1,6 +1,6 @@
 import assert from "assert"
 import { Token, TokenType } from "../Token"
-import { SyntaxNodeVisitor, SyntaxNode, BinarySyntaxNode, UnarySyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode, TypeDeclarationSyntaxNode } from "../syntax/syntax"
+import { SyntaxNodeVisitor, SyntaxNode, BinarySyntaxNode, UnarySyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode, TypeDeclarationSyntaxNode, ClassDeclarationSyntaxNode } from "../syntax/syntax"
 import { ByteBuffer } from "../../bytecode/ByteBuffer"
 import { OpCode } from "../../bytecode/opcodes"
 import { ValueType } from "../syntax/ValueType"
@@ -200,6 +200,9 @@ class BytecodeGenerator implements SyntaxNodeVisitor<void> {
     this.compileNodeList(node.statementList);
     this.popLocals();
     this.functionScope.popBlockScope();
+  }
+  visitClassDeclaration(_node: ClassDeclarationSyntaxNode): void {
+    // TODO: methods need to be written to constants table
   }
   visitTypeDeclaration(_node: TypeDeclarationSyntaxNode): void {
     // pass

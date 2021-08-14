@@ -1,6 +1,6 @@
 import { lex } from "../lexer/lexer";
 import { Token, TokenType } from "../Token";
-import { LiteralSyntaxNode, UnarySyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode, TypeDeclarationSyntaxNode } from "../syntax/syntax";
+import { LiteralSyntaxNode, UnarySyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode, TypeDeclarationSyntaxNode, ClassDeclarationSyntaxNode } from "../syntax/syntax";
 import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
 import { ValueType } from "../syntax/ValueType"
 import { TypeExpression } from "../syntax/TypeExpression"
@@ -78,9 +78,9 @@ export class Parser {
     else if (this.reader.match(TokenType.KEYWORD_TYPE)) {
       return this.parseTypeDeclarationStatement();
     }
-    // else if (this.reader.match(TokenType.KEYWORD_CLASS)) {
-    //   return classDeclarationStatement();
-    // }
+    else if (this.reader.match(TokenType.KEYWORD_CLASS)) {
+      return this.parseClassDeclarationStatement();
+    }
     else if (this.reader.matchOneOf([TokenType.KEYWORD_CONST, TokenType.KEYWORD_LET])) {
       return this.parseVariableDeclarationStatement();
     }
@@ -105,16 +105,45 @@ export class Parser {
     this.reader.consume(TokenType.SEMICOLON, `Semicolon expected after type declaration statement`);
     return new TypeDeclarationSyntaxNode(typeKeywordToken, newTypeName, newTypeExpression);
   }
-  // classDeclarationStatement() {
-  //   const classKeywordToken = this.reader.previous();
-  //   const newClassName = this.reader.consume(TokenType.IDENTIFIER, `expected identifier after class keyword`);
-  //   let baseClassName: Token | null = null;
-  //   if (this.reader.match(TokenType.KEYWORD_EXTENDS)) {
-  //     baseClassName = this.reader.consume(TokenType.IDENTIFIER, `expected identifier after extends keyword`);
-  //   }
-  //   this.reader.consume(TokenType.OPEN_BRACE, 
-  //   return new ClassDeclarationSyntaxNode(classKeywordToken, newClassName, baseClassName, ???);
-  // }
+  parseClassDeclarationStatement() {
+    const classKeywordToken = this.reader.previous();
+    const newClassName = this.reader.consume(TokenType.IDENTIFIER, `expected identifier after class keyword`);
+    
+    let baseClassName: Token | null = null;
+    if (this.reader.match(TokenType.KEYWORD_EXTENDS)) {
+      baseClassName = this.reader.consume(TokenType.IDENTIFIER, `expected identifier after extends keyword`);
+    }
+    
+    let implementedInterfaceNames: Array<Token> = [];
+    if (this.reader.match(TokenType.KEYWORD_IMPLEMENTS)) {
+      this.helper.parseDelimitedList(TokenType.COMMA, null, 1, () => {
+        const interfaceName = this.reader.consume(TokenType.IDENTIFIER, `expected identifier after extends keyword`);
+        implementedInterfaceNames.push(interfaceName);
+      });
+    }
+    
+    this.reader.consume(TokenType.OPEN_BRACE, `expected opening brace as part of class definition`);
+    const methods: Map<string, FunctionDefinitionSyntaxNode> = new Map();
+    const fields: Map<string, TypeExpression | null> = new Map();
+    while (this.reader.match(TokenType.CLOSE_BRACE) === false) {
+      const memberName = this.reader.consume(TokenType.IDENTIFIER, `identifier for member expected in class definition member block`);
+      // method
+      if (this.reader.match(TokenType.OPEN_PAREN)) {
+        const { parameterList, statementBlockNode } = this.parseFunctionAfterOpenParen() // n.b. statementBlockNode is discarded!
+        methods.set(memberName.lexeme, new FunctionDefinitionSyntaxNode(memberName, parameterList, statementBlockNode.statementList));
+      }
+      // or field
+      else {
+        let fieldType: TypeExpression | null = null;
+        if (this.reader.match(TokenType.COLON)) {
+          fieldType = this.parseTypeExpression();
+        }
+        fields.set(memberName.lexeme, fieldType);
+        this.reader.consume(TokenType.SEMICOLON, `expected semicolon after class field definition`);
+      }
+    }
+    return new ClassDeclarationSyntaxNode(classKeywordToken, newClassName, baseClassName, implementedInterfaceNames, methods, fields);
+  }
   parseVariableDeclarationStatement() {
     const modifier = this.reader.previous();
     const identifier = this.reader.consume(TokenType.IDENTIFIER, `lvalue in variable declaration statement must be an identifier`);
@@ -199,21 +228,25 @@ export class Parser {
     }
     return expr;
   }
+  parseFunctionAfterOpenParen(): { parameterList: Array<Token>, statementBlockNode: StatementBlockSyntaxNode } {
+    const parameterList: Array<Token> = [];
+    this.helper.parseDelimitedList(TokenType.COMMA, TokenType.CLOSE_PAREN, 0, () => {
+      if (!this.reader.match(TokenType.IDENTIFIER)) {
+        throw this.generateError(this.reader.peek(), `identifier expected in function/method argument list`);
+      }
+      parameterList.push(this.reader.previous());
+    });
+    this.reader.consume(TokenType.OPEN_BRACE, `function/method body must start with "{"`);
+    const statementBlockNode = this.parseStatementBlock();
+    this.reader.consume(TokenType.CLOSE_BRACE, `function/method body must end with "}"`);
+    return { parameterList, statementBlockNode }
+  }
   parseAnonymousFunction() {
     if (this.reader.match(TokenType.KEYWORD_FN)) {
       const referenceToken = this.reader.previous();
-      this.reader.consume(TokenType.OPEN_PAREN, `definition must start with "(" for parameterList`);
-      const parameterList: Array<Token> = [];
-      this.helper.parseDelimitedList(TokenType.COMMA, TokenType.CLOSE_PAREN, 0, () => {
-        if (!this.reader.match(TokenType.IDENTIFIER)) {
-          throw this.generateError(this.reader.peek(), `identifier expected in argument list`);
-        }
-        parameterList.push(this.reader.previous());
-      });
-      this.reader.consume(TokenType.OPEN_BRACE, `body must start with "{"`);
-      const temporaryBlockNode = this.parseStatementBlock();
-      this.reader.consume(TokenType.CLOSE_BRACE, `body must end with "}"`);
-      return new FunctionDefinitionSyntaxNode(referenceToken, parameterList, temporaryBlockNode.statementList);
+      this.reader.consume(TokenType.OPEN_PAREN, `function/method definition must start with "(" for parameterList`);
+      const { parameterList, statementBlockNode } = this.parseFunctionAfterOpenParen(); // n.b. statementBlockNode is discarded!
+      return new FunctionDefinitionSyntaxNode(referenceToken, parameterList, statementBlockNode.statementList);
     }
     return this.parseOrExpression();
   }
