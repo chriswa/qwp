@@ -2,6 +2,12 @@ import { BinarySyntaxNode, SyntaxNode } from "../syntax/syntax"
 import { Token, TokenType } from "../Token"
 import { TokenReader } from "./TokenReader"
 
+const stringBackslashSequences: Record<string, string> = {
+  "n": "\n",
+  "t": "\t",
+  "\"": "\"",
+}
+
 export class ParserHelper {
   public constructor(
     private reader: TokenReader,
@@ -29,8 +35,13 @@ export class ParserHelper {
     }
     return list;
   }
+  unescapeString(unescapedString: string): string {
+    return unescapedString.replace(/\\./g, (substring) => {
+      const char = substring.substr(1, 1);
+      if (char in stringBackslashSequences) {
+        return stringBackslashSequences[char];
+      }
+      throw this.generateError(this.reader.previous(), `string contains unnecessary backslash sequence "\\${char}"`);
+    });
+  }
 }
-
-//       this.helper.parseDelimitedListWithAtLeastOneItem(TokenType.COMMA, () => {
-//         typeParameters.push(this.parseTypeExpression());
-//       });

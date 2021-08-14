@@ -290,7 +290,7 @@ export class Parser {
     }
     if (this.reader.match(TokenType.STRING)) {
       let string = this.reader.previous().lexeme;
-      string = unescapeString(string.substr(1, string.length - 2)); // strip quotes and then unescape newlines, tabs, etc
+      string = this.helper.unescapeString(string.substr(1, string.length - 2)); // strip quotes and then unescape newlines, tabs, etc
       return new LiteralSyntaxNode(this.reader.previous(), string, ValueType.STRING);
     }
     if (this.reader.match(TokenType.IDENTIFIER)) {
@@ -303,20 +303,4 @@ export class Parser {
     }
     throw this.generateError(this.reader.peek(), `expecting expression`);
   }
-}
-
-const backslashSequences: Record<string, string> = {
-  "n": "\n",
-  "t": "\t",
-  "\"": "\"", // redundant
-}
-
-function unescapeString(unescapedString: string): string {
-  return unescapedString.replace(/\\./g, (substring) => {
-    const char = substring.substr(1, 1);
-    if (char in backslashSequences) {
-      return backslashSequences[char];
-    }
-    return char; // TODO: error instead?
-  });
 }
