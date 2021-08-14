@@ -1,63 +1,29 @@
 import { lex } from "../lexer/lexer";
 import { Token, TokenType } from "../Token";
-import { BinarySyntaxNode, LiteralSyntaxNode, UnarySyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode, TypeDeclarationSyntaxNode } from "../syntax/syntax";
+import { LiteralSyntaxNode, UnarySyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode, TypeDeclarationSyntaxNode } from "../syntax/syntax";
 import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
 import { ValueType } from "../syntax/ValueType"
 import { TypeExpression } from "../syntax/TypeExpression"
 import { CompileError } from "../CompileError"
-
-class TokenReader {
-  private index = 0;
-  public constructor(
-    private tokens: Array<Token>,
-    private parseErrorGenerator: (token: Token, message: string) => ErrorWithSourcePos,
-  ) {
-  }
-  public peek() {
-    return this.tokens[this.index];
-  }
-  public isAtEnd() {
-    return this.peek().type === TokenType.EOF;
-  }
-  public previous() {
-    return this.tokens[this.index - 1];
-  }
-  public check(requiredTypes: Array<TokenType>) {
-    const peekedType = this.peek().type;
-    return requiredTypes.indexOf(peekedType) > -1;
-  }
-  public match(requiredTypes: Array<TokenType>) {
-    const isMatch = this.check(requiredTypes);
-    if (isMatch) {
-      this.advance();
-    }
-    return isMatch;
-  }
-  public advance() {
-    if (this.isAtEnd()) {
-      throw this.parseErrorGenerator(this.peek(), `Unexpected end-of-file!`);
-    }
-    this.index += 1;
-  }
-  public consume(requiredType: TokenType, errorMessage: string) {
-    if (this.check([requiredType])) {
-      this.advance();
-      return this.previous();
-    }
-    else {
-      throw this.parseErrorGenerator(this.peek(), `Parse error: ${errorMessage}`);
-    }
-  }
-}
+import { TokenReader } from "./TokenReader"
+import { ParserHelper } from "./ParserHelper"
 
 export function parse(source: string, path: string): SyntaxNode {
   const tokens = lex(source, path);
-  const reader = new TokenReader(tokens, generateErrorWithSourcePos);
 
   const parserErrorsWithSourcePos: Array<ErrorWithSourcePos> = [];
+  function generateParseError(token: Token, message: string) {
+    const parseError = new ErrorWithSourcePos("Parser: " + message, token.path, token.charPos);
+    parserErrorsWithSourcePos.push(parseError);
+    return parseError;
+  }
+
+  const tokenReader = new TokenReader(tokens, generateParseError);
+
+  const parser = new Parser(tokenReader, generateParseError);
   let ast: SyntaxNode | null = null;
   try {
-    ast = module();
+    ast = parser.parseModule();
   }
   catch (error) {
     if (!(error instanceof ErrorWithSourcePos)) {
@@ -66,162 +32,170 @@ export function parse(source: string, path: string): SyntaxNode {
   }
   if (ast === null) {
     if (parserErrorsWithSourcePos.length === 0) {
-      throw new Error(`Internal error: ast not set but no parsererrors set`);
+      throw new Error(`Internal error: Parser fail! ast is null but no parserErrorsWithSourcePos set!`);
     }
     throw new CompileError(parserErrorsWithSourcePos);
   }
   return ast;
+}
 
-  function generateErrorWithSourcePos(token: Token, message: string) {
-    const parseError = new ErrorWithSourcePos("Parser: " + message, token.path, token.charPos);
-    parserErrorsWithSourcePos.push(parseError);
-    return parseError;
+export class Parser {
+  private helper: ParserHelper;
+  public constructor(
+    private reader: TokenReader,
+    private generateError: (token: Token, message: string) => void,
+  ) {
+    this.helper = new ParserHelper(reader, generateError);
   }
-
-  function synchronizeAfterErrorWithSourcePos() {
-    reader.advance();
-    while (!reader.isAtEnd()) {
-      if (reader.previous().type === TokenType.SEMICOLON) {
-        return;
-      }
-      if (reader.check([
-        TokenType.KEYWORD_IF, // TODO: etc
-      ])) {
-        return;
-      }
-      reader.advance();
-    }
-  }
-
-  function metaBinary(subGrammar: () => SyntaxNode, operators: Array<TokenType>) {
-    let expr: SyntaxNode = subGrammar();
-    while (reader.match(operators)) {
-      const op = reader.previous();
-      const right = subGrammar();
-      expr = new BinarySyntaxNode(op, expr, op, right);
-    }
-    return expr;
-  }
-
-  function module() {
-    const referenceToken = reader.peek();
+  // synchronizeAfterErrorWithSourcePos() {
+  //   reader.advance();
+  //   while (!reader.isAtEnd()) {
+  //     if (reader.previous().type === TokenType.SEMICOLON) {
+  //       return;
+  //     }
+  //     if (reader.checkOneOf([
+  //       TokenType.KEYWORD_IF, // TODO: etc
+  //     ])) {
+  //       return;
+  //     }
+  //     reader.advance();
+  //   }
+  // }
+  parseModule() {
+    const referenceToken = this.reader.peek();
     const statementList: Array<SyntaxNode> = [];
-    while (!reader.isAtEnd()) {
-      statementList.push(statement())
+    while (!this.reader.isAtEnd()) {
+      statementList.push(this.parseStatement())
     }
     return new StatementBlockSyntaxNode(referenceToken, statementList);
   }
-  function statement() {
-    if (reader.match([TokenType.OPEN_BRACE])) {
-      const blockNode = block();
-      reader.consume(TokenType.CLOSE_BRACE, `explicit block must end with "}"`);
+  parseStatement() {
+    if (this.reader.match(TokenType.OPEN_BRACE)) {
+      const blockNode = this.parseStatementBlock();
+      this.reader.consume(TokenType.CLOSE_BRACE, `explicit block must end with "}"`);
       return blockNode;
     }
-    else if (reader.match([TokenType.KEYWORD_TYPE])) {
-      return typeDeclarationStatement();
+    else if (this.reader.match(TokenType.KEYWORD_TYPE)) {
+      return this.parseTypeDeclarationStatement();
     }
-    else if (reader.match([TokenType.KEYWORD_CONST, TokenType.KEYWORD_LET])) {
-      return variableDeclarationStatement();
+    // else if (this.reader.match(TokenType.KEYWORD_CLASS)) {
+    //   return classDeclarationStatement();
+    // }
+    else if (this.reader.matchOneOf([TokenType.KEYWORD_CONST, TokenType.KEYWORD_LET])) {
+      return this.parseVariableDeclarationStatement();
     }
-    else if (reader.match([TokenType.KEYWORD_IF])) {
-      return ifStatement();
+    else if (this.reader.match(TokenType.KEYWORD_IF)) {
+      return this.parseIfStatement();
     }
-    else if (reader.match([TokenType.KEYWORD_WHILE])) {
-      return whileStatement();
+    else if (this.reader.match(TokenType.KEYWORD_WHILE)) {
+      return this.parseWhileStatement();
     }
-    else if (reader.match([TokenType.KEYWORD_RETURN])) {
-      return returnStatement();
+    else if (this.reader.match(TokenType.KEYWORD_RETURN)) {
+      return this.parseReturnStatement();
     }
-    const expr = expression();
-    reader.consume(TokenType.SEMICOLON, `Semicolon expected after expression/assignment statement`);
+    const expr = this.parseExpression();
+    this.reader.consume(TokenType.SEMICOLON, `Semicolon expected after expression/assignment statement`);
     return expr;
   }
-  function typeDeclarationStatement() {
-    const typeKeywordToken = reader.previous();
-    const newTypeName = reader.consume(TokenType.IDENTIFIER, `expected identifier after type keyword`);
-    reader.consume(TokenType.EQUAL, `expected equal sign (=) after type identifier`);
-    const newTypeExpression = typeExpression();
-    reader.consume(TokenType.SEMICOLON, `Semicolon expected after type declaration statement`);
+  parseTypeDeclarationStatement() {
+    const typeKeywordToken = this.reader.previous();
+    const newTypeName = this.reader.consume(TokenType.IDENTIFIER, `expected identifier after type keyword`);
+    this.reader.consume(TokenType.EQUAL, `expected equal sign (=) after type identifier`);
+    const newTypeExpression = this.parseTypeExpression();
+    this.reader.consume(TokenType.SEMICOLON, `Semicolon expected after type declaration statement`);
     return new TypeDeclarationSyntaxNode(typeKeywordToken, newTypeName, newTypeExpression);
   }
-  function variableDeclarationStatement() {
-    const modifier = reader.previous();
-    const identifier = reader.consume(TokenType.IDENTIFIER, `lvalue in variable declaration statement must be an identifier`);
+  // classDeclarationStatement() {
+  //   const classKeywordToken = this.reader.previous();
+  //   const newClassName = this.reader.consume(TokenType.IDENTIFIER, `expected identifier after class keyword`);
+  //   let baseClassName: Token | null = null;
+  //   if (this.reader.match(TokenType.KEYWORD_EXTENDS)) {
+  //     baseClassName = this.reader.consume(TokenType.IDENTIFIER, `expected identifier after extends keyword`);
+  //   }
+  //   this.reader.consume(TokenType.OPEN_BRACE, 
+  //   return new ClassDeclarationSyntaxNode(classKeywordToken, newClassName, baseClassName, ???);
+  // }
+  parseVariableDeclarationStatement() {
+    const modifier = this.reader.previous();
+    const identifier = this.reader.consume(TokenType.IDENTIFIER, `lvalue in variable declaration statement must be an identifier`);
     let type = null;
-    if (reader.match([TokenType.COLON])) {
-      type = typeExpression();
+    if (this.reader.match(TokenType.COLON)) {
+      type = this.parseTypeExpression();
     }
     let rvalue: SyntaxNode | null = null;
-    if (reader.match([TokenType.COLON_EQUAL])) {
-      rvalue = expression();
+    if (this.reader.match(TokenType.COLON_EQUAL)) {
+      rvalue = this.parseExpression();
     }
-    reader.consume(TokenType.SEMICOLON, `Semicolon expected after variable assignment statement`);
+    this.reader.consume(TokenType.SEMICOLON, `Semicolon expected after variable assignment statement`);
     return new VariableAssignmentSyntaxNode(modifier, modifier, identifier, type, rvalue);
   }
-  function typeExpression(): TypeExpression {
-    const typeName = reader.consume(TokenType.IDENTIFIER, `type expression expecting identifier`)
+  parseTypeExpression(): TypeExpression {
+    const typeName = this.reader.consume(TokenType.IDENTIFIER, `type expression expecting identifier`)
     let typeParameters: Array<TypeExpression> = [];
-    if (reader.match([TokenType.LESS_THAN])) {
-      let isStillExpectingParameters = true;
-      while (isStillExpectingParameters) {
-        typeParameters.push(typeExpression());
-        isStillExpectingParameters = reader.match([TokenType.COMMA]);
-      }
-      reader.consume(TokenType.GREATER_THAN, `type expression expecting closing angle brace for parameter list`);
+    if (this.reader.match(TokenType.LESS_THAN)) {
+      // let isStillExpectingParameters = true;
+      // while (isStillExpectingParameters) {
+      //   typeParameters.push(typeExpression());
+      //   isStillExpectingParameters = this.reader.match(TokenType.COMMA);
+      // }
+      this.helper.parseDelimitedListWithAtLeastOneItem(TokenType.COMMA, () => {
+        typeParameters.push(this.parseTypeExpression());
+      });
+      this.reader.consume(TokenType.GREATER_THAN, `type expression expecting closing angle brace for parameter list`);
     }
     return new TypeExpression(typeName, typeParameters);
   }
-  function ifStatement() {
-    const referenceToken = reader.previous();
-    reader.consume(TokenType.OPEN_PAREN, `Open paren expected after "if" statement`);
-    const condExpr = expression();
-    reader.consume(TokenType.CLOSE_PAREN, `Open paren expected after "if" statement`);
-    reader.consume(TokenType.OPEN_BRACE, `Opening curly brace required for "if" statement's "then" block`);
-    const thenBlock = block();
-    reader.consume(TokenType.CLOSE_BRACE, `Closing curly brace required after "if" statement's "then" block`);
+  parseIfStatement() {
+    const referenceToken = this.reader.previous();
+    this.reader.consume(TokenType.OPEN_PAREN, `Open paren expected after "if" statement`);
+    const condExpr = this.parseExpression();
+    this.reader.consume(TokenType.CLOSE_PAREN, `Open paren expected after "if" statement`);
+    this.reader.consume(TokenType.OPEN_BRACE, `Opening curly brace required for "if" statement's "then" block`);
+    const thenBlock = this.parseStatementBlock();
+    this.reader.consume(TokenType.CLOSE_BRACE, `Closing curly brace required after "if" statement's "then" block`);
     let elseBlock = null;
-    if (reader.match([TokenType.KEYWORD_ELSE])) {
-      reader.consume(TokenType.OPEN_BRACE, `Opening curly brace required for "if" statement's "else" block`);
-      elseBlock = block();
-      reader.consume(TokenType.CLOSE_BRACE, `Closing curly brace required after "if" statement's "else" block`);
+    if (this.reader.match(TokenType.KEYWORD_ELSE)) {
+      this.reader.consume(TokenType.OPEN_BRACE, `Opening curly brace required for "if" statement's "else" block`);
+      elseBlock = this.parseStatementBlock();
+      this.reader.consume(TokenType.CLOSE_BRACE, `Closing curly brace required after "if" statement's "else" block`);
     }
     return new IfStatementSyntaxNode(referenceToken, condExpr, thenBlock, elseBlock);
   }
-  function whileStatement() {
-    const referenceToken = reader.previous();
-    reader.consume(TokenType.OPEN_PAREN, `Open paren expected after "while" statement`);
-    const condExpr = expression();
-    reader.consume(TokenType.CLOSE_PAREN, `Open paren expected after "while" statement`);
-    reader.consume(TokenType.OPEN_BRACE, `Opening curly brace required for "while" statement's "loop" block`);
-    const loopBlock = block();
-    reader.consume(TokenType.CLOSE_BRACE, `Closing curly brace required after "while" statement's "loop" block`);
+  parseWhileStatement() {
+    const referenceToken = this.reader.previous();
+    this.reader.consume(TokenType.OPEN_PAREN, `Open paren expected after "while" statement`);
+    const condExpr = this.parseExpression();
+    this.reader.consume(TokenType.CLOSE_PAREN, `Open paren expected after "while" statement`);
+    this.reader.consume(TokenType.OPEN_BRACE, `Opening curly brace required for "while" statement's "loop" block`);
+    const loopBlock = this.parseStatementBlock();
+    this.reader.consume(TokenType.CLOSE_BRACE, `Closing curly brace required after "while" statement's "loop" block`);
     return new WhileStatementSyntaxNode(referenceToken, condExpr, loopBlock);
   }
-  function returnStatement() {
-    const referenceToken = reader.previous();
+  parseReturnStatement() {
+    const referenceToken = this.reader.previous();
     let retval: SyntaxNode | null = null;
-    if (!reader.check([TokenType.SEMICOLON])) {
-      retval = expression();
+    if (!this.reader.check(TokenType.SEMICOLON)) {
+      retval = this.parseExpression();
     }
-    reader.consume(TokenType.SEMICOLON, `Return statement must end with semicolon`);
+    this.reader.consume(TokenType.SEMICOLON, `Return statement must end with semicolon`);
     return new ReturnStatementSyntaxNode(referenceToken, retval);
   }
-  function block() {
-    const referenceToken = reader.previous();
+  parseStatementBlock() {
+    const referenceToken = this.reader.previous();
     const statementList: Array<SyntaxNode> = [];
-    while (!reader.check([TokenType.CLOSE_BRACE]) && !reader.isAtEnd()) {
-      statementList.push(statement());
+    while (!this.reader.check(TokenType.CLOSE_BRACE) && !this.reader.isAtEnd()) {
+      statementList.push(this.parseStatement());
     }
     return new StatementBlockSyntaxNode(referenceToken, statementList);
   }
-  function expression(): SyntaxNode {
-    return assignment()
+  parseExpression(): SyntaxNode {
+    return this.parseAssignmentStatement()
   }
-  function assignment() {
-    const expr = anonymousFunction();
-    if (reader.match([TokenType.COLON_EQUAL])) {
-      const referenceToken = reader.previous();
-      const rvalue = expression();
+  parseAssignmentStatement() {
+    const expr = this.parseAnonymousFunction();
+    if (this.reader.match(TokenType.COLON_EQUAL)) {
+      const referenceToken = this.reader.previous();
+      const rvalue = this.parseExpression();
       if (expr instanceof VariableLookupSyntaxNode) {
         return new VariableAssignmentSyntaxNode(referenceToken, null, expr.identifier, null, rvalue);
       }
@@ -231,75 +205,75 @@ export function parse(source: string, path: string): SyntaxNode {
     }
     return expr;
   }
-  function anonymousFunction() {
-    if (reader.match([TokenType.KEYWORD_FN])) {
-      const referenceToken = reader.previous();
-      reader.consume(TokenType.OPEN_PAREN, `function definition must start with "(" for parameterList`);
+  parseAnonymousFunction() {
+    if (this.reader.match(TokenType.KEYWORD_FN)) {
+      const referenceToken = this.reader.previous();
+      this.reader.consume(TokenType.OPEN_PAREN, `definition must start with "(" for parameterList`);
       const parameterList: Array<Token> = [];
       let isFirst = true;
       while (true) {
-        if (reader.match([TokenType.CLOSE_PAREN])) {
+        if (this.reader.match(TokenType.CLOSE_PAREN)) {
           break;
         }
         if (!isFirst) {
-          reader.consume(TokenType.COMMA, `function arguments must be separated by commas`);
+          this.reader.consume(TokenType.COMMA, `arguments must be separated by commas`);
         }
         isFirst = false;
-        if (!reader.match([TokenType.IDENTIFIER])) {
-          throw generateErrorWithSourcePos(reader.peek(), `identifier expected in function argument list`);
+        if (!this.reader.match(TokenType.IDENTIFIER)) {
+          throw this.generateError(this.reader.peek(), `identifier expected in argument list`);
         }
-        parameterList.push(reader.previous());
+        parameterList.push(this.reader.previous());
       }
-      reader.consume(TokenType.OPEN_BRACE, `function body must start with "{"`);
-      const temporaryBlockNode = block();
-      reader.consume(TokenType.CLOSE_BRACE, `function body must end with "}"`);
+      this.reader.consume(TokenType.OPEN_BRACE, `body must start with "{"`);
+      const temporaryBlockNode = this.parseStatementBlock();
+      this.reader.consume(TokenType.CLOSE_BRACE, `body must end with "}"`);
       return new FunctionDefinitionSyntaxNode(referenceToken, parameterList, temporaryBlockNode.statementList);
     }
-    return or();
+    return this.parseOrExpression();
   }
-  function or() {
-    let expr = and();
-    while (reader.match([TokenType.DOUBLE_PIPE])) {
-      const op = reader.previous();
-      const right = and();
+  parseOrExpression() {
+    let expr = this.parseAndExpression();
+    while (this.reader.match(TokenType.DOUBLE_PIPE)) {
+      const op = this.reader.previous();
+      const right = this.parseAndExpression();
       expr = new LogicShortCircuitSyntaxNode(op, expr, op, right);
     }
     return expr;
   }
-  function and() {
-    let expr = equality();
-    while (reader.match([TokenType.DOUBLE_AMPERSAND])) {
-      const op = reader.previous();
-      const right = equality();
+  parseAndExpression() {
+    let expr = this.parseEqualityExpression();
+    while (this.reader.match(TokenType.DOUBLE_AMPERSAND)) {
+      const op = this.reader.previous();
+      const right = this.parseEqualityExpression();
       expr = new LogicShortCircuitSyntaxNode(op, expr, op, right);
     }
     return expr;
   }
-  function equality() {
-    return metaBinary(comparison, [TokenType.DOUBLE_EQUAL, TokenType.BANG_EQUAL]);
+  parseEqualityExpression() {
+    return this.helper.parseBinaryExpression(this.parseComparisonExpression.bind(this), [TokenType.DOUBLE_EQUAL, TokenType.BANG_EQUAL]);
   }
-  function comparison() {
-    return metaBinary(addSubExpr, [TokenType.GREATER_THAN, TokenType.GREATER_THAN_OR_EQUAL, TokenType.LESS_THAN, TokenType.LESS_THAN_OR_EQUAL]);
+  parseComparisonExpression() {
+    return this.helper.parseBinaryExpression(this.parseAddOrSubtractExpression.bind(this), [TokenType.GREATER_THAN, TokenType.GREATER_THAN_OR_EQUAL, TokenType.LESS_THAN, TokenType.LESS_THAN_OR_EQUAL]);
   }
-  function addSubExpr() {
-    return metaBinary(multDivExpr, [TokenType.PLUS, TokenType.MINUS]);
+  parseAddOrSubtractExpression() {
+    return this.helper.parseBinaryExpression(this.parseMultOrDivExpression.bind(this), [TokenType.PLUS, TokenType.MINUS]);
   }
-  function multDivExpr() {
-    return metaBinary(unary, [TokenType.ASTERISK, TokenType.FORWARD_SLASH]);
+  parseMultOrDivExpression() {
+    return this.helper.parseBinaryExpression(this.parseUnaryExpression.bind(this), [TokenType.ASTERISK, TokenType.FORWARD_SLASH]);
   }
-  function unary(): SyntaxNode {
-    if (reader.match([TokenType.BANG, TokenType.MINUS])) {
-      const op = reader.previous();
-      const right = unary();
+  parseUnaryExpression(): SyntaxNode {
+    if (this.reader.matchOneOf([TokenType.BANG, TokenType.MINUS])) {
+      const op = this.reader.previous();
+      const right = this.parseUnaryExpression();
       return new UnarySyntaxNode(op, op, right);
     }
-    return call();
+    return this.parseFunctionCallExpression();
   }
-  function call() {
-    let expr = primary();
+  parseFunctionCallExpression() {
+    let expr = this.parsePrimaryExpression();
     while (true) {
-      if (reader.match([TokenType.OPEN_PAREN])) {
-        expr = finishCall(expr);
+      if (this.reader.match(TokenType.OPEN_PAREN)) {
+        expr = this.parseCallParens(expr);
       }
       else {
         break
@@ -307,44 +281,44 @@ export function parse(source: string, path: string): SyntaxNode {
     }
     return expr;
   }
-  function finishCall(callee: SyntaxNode) {
-    const referenceToken = reader.previous();
+  parseCallParens(callee: SyntaxNode) {
+    const referenceToken = this.reader.previous();
     const argumentList: Array<SyntaxNode> = [];
-    if (!reader.check([TokenType.CLOSE_PAREN])) {
+    if (!this.reader.check(TokenType.CLOSE_PAREN)) {
       do {
-        argumentList.push(expression());
-      } while (reader.match([TokenType.COMMA]));
+        argumentList.push(this.parseExpression());
+      } while (this.reader.match(TokenType.COMMA));
     }
-    const _closingParen = reader.consume(TokenType.CLOSE_PAREN, `Expect ')' after arguments.`);
+    const _closingParen = this.reader.consume(TokenType.CLOSE_PAREN, `Expect ')' after arguments.`);
     return new FunctionCallSyntaxNode(referenceToken, callee, argumentList);
   }
-  function primary() {
-    if (reader.match([TokenType.KEYWORD_FALSE])) {
-      return new LiteralSyntaxNode(reader.previous(), false, ValueType.BOOLEAN);
+  parsePrimaryExpression() {
+    if (this.reader.match(TokenType.KEYWORD_FALSE)) {
+      return new LiteralSyntaxNode(this.reader.previous(), false, ValueType.BOOLEAN);
     }
-    if (reader.match([TokenType.KEYWORD_TRUE])) {
-      return new LiteralSyntaxNode(reader.previous(), true, ValueType.BOOLEAN);
+    if (this.reader.match(TokenType.KEYWORD_TRUE)) {
+      return new LiteralSyntaxNode(this.reader.previous(), true, ValueType.BOOLEAN);
     }
-    if (reader.match([TokenType.KEYWORD_NULL])) {
-      return new LiteralSyntaxNode(reader.previous(), null, ValueType.NULL); // ?
+    if (this.reader.match(TokenType.KEYWORD_NULL)) {
+      return new LiteralSyntaxNode(this.reader.previous(), null, ValueType.NULL); // ?
     }
-    if (reader.match([TokenType.NUMBER])) {
-      return new LiteralSyntaxNode(reader.previous(), parseFloat(reader.previous().lexeme), ValueType.NUMBER);
+    if (this.reader.match(TokenType.NUMBER)) {
+      return new LiteralSyntaxNode(this.reader.previous(), parseFloat(this.reader.previous().lexeme), ValueType.NUMBER);
     }
-    if (reader.match([TokenType.STRING])) {
-      let string = reader.previous().lexeme;
+    if (this.reader.match(TokenType.STRING)) {
+      let string = this.reader.previous().lexeme;
       string = unescapeString(string.substr(1, string.length - 2)); // strip quotes and then unescape newlines, tabs, etc
-      return new LiteralSyntaxNode(reader.previous(), string, ValueType.STRING);
+      return new LiteralSyntaxNode(this.reader.previous(), string, ValueType.STRING);
     }
-    if (reader.match([TokenType.IDENTIFIER])) {
-      return new VariableLookupSyntaxNode(reader.previous(), reader.previous()); // n.b. this might be an lvalue, which we will discover soon
+    if (this.reader.match(TokenType.IDENTIFIER)) {
+      return new VariableLookupSyntaxNode(this.reader.previous(), this.reader.previous()); // n.b. this might be an lvalue, which we will discover soon
     }
-    if (reader.match([TokenType.OPEN_PAREN])) {
-      const expr = expression();
-      reader.consume(TokenType.CLOSE_PAREN, "Expect ')' after expression.");
+    if (this.reader.match(TokenType.OPEN_PAREN)) {
+      const expr = this.parseExpression();
+      this.reader.consume(TokenType.CLOSE_PAREN, "Expect ')' after expression.");
       return expr;
     }
-    throw generateErrorWithSourcePos(reader.peek(), `expecting expression`);
+    throw this.generateError(this.reader.peek(), `expecting expression`);
   }
 }
 
@@ -363,4 +337,3 @@ function unescapeString(unescapedString: string): string {
     return char; // TODO: error instead?
   });
 }
-

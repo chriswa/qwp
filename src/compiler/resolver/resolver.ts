@@ -26,9 +26,7 @@ export class VariableDefinition {
   public isClosed = false;
   public isRef = false;
   constructor(
-    // public isDeclaredHere: boolean,
     public isBuiltInOrParameter: boolean,
-    // public isInitialized: boolean,
     public isReadOnly: boolean,
   ) { }
 }
