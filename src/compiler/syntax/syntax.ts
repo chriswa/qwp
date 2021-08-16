@@ -1,6 +1,8 @@
 import { Token } from "../Token"
 import { ValueType } from "./ValueType"
-import { TypeExpression } from "./TypeExpression"
+import { TypeHint } from "./TypeHint"
+import { FunctionParameter } from "./FunctionParameter"
+import { GenericDefinition } from "./GenericDefinition"
 
 export interface SyntaxNodeVisitor<T> {
   visitBinary(node: BinarySyntaxNode): T;
@@ -159,8 +161,9 @@ export class VariableLookupSyntaxNode extends SyntaxNode {
 export class TypeDeclarationSyntaxNode extends SyntaxNode {
   constructor(
     referenceToken: Token,
-    newTypeName: Token,
-    newTypeExpression: TypeExpression,
+    public identifier: Token,
+    public genericDefinition: GenericDefinition | null,
+    public typeHint: TypeHint,
   ) {
     super(referenceToken)
   }
@@ -173,10 +176,11 @@ export class ClassDeclarationSyntaxNode extends SyntaxNode {
   constructor(
     referenceToken: Token,
     public newClassName: Token,
+    public genericDefinition: GenericDefinition | null,
     public baseClassName: Token | null,
     public implementedInterfaceNames: Array<Token>,
     public methods: Map<string, FunctionDefinitionSyntaxNode>,
-    public fields: Map<string, TypeExpression | null>,
+    public fields: Map<string, TypeHint | null>,
   ) {
     super(referenceToken);
   }
@@ -190,7 +194,7 @@ export class VariableAssignmentSyntaxNode extends SyntaxNode {
     referenceToken: Token,
     public modifier: Token | null,
     public identifier: Token,
-    public type: TypeExpression | null,
+    public typeHint: TypeHint | null,
     public rvalue: SyntaxNode | null,
   ) {
     super(referenceToken);
@@ -203,7 +207,8 @@ export class VariableAssignmentSyntaxNode extends SyntaxNode {
 export class FunctionDefinitionSyntaxNode extends SyntaxNode {
   constructor(
     referenceToken: Token,
-    public parameterList: Array<Token>,
+    public genericDefinition: GenericDefinition | null,
+    public parameterList: Array<FunctionParameter>,
     public statementList: Array<SyntaxNode>,
   ) {
     super(referenceToken);

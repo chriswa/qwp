@@ -1,4 +1,6 @@
+import { GenericDefinition } from "../syntax/GenericDefinition"
 import { BinarySyntaxNode, SyntaxNode } from "../syntax/syntax"
+import { TypeHint } from "../syntax/TypeHint"
 import { Token, TokenType } from "../Token"
 import { TokenReader } from "./TokenReader"
 
@@ -13,6 +15,42 @@ export class ParserHelper {
     private reader: TokenReader,
     private generateError: (token: Token, message: string) => void,
   ) { }
+  parseTypeHint(): TypeHint {
+    const typeName = this.reader.consume(TokenType.IDENTIFIER, `type expression expecting identifier`);
+    let typeParameters: Array<TypeHint> = [];
+    if (this.reader.match(TokenType.LESS_THAN)) {
+      this.parseDelimitedList(TokenType.COMMA, TokenType.GREATER_THAN, 1, () => {
+        typeParameters.push(this.parseTypeHint());
+      });
+    }
+    return new TypeHint(typeName, typeParameters);
+  }
+  parseGenericDefinition(): GenericDefinition {
+    const typeName = this.reader.consume(TokenType.IDENTIFIER, `type expression expecting identifier`); // TODO: extends, |, etc
+    let typeParameters: Array<TypeHint> = [];
+    if (this.reader.match(TokenType.LESS_THAN)) {
+      this.parseDelimitedList(TokenType.COMMA, TokenType.GREATER_THAN, 1, () => {
+        typeParameters.push(this.parseGenericDefinition());
+      });
+    }
+    return new GenericDefinition(typeName, typeParameters);
+  }
+  parseOptionalTypeHint(): TypeHint | null {
+    if (this.reader.match(TokenType.COLON)) {
+      return this.parseTypeHint();
+    }
+    else {
+      return null;
+    }
+  }
+  parseOptionalGenericDefinition(): GenericDefinition | null {
+    if (this.reader.match(TokenType.LESS_THAN)) {
+      return this.parseGenericDefinition();
+    }
+    else {
+      return null;
+    }
+  }
   parseBinaryExpression(subGrammar: () => SyntaxNode, operatorTokens: Array<TokenType>) {
     let expr: SyntaxNode = subGrammar();
     while (this.reader.matchOneOf(operatorTokens)) {

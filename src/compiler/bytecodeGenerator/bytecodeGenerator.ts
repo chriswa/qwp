@@ -249,7 +249,7 @@ class BytecodeGenerator implements SyntaxNodeVisitor<void> {
   visitFunctionDefinition(node: FunctionDefinitionSyntaxNode): void {
     const closedVars = this.getClosedVarsByFunctionNode(node);
     const fnBytecodeGenerator = new BytecodeGenerator(this.context, this, node);
-    fnBytecodeGenerator.declareParametersAndClosedVars(node.parameterList.map(token => token.lexeme), closedVars);
+    fnBytecodeGenerator.declareParametersAndClosedVars(node.parameterList.map(parameter => parameter.identifier.lexeme), closedVars);
     fnBytecodeGenerator.compileNodeList(node.statementList);
     fnBytecodeGenerator.popLocals();
     fnBytecodeGenerator.instructionBuffer.pushUint8(OpCode.CODESTOP);

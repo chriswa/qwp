@@ -1,5 +1,5 @@
 import { SyntaxNode } from "../syntax/syntax"
-import { ResolverScope, VariableDefinition } from "./resolver"
+import { ResolverScope, VariableDefinition } from "./ResolverScope"
 
 export class ResolverOutput {
   public decoratedNodes: Map<SyntaxNode, ResolverScopeOutput> = new Map();
