@@ -1,9 +1,9 @@
 import { Token } from "../Token"
 
-export class TypeHint {
+export class TypeAnnotation {
   constructor(
     public name: Token,
-    public parameters: Array<TypeHint> = [],
+    public parameters: Array<TypeAnnotation> = [],
   ) {
   }
 }

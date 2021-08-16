@@ -1,4 +1,4 @@
-import { TypeHint } from "../syntax/TypeHint"
+import { TypeAnnotation } from "../syntax/TypeAnnotation"
 
 export class VariableDefinition {
   public isClosed = false;
@@ -15,7 +15,7 @@ export class ResolverScope {
   public variableDefinitions: Map<string, VariableDefinition> = new Map();
   public initializedVars: Set<string> = new Set();
   public closedVars: Array<string> = []; // only used if this.isFunction === true
-  public typeDeclarations: Map<string, TypeHint> = new Map(); // TODO: TypeHint?
+  public typeDeclarations: Map<string, TypeAnnotation> = new Map(); // TODO: TypeAnnotation?
   public classDeclarations: Map<string, ClassDefinition> = new Map();
 
   public constructor(
@@ -31,13 +31,13 @@ export class ResolverScope {
   }
 
   // types
-  public declareType(identifier: string, typeHint: TypeHint): void {
+  public declareType(identifier: string, typeAnnotation: TypeAnnotation): void {
     if (this.lookupType(identifier) !== null) {
       throw new Error(`cannot define type "${identifier}": already defined in stack!`);
     }
-    this.typeDeclarations.set(identifier, typeHint);
+    this.typeDeclarations.set(identifier, typeAnnotation);
   }
-  public lookupType(identifier: string): TypeHint | null {
+  public lookupType(identifier: string): TypeAnnotation | null {
     return this.typeDeclarations.get(identifier) ?? this.parentScope?.lookupType(identifier) ?? null;
   }
 

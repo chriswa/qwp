@@ -1,9 +1,9 @@
 import { Token } from "../Token"
-import { TypeHint } from "./TypeHint"
+import { TypeAnnotation } from "./TypeAnnotation"
 
 export class FunctionParameter {
   constructor(
     public identifier: Token,
-    public typeHint: TypeHint | null,
+    public typeAnnotation: TypeAnnotation | null,
   ) { }
 }

@@ -1,6 +1,6 @@
 import { Token } from "../Token"
 import { ValueType } from "./ValueType"
-import { TypeHint } from "./TypeHint"
+import { TypeAnnotation } from "./TypeAnnotation"
 import { FunctionParameter } from "./FunctionParameter"
 import { GenericDefinition } from "./GenericDefinition"
 
@@ -163,7 +163,7 @@ export class TypeDeclarationSyntaxNode extends SyntaxNode {
     referenceToken: Token,
     public identifier: Token,
     public genericDefinition: GenericDefinition | null,
-    public typeHint: TypeHint,
+    public typeAnnotation: TypeAnnotation,
   ) {
     super(referenceToken)
   }
@@ -180,7 +180,7 @@ export class ClassDeclarationSyntaxNode extends SyntaxNode {
     public baseClassName: Token | null,
     public implementedInterfaceNames: Array<Token>,
     public methods: Map<string, FunctionDefinitionSyntaxNode>,
-    public fields: Map<string, TypeHint | null>,
+    public fields: Map<string, TypeAnnotation | null>,
   ) {
     super(referenceToken);
   }
@@ -194,7 +194,7 @@ export class VariableAssignmentSyntaxNode extends SyntaxNode {
     referenceToken: Token,
     public modifier: Token | null,
     public identifier: Token,
-    public typeHint: TypeHint | null,
+    public typeAnnotation: TypeAnnotation | null,
     public rvalue: SyntaxNode | null,
   ) {
     super(referenceToken);

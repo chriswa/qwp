@@ -1,6 +1,6 @@
 import { GenericDefinition } from "../syntax/GenericDefinition"
 import { BinarySyntaxNode, SyntaxNode } from "../syntax/syntax"
-import { TypeHint } from "../syntax/TypeHint"
+import { TypeAnnotation } from "../syntax/TypeAnnotation"
 import { Token, TokenType } from "../Token"
 import { TokenReader } from "./TokenReader"
 
@@ -15,19 +15,19 @@ export class ParserHelper {
     private reader: TokenReader,
     private generateError: (token: Token, message: string) => void,
   ) { }
-  parseTypeHint(): TypeHint {
+  parseTypeAnnotation(): TypeAnnotation {
     const typeName = this.reader.consume(TokenType.IDENTIFIER, `type expression expecting identifier`);
-    let typeParameters: Array<TypeHint> = [];
+    let typeParameters: Array<TypeAnnotation> = [];
     if (this.reader.match(TokenType.LESS_THAN)) {
       this.parseDelimitedList(TokenType.COMMA, TokenType.GREATER_THAN, 1, () => {
-        typeParameters.push(this.parseTypeHint());
+        typeParameters.push(this.parseTypeAnnotation());
       });
     }
-    return new TypeHint(typeName, typeParameters);
+    return new TypeAnnotation(typeName, typeParameters);
   }
   parseGenericDefinition(): GenericDefinition {
     const typeName = this.reader.consume(TokenType.IDENTIFIER, `type expression expecting identifier`); // TODO: extends, |, etc
-    let typeParameters: Array<TypeHint> = [];
+    let typeParameters: Array<TypeAnnotation> = [];
     if (this.reader.match(TokenType.LESS_THAN)) {
       this.parseDelimitedList(TokenType.COMMA, TokenType.GREATER_THAN, 1, () => {
         typeParameters.push(this.parseGenericDefinition());
@@ -35,9 +35,9 @@ export class ParserHelper {
     }
     return new GenericDefinition(typeName, typeParameters);
   }
-  parseOptionalTypeHint(): TypeHint | null {
+  parseOptionalTypeAnnotation(): TypeAnnotation | null {
     if (this.reader.match(TokenType.COLON)) {
-      return this.parseTypeHint();
+      return this.parseTypeAnnotation();
     }
     else {
       return null;

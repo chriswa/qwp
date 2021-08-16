@@ -6,7 +6,7 @@ import { parse } from "../parser/parser"
 import { CompileError } from "../CompileError"
 import { ResolverOutput } from "./resolverOutput"
 import { ResolverScope } from "./ResolverScope"
-import { TypeHint } from "../syntax/TypeHint"
+import { TypeAnnotation } from "../syntax/TypeAnnotation"
 
 interface IResolverResponse {
   ast: SyntaxNode;
@@ -127,12 +127,12 @@ class Resolver implements SyntaxNodeVisitor<void> {
   }
   visitClassDeclaration(node: ClassDeclarationSyntaxNode) {
     // TODO: ???
-    // this.scope.declareClass(node.newClassName.lexeme, node.newTypeHint);
-    // this.scope.declareType(node.newClassName.lexeme, new TypeHint(node.newClassName.lexeme));
+    // this.scope.declareClass(node.newClassName.lexeme, node.newTypeAnnotation);
+    // this.scope.declareType(node.newClassName.lexeme, new TypeAnnotation(node.newClassName.lexeme));
   }
   visitTypeDeclaration(node: TypeDeclarationSyntaxNode) {
     // TODO: write a type system
-    this.scope.declareType(node.identifier.lexeme, node.typeHint);
+    this.scope.declareType(node.identifier.lexeme, node.typeAnnotation);
   }
   visitVariableLookup(node: VariableLookupSyntaxNode) {
     const identifier = node.identifier.lexeme;

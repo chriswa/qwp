@@ -3,7 +3,7 @@ import { Token, TokenType } from "../Token";
 import { LiteralSyntaxNode, UnarySyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode, TypeDeclarationSyntaxNode, ClassDeclarationSyntaxNode } from "../syntax/syntax";
 import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
 import { ValueType } from "../syntax/ValueType"
-import { TypeHint } from "../syntax/TypeHint"
+import { TypeAnnotation } from "../syntax/TypeAnnotation"
 import { CompileError } from "../CompileError"
 import { TokenReader } from "./TokenReader"
 import { ParserHelper } from "./ParserHelper"
@@ -104,9 +104,9 @@ export class Parser {
     const newTypeName = this.reader.consume(TokenType.IDENTIFIER, `expected identifier after type keyword`);
     const genericDefinition = this.helper.parseOptionalGenericDefinition();
     this.reader.consume(TokenType.EQUAL, `expected equal sign (=) after type identifier`);
-    const newTypeHint = this.helper.parseTypeHint();
+    const newTypeAnnotation = this.helper.parseTypeAnnotation();
     this.reader.consume(TokenType.SEMICOLON, `Semicolon expected after type declaration statement`);
-    return new TypeDeclarationSyntaxNode(typeKeywordToken, newTypeName, genericDefinition, newTypeHint);
+    return new TypeDeclarationSyntaxNode(typeKeywordToken, newTypeName, genericDefinition, newTypeAnnotation);
   }
   parseClassDeclarationStatement() {
     const classKeywordToken = this.reader.previous();
@@ -129,7 +129,7 @@ export class Parser {
     
     this.reader.consume(TokenType.OPEN_BRACE, `expected opening brace as part of class definition`);
     const methods: Map<string, FunctionDefinitionSyntaxNode> = new Map();
-    const fields: Map<string, TypeHint | null> = new Map();
+    const fields: Map<string, TypeAnnotation | null> = new Map();
     while (this.reader.match(TokenType.CLOSE_BRACE) === false) {
       const memberName = this.reader.consume(TokenType.IDENTIFIER, `identifier for member expected in class definition member block`);
       // method
@@ -139,11 +139,11 @@ export class Parser {
       }
       // or field
       else {
-        let fieldTypeHint: TypeHint | null = null;
+        let fieldTypeAnnotation: TypeAnnotation | null = null;
         if (this.reader.match(TokenType.COLON)) {
-          fieldTypeHint = this.helper.parseTypeHint();
+          fieldTypeAnnotation = this.helper.parseTypeAnnotation();
         }
-        fields.set(memberName.lexeme, fieldTypeHint);
+        fields.set(memberName.lexeme, fieldTypeAnnotation);
         this.reader.consume(TokenType.SEMICOLON, `expected semicolon after class field definition`);
       }
     }
@@ -152,13 +152,13 @@ export class Parser {
   parseVariableDeclarationStatement() {
     const modifier = this.reader.previous();
     const identifier = this.reader.consume(TokenType.IDENTIFIER, `lvalue in variable declaration statement must be an identifier`);
-    const typeHint = this.helper.parseOptionalTypeHint();
+    const typeAnnotation = this.helper.parseOptionalTypeAnnotation();
     let rvalue: SyntaxNode | null = null;
     if (this.reader.match(TokenType.COLON_EQUAL)) {
       rvalue = this.parseExpression();
     }
     this.reader.consume(TokenType.SEMICOLON, `Semicolon expected after variable assignment statement`);
-    return new VariableAssignmentSyntaxNode(modifier, modifier, identifier, typeHint, rvalue);
+    return new VariableAssignmentSyntaxNode(modifier, modifier, identifier, typeAnnotation, rvalue);
   }
   parseIfStatement() {
     const referenceToken = this.reader.previous();
@@ -224,8 +224,8 @@ export class Parser {
     const parameterList: Array<FunctionParameter> = [];
     this.helper.parseDelimitedList(TokenType.COMMA, TokenType.CLOSE_PAREN, 0, () => {
       const parameterIdentifier = this.reader.consume(TokenType.IDENTIFIER, `identifier expected in function/method argument list`);
-      const typeHint = this.helper.parseOptionalTypeHint();
-      parameterList.push(new FunctionParameter(parameterIdentifier, typeHint));
+      const typeAnnotation = this.helper.parseOptionalTypeAnnotation();
+      parameterList.push(new FunctionParameter(parameterIdentifier, typeAnnotation));
     });
     this.reader.consume(TokenType.OPEN_BRACE, `function/method body must start with "{"`);
     const statementBlockNode = this.parseStatementBlock();
