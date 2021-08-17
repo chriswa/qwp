@@ -7,7 +7,8 @@ import { ValueType } from "../syntax/ValueType"
 import { ConstantsTable } from "./ConstantsTable"
 import { builtinsByName } from "../../builtins/builtins"
 import { resolve } from "../resolver/resolver"
-import { ResolverOutput, ResolverVariableDetails } from "../resolver/resolverOutput"
+import { ResolverOutput } from "../resolver/resolverOutput"
+import { VariableDefinition } from "../resolver/ResolverScope"
 
 export function generateBytecode(source: string, path: string) {
   const { ast, resolverOutput } = resolve(source, path);
@@ -33,15 +34,14 @@ class BytecodeGenerator implements SyntaxNodeVisitor<void> {
     this.functionScope = new BytecodeGeneratorFunctionScope(this.context, parentBytecodeGenerator?.functionScope ?? null, this.node);
   }
   private get constantsTable() { return this.context.constantsTable }
-  private getClosedVarsByFunctionNode(node: SyntaxNode) { return this.context.resolverOutput.decoratedNodes.get(node)?.closedVars ?? [] }
+  private getClosedVarsByFunctionNode(node: SyntaxNode) {
+    return this.context.resolverOutput.varsByScope.get(node)?.getClosedVars() ?? [];
+  }
 
   public declareParametersAndClosedVars(parameterIdentifiers: Array<string>, closedVarIdentifiers: Array<string>) {
-    // const parameterOffsetsToPromoteToHeap: Array<number> = [];
     parameterIdentifiers.forEach((identifier) => {
       const callFrameVarInfo = this.functionScope.currentBlockScope.declare(identifier);
-      if (callFrameVarInfo.resolverVarDetails.isClosed) {
-        // console.log(`  PARAMETER TO BE PROMOTED TO HEAP: ${identifier}`)
-        // parameterOffsetsToPromoteToHeap.push(callFrameVarInfo.callFrameOffset);
+      if (callFrameVarInfo.varDef.isClosedOver) {
         this.instructionBuffer.pushUint8(OpCode.PROMOTE_PARAM_TO_HEAP);
         this.instructionBuffer.pushUint8(callFrameVarInfo.callFrameOffset);
       }
@@ -212,7 +212,7 @@ class BytecodeGenerator implements SyntaxNodeVisitor<void> {
     const callFrameVarInfo = this.functionScope.declareOrAssign(identifier, node.modifier !== null);
     if (node.rvalue !== null) {
       this.compileNode(node.rvalue);
-      if (callFrameVarInfo.resolverVarDetails.isClosed) {
+      if (callFrameVarInfo.varDef.isClosedOver) {
         if (node.modifier !== null) {
           // if declaring, we'll swap the top stack value with the location of the allocation
           this.instructionBuffer.pushUint8(OpCode.ALLOC_SCALAR);
@@ -242,7 +242,7 @@ class BytecodeGenerator implements SyntaxNodeVisitor<void> {
     const callFrameVarInfo = this.functionScope.lookup(identifier);
     this.instructionBuffer.pushUint8(OpCode.FETCH_CALLFRAME_VALUE);
     this.instructionBuffer.pushUint8(callFrameVarInfo.callFrameOffset);
-    if (callFrameVarInfo.resolverVarDetails.isRef) {
+    if (callFrameVarInfo.varDef.isRef) {
       this.instructionBuffer.pushUint8(OpCode.DEREF);
     }
   }
@@ -284,7 +284,7 @@ class BytecodeGenerator implements SyntaxNodeVisitor<void> {
 class CallFrameVarInfo {
   constructor(
     public callFrameOffset: number,
-    public resolverVarDetails: ResolverVariableDetails,
+    public varDef: VariableDefinition,
   ) { }
 }
 
@@ -338,26 +338,26 @@ class BytecodeGeneratorBlockScope {
   public addPlaceholders() {
     this.localsCount += 2; // support return address and callframe jumpback distance in stack
   }
-  private findVarDetails(identifier: string): ResolverVariableDetails {
-    const declaredVars = this.context.resolverOutput.decoratedNodes.get(this.node)?.declaredVars!;
-    const x = declaredVars[identifier];
-    return x ?? this.parentScope?.findVarDetails(identifier);
+  private findVarDef(identifier: string): VariableDefinition {
+    const declaredVars = this.context.resolverOutput.varsByScope.get(this.node)?.variableDefinitions!;
+    const x = declaredVars.get(identifier)!;
+    return x ?? this.parentScope?.findVarDef(identifier);
   }
   public declare(identifier: string): CallFrameVarInfo {
-    const resolverVarDetails = this.findVarDetails(identifier);
-    if (resolverVarDetails === undefined) { throw new Error(`BytecodeGenerator could not find var declaration by resolver for ${identifier}`) }
+    const varDef = this.findVarDef(identifier);
+    if (varDef === undefined) { throw new Error(`BytecodeGenerator could not find var declaration by resolver for ${identifier}`) }
     const callFrameOffset = this.localsCount;
     this.callFrameOffsets.set(identifier, callFrameOffset);
     this.localIdentifiers.push(identifier);
     this.localsCount += 1;
-    return new CallFrameVarInfo(callFrameOffset, resolverVarDetails);
+    return new CallFrameVarInfo(callFrameOffset, varDef);
   }
   public findIdentifierInStack(identifier: string): CallFrameVarInfo | null {
     const callFrameOffset = this.callFrameOffsets.get(identifier);
     if (callFrameOffset !== undefined) {
-      const resolverVarDetails = this.findVarDetails(identifier);
-      if (resolverVarDetails === undefined) { throw new Error(`BytecodeGenerator could not find var declaration by resolver for ${identifier}`) }
-      return new CallFrameVarInfo(callFrameOffset, resolverVarDetails);
+      const varDef = this.findVarDef(identifier);
+      if (varDef === undefined) { throw new Error(`BytecodeGenerator could not find var declaration by resolver for ${identifier}`) }
+      return new CallFrameVarInfo(callFrameOffset, varDef);
     }
     if (this.parentScope !== null) {
       return this.parentScope.findIdentifierInStack(identifier);

@@ -20,20 +20,19 @@ export function resolve(source: string, path: string): IResolverResponse {
   if (resolverErrors.length > 0) {
     throw new CompileError(resolverErrors);
   }
-  const resolverOutput = new ResolverOutput(resolver.closedVarsByFunctionNode, resolver.scopesByNode);
+  const resolverOutput = new ResolverOutput(resolver.scopesByNode);
   return { ast, resolverOutput };
 }
 
 class Resolver implements SyntaxNodeVisitor<void> {
   scope: ResolverScope;
   scopesByNode: Map<SyntaxNode, ResolverScope> = new Map();
-  closedVarsByFunctionNode: Map<SyntaxNode, Array<string>> = new Map(); // map from FunctionDeclarationSyntaxNode to list of closed identifiers
   resolverErrors: Array<ErrorWithSourcePos> = [];
   constructor() {
-    this.scope = new ResolverScope(false, null, Array.from(builtinsByName.keys()));
+    this.scope = new ResolverScope(null, false, null, Array.from(builtinsByName.keys()));
   }
   beginScope(isFunction: boolean, node: SyntaxNode, preinitializedIdentifiers: Array<string>) {
-    this.scope = new ResolverScope(isFunction, this.scope, preinitializedIdentifiers);
+    this.scope = new ResolverScope(node, isFunction, this.scope, preinitializedIdentifiers);
     this.scopesByNode.set(node, this.scope);
   }
   endScope() {
@@ -183,9 +182,6 @@ class Resolver implements SyntaxNodeVisitor<void> {
     }
     this.beginScope(true, node, node.parameterList.map((parameter) => parameter.identifier.lexeme));
     this.resolveList(node.statementList);
-
-    this.closedVarsByFunctionNode.set(node, this.scope.closedVars);
-
     this.endScope();
   }
   visitFunctionCall(node: FunctionCallSyntaxNode) {

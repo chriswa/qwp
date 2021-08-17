@@ -1,8 +1,10 @@
+import { SyntaxNode } from "../syntax/syntax"
 import { TypeAnnotation } from "../syntax/TypeAnnotation"
 
 export class VariableDefinition {
-  public isClosed = false;
   public isRef = false;
+  public isClosedOver = false;
+  public isFromClosure = false;
   constructor(
     public isBuiltInOrParameter: boolean,
     public isReadOnly: boolean,
@@ -14,11 +16,11 @@ class ClassDefinition { } // TODO: !!!
 export class ResolverScope {
   public variableDefinitions: Map<string, VariableDefinition> = new Map();
   public initializedVars: Set<string> = new Set();
-  public closedVars: Array<string> = []; // only used if this.isFunction === true
-  public typeDeclarations: Map<string, TypeAnnotation> = new Map(); // TODO: TypeAnnotation?
+  public typeDeclarations: Map<string, TypeAnnotation> = new Map();
   public classDeclarations: Map<string, ClassDefinition> = new Map();
 
   public constructor(
+    public referenceNode: SyntaxNode | null,
     private isFunction: boolean,
     public parentScope: ResolverScope | null = null,
     preinitializedIdentifiers: Array<string>,
@@ -62,13 +64,14 @@ export class ResolverScope {
       const ancestorVarDef = this.parentScope.lookupVariable(identifier);
       // if we needed to look above the function for this var, it must be treated as closed
       if (ancestorVarDef !== null && this.isFunction) {
-        ancestorVarDef.isClosed = true;
+        ancestorVarDef.isClosedOver = true;
         ancestorVarDef.isRef = true;
-        this.closedVars.push(identifier);
         const newVarDef = new VariableDefinition(true, ancestorVarDef.isReadOnly);
         newVarDef.isRef = true;
-        this.initializedVars.add(identifier); // necessary?
+        newVarDef.isFromClosure = true;
+        this.initializedVars.add(identifier); // must be set on vars from closure to avoid failing "uninitialized variable" rule
         this.variableDefinitions.set(identifier, newVarDef);
+        return newVarDef;
       }
       return ancestorVarDef;
     }
@@ -84,5 +87,15 @@ export class ResolverScope {
   }
   public isVariableInitialized(identifier: string): boolean {
     return this.initializedVars.has(identifier) || (this.parentScope?.isVariableInitialized(identifier) ?? false);
+  }
+
+  public getClosedVars(): Array<string> {
+    const closedVars: Array<string> = [];
+    this.variableDefinitions.forEach((varDef, identifier) => {
+      if (varDef.isFromClosure) {
+        closedVars.push(identifier);
+      }
+    });
+    return closedVars;
   }
 }
