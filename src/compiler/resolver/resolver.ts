@@ -1,12 +1,13 @@
 import { BinarySyntaxNode, ClassDeclarationSyntaxNode, FunctionCallSyntaxNode, FunctionDefinitionSyntaxNode, GroupingSyntaxNode, IfStatementSyntaxNode, LiteralSyntaxNode, LogicShortCircuitSyntaxNode, ReturnStatementSyntaxNode, StatementBlockSyntaxNode, SyntaxNode, SyntaxNodeVisitor, TypeDeclarationSyntaxNode, UnarySyntaxNode, VariableAssignmentSyntaxNode, VariableLookupSyntaxNode, WhileStatementSyntaxNode } from "../syntax/syntax"
-import { builtinsByName } from "../../builtins/builtins"
+import { builtinsByName, builtinsTypesByName } from "../../builtins/builtins"
 import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
 import { TokenType } from "../Token"
 import { parse } from "../parser/parser"
 import { CompileError } from "../CompileError"
 import { ResolverOutput } from "./resolverOutput"
-import { ResolverScope } from "./ResolverScope"
+import { ResolverScope, UnresolvedType } from "./ResolverScope"
 import { TypeAnnotation } from "../syntax/TypeAnnotation"
+import { FunctionParameter } from "../syntax/FunctionParameter"
 
 interface IResolverResponse {
   ast: SyntaxNode;
@@ -29,11 +30,15 @@ class Resolver implements SyntaxNodeVisitor<void> {
   scopesByNode: Map<SyntaxNode, ResolverScope> = new Map();
   resolverErrors: Array<ErrorWithSourcePos> = [];
   constructor() {
-    this.scope = new ResolverScope(null, false, null, Array.from(builtinsByName.keys()));
+    this.scope = new ResolverScope(null, false, null);
+    this.scope.preinitializeIdentifiers(builtinsTypesByName);
   }
-  beginScope(isFunction: boolean, node: SyntaxNode, preinitializedIdentifiers: Array<string>) {
-    this.scope = new ResolverScope(node, isFunction, this.scope, preinitializedIdentifiers);
-    this.scopesByNode.set(node, this.scope);
+  beginScope(isFunction: boolean, node: SyntaxNode, functionParameters: Array<FunctionParameter>) {
+    const newScope = new ResolverScope(node, isFunction, this.scope);
+    const preinitializedIdentifiers = new Map(functionParameters.map(parameter => [parameter.identifier.lexeme, new UnresolvedType(parameter.typeAnnotation, newScope)]));
+    newScope.preinitializeIdentifiers(preinitializedIdentifiers);
+    this.scopesByNode.set(node, newScope);
+    this.scope = newScope;
   }
   endScope() {
     if (this.scope.parentScope === null) {
@@ -157,7 +162,7 @@ class Resolver implements SyntaxNodeVisitor<void> {
         this.generateResolverError(node, `Variable/parameter shadowing is not allowed`);
         return;
       }
-      existingVariableStatusInStack = this.scope.declareVariable(identifier, declarationModifier.type === TokenType.KEYWORD_CONST);
+      existingVariableStatusInStack = this.scope.declareVariable(identifier, node.typeAnnotation, declarationModifier.type === TokenType.KEYWORD_CONST);
     }
     else {
       if (existingVariableStatusInStack === null) {
@@ -180,7 +185,7 @@ class Resolver implements SyntaxNodeVisitor<void> {
         this.generateResolverError(node, `Variable/parameter shadowing is not allowed`);
       }
     }
-    this.beginScope(true, node, node.parameterList.map((parameter) => parameter.identifier.lexeme));
+    this.beginScope(true, node, node.parameterList);
     this.resolveList(node.statementList);
     this.endScope();
   }

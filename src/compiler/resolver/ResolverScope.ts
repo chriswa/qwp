@@ -1,12 +1,25 @@
+import { Type } from "../../basicTypes"
 import { SyntaxNode } from "../syntax/syntax"
 import { TypeAnnotation } from "../syntax/TypeAnnotation"
+
+export class UnresolvedType extends Type {
+  constructor(
+    public typeAnnotation: TypeAnnotation | null,
+    public resolverScope: ResolverScope
+  ) {
+    super();
+  }
+  toString() {
+    return `unresolved(${this.typeAnnotation?.toString()})`;
+  }
+}
 
 export class VariableDefinition {
   public isRef = false;
   public isClosedOver = false;
   public isFromClosure = false;
   constructor(
-    public isBuiltInOrParameter: boolean,
+    public type: Type,
     public isReadOnly: boolean,
   ) { }
 }
@@ -23,13 +36,14 @@ export class ResolverScope {
     public referenceNode: SyntaxNode | null,
     private isFunction: boolean,
     public parentScope: ResolverScope | null = null,
-    preinitializedIdentifiers: Array<string>,
   ) {
-    for (const identifier of preinitializedIdentifiers) {
-      const variableStatus = new VariableDefinition(true, true);
+  }
+  public preinitializeIdentifiers(preinitializedIdentifiers: Map<string, Type>) {
+    preinitializedIdentifiers.forEach((type, identifier) => {
+      const variableStatus = new VariableDefinition(type, true);
       this.initializedVars.add(identifier);
       this.variableDefinitions.set(identifier, variableStatus);
-    }
+    });
   }
 
   // types
@@ -66,7 +80,7 @@ export class ResolverScope {
       if (ancestorVarDef !== null && this.isFunction) {
         ancestorVarDef.isClosedOver = true;
         ancestorVarDef.isRef = true;
-        const newVarDef = new VariableDefinition(true, ancestorVarDef.isReadOnly);
+        const newVarDef = new VariableDefinition(ancestorVarDef.type, ancestorVarDef.isReadOnly);
         newVarDef.isRef = true;
         newVarDef.isFromClosure = true;
         this.initializedVars.add(identifier); // must be set on vars from closure to avoid failing "uninitialized variable" rule
@@ -77,8 +91,8 @@ export class ResolverScope {
     }
     return null;
   }
-  public declareVariable(identifier: string, isReadOnly: boolean): VariableDefinition {
-    const variableStatus = new VariableDefinition(false, isReadOnly);
+  public declareVariable(identifier: string, typeAnnotation: TypeAnnotation | null, isReadOnly: boolean): VariableDefinition {
+    const variableStatus = new VariableDefinition(new UnresolvedType(typeAnnotation, this), isReadOnly);
     this.variableDefinitions.set(identifier, variableStatus);
     return variableStatus;
   }

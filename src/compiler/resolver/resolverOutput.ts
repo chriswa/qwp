@@ -3,7 +3,7 @@ import { ResolverScope, VariableDefinition } from "./ResolverScope"
 
 export class ResolverOutput {
   constructor(
-    public varsByScope: Map<SyntaxNode, ResolverScope>,
+    public scopesByNode: Map<SyntaxNode, ResolverScope>,
   ) {
   }
 }

@@ -35,7 +35,7 @@ class BytecodeGenerator implements SyntaxNodeVisitor<void> {
   }
   private get constantsTable() { return this.context.constantsTable }
   private getClosedVarsByFunctionNode(node: SyntaxNode) {
-    return this.context.resolverOutput.varsByScope.get(node)?.getClosedVars() ?? [];
+    return this.context.resolverOutput.scopesByNode.get(node)?.getClosedVars() ?? [];
   }
 
   public declareParametersAndClosedVars(parameterIdentifiers: Array<string>, closedVarIdentifiers: Array<string>) {
@@ -339,7 +339,7 @@ class BytecodeGeneratorBlockScope {
     this.localsCount += 2; // support return address and callframe jumpback distance in stack
   }
   private findVarDef(identifier: string): VariableDefinition {
-    const declaredVars = this.context.resolverOutput.varsByScope.get(this.node)?.variableDefinitions!;
+    const declaredVars = this.context.resolverOutput.scopesByNode.get(this.node)?.variableDefinitions!;
     const x = declaredVars.get(identifier)!;
     return x ?? this.parentScope?.findVarDef(identifier);
   }

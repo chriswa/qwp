@@ -1,4 +1,5 @@
-import { Builtin, builtinsById, Primitive } from "../builtins/builtins"
+import { FunctionType, primitiveTypes } from "../basicTypes"
+import { Builtin, builtinsById } from "../builtins/builtins"
 import { OpCode } from "../bytecode/opcodes"
 import { VM } from "./VM"
 
@@ -165,25 +166,32 @@ opCodeHandlers[OpCode.CALL] = (vm: VM) => {
   }
 }
 function callBuiltin(vm: VM, builtin: Builtin, argumentCount: number) {
-  if (argumentCount !== builtin.parameterPrimitives.length) { throw new Error(`incorrect argument count for builtin`) }
+  const builtinFunctionType = builtin.type as FunctionType;
+  if (argumentCount !== builtinFunctionType.argumentTypes.length) { throw new Error(`incorrect argument count for builtin`) }
   const builtinArgs: Array<number> = [];
   for (let i = argumentCount - 1; i >= 0; i -= 1) {
-    const argPrimitive = builtin.parameterPrimitives[i];
-    if (argPrimitive === Primitive.U32) {
+    const argType = builtinFunctionType.argumentTypes[i];
+    if (argType === primitiveTypes.uint32) {
       builtinArgs.unshift(vm.ramBuffer.popUint32()); // unshift to avoid reversing the list
     }
-    else if (argPrimitive === Primitive.F32) {
+    else if (argType === primitiveTypes.float32) {
       builtinArgs.unshift(vm.ramBuffer.popFloat32()); // unshift to avoid reversing the list
+    }
+    else {
+      throw new Error(`callBuiltin has no logic for this builtin argument type`);
     }
   }
   const retval = builtin.handler(builtinArgs);
-  if (builtin.returnPrimitives.length > 0) {
-    const retvalPrimitive = builtin.returnPrimitives[0]
-    if (retvalPrimitive === Primitive.U32) {
+  if (builtinFunctionType.returnType !== primitiveTypes.void) {
+    const returnType = builtinFunctionType.returnType;
+    if (returnType === primitiveTypes.uint32) {
       vm.ramBuffer.pushUint32(retval);
     }
-    else if (retvalPrimitive === Primitive.F32) {
+    else if (returnType === primitiveTypes.float32) {
       vm.ramBuffer.pushFloat32(retval);
+    }
+    else {
+      throw new Error(`callBuiltin has no logic for this builtin return value type`);
     }
   }
 }
