@@ -1,4 +1,4 @@
-import { FunctionType, primitiveTypes, Type } from "../basicTypes"
+import { FunctionType, primitiveTypes, Type } from "../types"
 
 let printFunction: (str: string) => void = console.log;
 

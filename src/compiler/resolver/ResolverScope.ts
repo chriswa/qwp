@@ -1,18 +1,7 @@
-import { Type } from "../../basicTypes"
+import { ClassType, primitiveTypesMap, Type } from "../../types"
 import { SyntaxNode } from "../syntax/syntax"
 import { TypeAnnotation } from "../syntax/TypeAnnotation"
-
-export class UnresolvedType extends Type {
-  constructor(
-    public typeAnnotation: TypeAnnotation | null,
-    public resolverScope: ResolverScope
-  ) {
-    super();
-  }
-  toString() {
-    return `unresolved(${this.typeAnnotation?.toString()})`;
-  }
-}
+import { UnresolvedType } from "./UnresolvedType"
 
 export class VariableDefinition {
   public isRef = false;
@@ -24,13 +13,10 @@ export class VariableDefinition {
   ) { }
 }
 
-class ClassDefinition { } // TODO: !!!
-
 export class ResolverScope {
   public variableDefinitions: Map<string, VariableDefinition> = new Map();
   public initializedVars: Set<string> = new Set();
-  public typeDeclarations: Map<string, TypeAnnotation> = new Map();
-  public classDeclarations: Map<string, ClassDefinition> = new Map();
+  public types: Map<string, Type> = new Map();
 
   public constructor(
     public referenceNode: SyntaxNode | null,
@@ -38,35 +24,59 @@ export class ResolverScope {
     public parentScope: ResolverScope | null = null,
   ) {
   }
-  public preinitializeIdentifiers(preinitializedIdentifiers: Map<string, Type>) {
-    preinitializedIdentifiers.forEach((type, identifier) => {
+  public preinitializeIdentifiers(identifiers: Map<string, Type>) {
+    identifiers.forEach((type, identifier) => {
       const variableStatus = new VariableDefinition(type, true);
       this.initializedVars.add(identifier);
       this.variableDefinitions.set(identifier, variableStatus);
     });
   }
+  public preinitializeTypes(types: Map<string, Type>) {
+    types.forEach((type, typeName) => {
+      this.types.set(typeName, type);
+    });
+  }
 
   // types
-  public declareType(identifier: string, typeAnnotation: TypeAnnotation): void {
+  public declareType(identifier: string, type: Type): void {
     if (this.lookupType(identifier) !== null) {
       throw new Error(`cannot define type "${identifier}": already defined in stack!`);
     }
-    this.typeDeclarations.set(identifier, typeAnnotation);
+    this.types.set(identifier, type);
   }
-  public lookupType(identifier: string): TypeAnnotation | null {
-    return this.typeDeclarations.get(identifier) ?? this.parentScope?.lookupType(identifier) ?? null;
+  public lookupType(identifier: string): Type | null {
+    return this.types.get(identifier) ?? this.parentScope?.lookupType(identifier) ?? null;
   }
+  public resolveTypeAnnotation(typeAnnotation: TypeAnnotation | null): Type {
+    if (typeAnnotation === null) {
+      return new UnresolvedType(null, this);
+    }
+    const lookedUpType = this.lookupType(typeAnnotation.name.lexeme);
+    if (lookedUpType === null) {
+      throw new Error(`type "${typeAnnotation.name.lexeme}" is undeclared`); // TODO: CompilerError instead! do we need to call Resolver.generateResolverError
+    }
+    if (typeAnnotation.parameters.length > 0) {
+      throw new Error(`TODO: type binding`);
+    }
+    return lookedUpType;
+    // return this.resolveType(new UnresolvedType(typeAnnotation, this));
+  }
+  // public resolveType(inputType: Type): Type {
+  //   if (inputType instanceof UnresolvedType && inputType.typeAnnotation !== null) {
+  //   }
+  //   return inputType;
+  // }
 
   // classes
-  public declareClass(identifier: string, classDefinition: ClassDefinition): void {
-    if (this.lookupClass(identifier) !== null) {
-      throw new Error(`cannot define type "${identifier}": already defined in stack!`);
-    }
-    this.classDeclarations.set(identifier, classDefinition);
-  }
-  public lookupClass(identifier: string): ClassDefinition | null {
-    return this.classDeclarations.get(identifier) ?? this.parentScope?.lookupClass(identifier) ?? null;
-  }
+  // public declareClass(identifier: string, classType: ClassType): void {
+  //   if (this.lookupClass(identifier) !== null) {
+  //     throw new Error(`cannot define type "${identifier}": already defined in stack!`);
+  //   }
+  //   this.classDeclarations.set(identifier, classType);
+  // }
+  // public lookupClass(identifier: string): ClassType | null {
+  //   return this.classDeclarations.get(identifier) ?? this.parentScope?.lookupClass(identifier) ?? null;
+  // }
 
   // variables
   public lookupVariable(identifier: string): VariableDefinition | null {
@@ -92,7 +102,7 @@ export class ResolverScope {
     return null;
   }
   public declareVariable(identifier: string, typeAnnotation: TypeAnnotation | null, isReadOnly: boolean): VariableDefinition {
-    const variableStatus = new VariableDefinition(new UnresolvedType(typeAnnotation, this), isReadOnly);
+    const variableStatus = new VariableDefinition(this.resolveTypeAnnotation(typeAnnotation), isReadOnly);
     this.variableDefinitions.set(identifier, variableStatus);
     return variableStatus;
   }

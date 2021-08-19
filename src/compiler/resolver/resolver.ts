@@ -1,13 +1,14 @@
 import { BinarySyntaxNode, ClassDeclarationSyntaxNode, FunctionCallSyntaxNode, FunctionDefinitionSyntaxNode, GroupingSyntaxNode, IfStatementSyntaxNode, LiteralSyntaxNode, LogicShortCircuitSyntaxNode, ReturnStatementSyntaxNode, StatementBlockSyntaxNode, SyntaxNode, SyntaxNodeVisitor, TypeDeclarationSyntaxNode, UnarySyntaxNode, VariableAssignmentSyntaxNode, VariableLookupSyntaxNode, WhileStatementSyntaxNode } from "../syntax/syntax"
-import { builtinsByName, builtinsTypesByName } from "../../builtins/builtins"
+import { builtinsTypesByName } from "../../builtins/builtins"
 import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
 import { TokenType } from "../Token"
 import { parse } from "../parser/parser"
 import { CompileError } from "../CompileError"
 import { ResolverOutput } from "./resolverOutput"
-import { ResolverScope, UnresolvedType } from "./ResolverScope"
-import { TypeAnnotation } from "../syntax/TypeAnnotation"
+import { ResolverScope } from "./ResolverScope"
 import { FunctionParameter } from "../syntax/FunctionParameter"
+import { ClassType, InterfaceType, primitiveTypesMap } from "../../types"
+import { mapMap } from "../../util"
 
 interface IResolverResponse {
   ast: SyntaxNode;
@@ -30,12 +31,14 @@ class Resolver implements SyntaxNodeVisitor<void> {
   scopesByNode: Map<SyntaxNode, ResolverScope> = new Map();
   resolverErrors: Array<ErrorWithSourcePos> = [];
   constructor() {
-    this.scope = new ResolverScope(null, false, null);
-    this.scope.preinitializeIdentifiers(builtinsTypesByName);
+    const topScope = new ResolverScope(null, false, null);
+    topScope.preinitializeIdentifiers(builtinsTypesByName);
+    topScope.preinitializeTypes(primitiveTypesMap);
+    this.scope = topScope;
   }
   beginScope(isFunction: boolean, node: SyntaxNode, functionParameters: Array<FunctionParameter>) {
     const newScope = new ResolverScope(node, isFunction, this.scope);
-    const preinitializedIdentifiers = new Map(functionParameters.map(parameter => [parameter.identifier.lexeme, new UnresolvedType(parameter.typeAnnotation, newScope)]));
+    const preinitializedIdentifiers = new Map(functionParameters.map(parameter => [parameter.identifier.lexeme, newScope.resolveTypeAnnotation(parameter.typeAnnotation)]));
     newScope.preinitializeIdentifiers(preinitializedIdentifiers);
     this.scopesByNode.set(node, newScope);
     this.scope = newScope;
@@ -130,13 +133,35 @@ class Resolver implements SyntaxNodeVisitor<void> {
     this.resolveSyntaxNode(node.right);
   }
   visitClassDeclaration(node: ClassDeclarationSyntaxNode) {
-    // TODO: ???
-    // this.scope.declareClass(node.newClassName.lexeme, node.newTypeAnnotation);
-    // this.scope.declareType(node.newClassName.lexeme, new TypeAnnotation(node.newClassName.lexeme));
+    let baseClassType: ClassType | null = null;
+    if (node.baseClassName !== null) {
+      const lookedupBaseClassType = this.scope.lookupType(node.baseClassName.lexeme);
+      if (lookedupBaseClassType instanceof ClassType === false) {
+        this.generateResolverError(node, `Class declaration error: base class not declared or is not a class`);
+        return;
+      }
+      baseClassType = lookedupBaseClassType as ClassType;
+    }
+    const interfaceTypes: Array<InterfaceType> = [];
+    node.implementedInterfaceNames.forEach(interfaceNameToken => {
+      const interfaceType = this.scope.lookupType(interfaceNameToken.lexeme);
+      if (interfaceType instanceof InterfaceType === false) {
+        this.generateResolverError(node, `Class declaration error: interface "${interfaceNameToken.lexeme}" not declared or is not an interface`);
+        return;
+      }
+      interfaceTypes.push(interfaceType as InterfaceType);
+    });
+    const classType = new ClassType(node.referenceToken, node.newClassName.lexeme);
+    classType.genericDefinition = node.genericDefinition;
+    classType.baseClassType = baseClassType;
+    classType.interfaceTypes = interfaceTypes;
+    classType.fields = mapMap(node.fields, (typeAnnotation) => this.scope.resolveTypeAnnotation(typeAnnotation));
+    // classType.methods = node.methods; // TODO: methods!
+    this.scope.declareType(classType.name, classType);
   }
   visitTypeDeclaration(node: TypeDeclarationSyntaxNode) {
     // TODO: write a type system
-    this.scope.declareType(node.identifier.lexeme, node.typeAnnotation);
+    this.scope.declareType(node.identifier.lexeme, this.scope.resolveTypeAnnotation(node.typeAnnotation));
   }
   visitVariableLookup(node: VariableLookupSyntaxNode) {
     const identifier = node.identifier.lexeme;

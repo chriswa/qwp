@@ -1,4 +1,4 @@
-type Bar = Baaz<Quux<int>>;
+type Bar = uint32;
 
 const foo : Bar := 123;
 printFloat32(foo);

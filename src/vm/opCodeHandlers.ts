@@ -1,4 +1,4 @@
-import { FunctionType, primitiveTypes } from "../basicTypes"
+import { FunctionType, primitiveTypes } from "../types"
 import { Builtin, builtinsById } from "../builtins/builtins"
 import { OpCode } from "../bytecode/opcodes"
 import { VM } from "./VM"
