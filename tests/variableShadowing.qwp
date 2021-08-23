@@ -11,5 +11,5 @@ const a := 123; // "global";
 
 /*
 EXPECT COMPILE ERROR
-Resolver: Variable/parameter shadowing is not allowed at line 8, col 3
+Resolver: Variable/parameter/field shadowing is not allowed at line 8, col 3
 */

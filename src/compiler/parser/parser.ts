@@ -1,6 +1,6 @@
 import { lex } from "../lexer/lexer";
 import { Token, TokenType } from "../Token";
-import { LiteralSyntaxNode, UnarySyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode, TypeDeclarationSyntaxNode, ClassDeclarationSyntaxNode } from "../syntax/syntax";
+import { LiteralSyntaxNode, UnarySyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode, TypeDeclarationSyntaxNode, ClassDeclarationSyntaxNode, ObjectInstantiationSyntaxNode } from "../syntax/syntax";
 import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
 import { ValueType } from "../syntax/ValueType"
 import { TypeAnnotation } from "../syntax/TypeAnnotation"
@@ -135,7 +135,8 @@ export class Parser {
       // method
       if (this.reader.match(TokenType.OPEN_PAREN)) {
         const { parameterList, statementBlockNode } = this.parseFunctionAfterOpenParen() // n.b. statementBlockNode is discarded!
-        methods.set(memberName.lexeme, new FunctionDefinitionSyntaxNode(memberName, null, parameterList, statementBlockNode.statementList));
+        const returnTypeAnnotation = this.helper.parseOptionalTypeAnnotation();
+        methods.set(memberName.lexeme, new FunctionDefinitionSyntaxNode(memberName, null, parameterList, returnTypeAnnotation, statementBlockNode.statementList));
       }
       // or field
       else {
@@ -220,25 +221,26 @@ export class Parser {
     }
     return expr;
   }
-  parseFunctionAfterOpenParen(): { parameterList: Array<FunctionParameter>, statementBlockNode: StatementBlockSyntaxNode } {
+  parseFunctionAfterOpenParen(): { parameterList: Array<FunctionParameter>, returnTypeAnnotation: TypeAnnotation | null, statementBlockNode: StatementBlockSyntaxNode } {
     const parameterList: Array<FunctionParameter> = [];
     this.helper.parseDelimitedList(TokenType.COMMA, TokenType.CLOSE_PAREN, 0, () => {
       const parameterIdentifier = this.reader.consume(TokenType.IDENTIFIER, `identifier expected in function/method argument list`);
       const typeAnnotation = this.helper.parseOptionalTypeAnnotation();
       parameterList.push(new FunctionParameter(parameterIdentifier, typeAnnotation));
     });
+    const returnTypeAnnotation = this.helper.parseOptionalTypeAnnotation();
     this.reader.consume(TokenType.OPEN_BRACE, `function/method body must start with "{"`);
     const statementBlockNode = this.parseStatementBlock();
     this.reader.consume(TokenType.CLOSE_BRACE, `function/method body must end with "}"`);
-    return { parameterList, statementBlockNode }
+    return { parameterList, returnTypeAnnotation, statementBlockNode }
   }
   parseAnonymousFunction() {
     if (this.reader.match(TokenType.KEYWORD_FN)) {
       const referenceToken = this.reader.previous();
       const genericDefinition = this.helper.parseOptionalGenericDefinition();
       this.reader.consume(TokenType.OPEN_PAREN, `function/method definition requires "(" for parameter list`);
-      const { parameterList, statementBlockNode } = this.parseFunctionAfterOpenParen(); // n.b. statementBlockNode is discarded!
-      return new FunctionDefinitionSyntaxNode(referenceToken, genericDefinition, parameterList, statementBlockNode.statementList);
+      const { parameterList, returnTypeAnnotation, statementBlockNode } = this.parseFunctionAfterOpenParen(); // n.b. statementBlockNode is discarded!
+      return new FunctionDefinitionSyntaxNode(referenceToken, genericDefinition, parameterList, returnTypeAnnotation, statementBlockNode.statementList);
     }
     return this.parseOrExpression();
   }
@@ -304,24 +306,34 @@ export class Parser {
     if (this.reader.match(TokenType.KEYWORD_FALSE)) {
       return new LiteralSyntaxNode(this.reader.previous(), false, ValueType.BOOLEAN);
     }
-    if (this.reader.match(TokenType.KEYWORD_TRUE)) {
+    else if (this.reader.match(TokenType.KEYWORD_TRUE)) {
       return new LiteralSyntaxNode(this.reader.previous(), true, ValueType.BOOLEAN);
     }
-    if (this.reader.match(TokenType.KEYWORD_NULL)) {
+    else if (this.reader.match(TokenType.KEYWORD_NULL)) {
       return new LiteralSyntaxNode(this.reader.previous(), null, ValueType.NULL); // ?
     }
-    if (this.reader.match(TokenType.NUMBER)) {
+    else if (this.reader.match(TokenType.NUMBER)) {
       return new LiteralSyntaxNode(this.reader.previous(), parseFloat(this.reader.previous().lexeme), ValueType.NUMBER);
     }
-    if (this.reader.match(TokenType.STRING)) {
+    else if (this.reader.match(TokenType.STRING)) {
       let string = this.reader.previous().lexeme;
       string = this.helper.unescapeString(string.substr(1, string.length - 2)); // strip quotes and then unescape newlines, tabs, etc
       return new LiteralSyntaxNode(this.reader.previous(), string, ValueType.STRING);
     }
-    if (this.reader.match(TokenType.IDENTIFIER)) {
+    else if (this.reader.match(TokenType.KEYWORD_NEW)) {
+      const referenceToken = this.reader.previous();
+      const className = this.reader.consume(TokenType.IDENTIFIER, `identifier (class name) expected after "new" keyword`);
+      this.reader.consume(TokenType.OPEN_PAREN, `open paren expected after class name in "new" expression`);
+      const argumentList: Array<SyntaxNode> = [];
+      this.helper.parseDelimitedList(TokenType.COMMA, TokenType.CLOSE_PAREN, 0, () => {
+        argumentList.push(this.parseExpression());
+      });
+      return new ObjectInstantiationSyntaxNode(referenceToken, className, argumentList);
+    }
+    else if (this.reader.match(TokenType.IDENTIFIER)) {
       return new VariableLookupSyntaxNode(this.reader.previous(), this.reader.previous()); // n.b. this might be an lvalue, which we will discover soon
     }
-    if (this.reader.match(TokenType.OPEN_PAREN)) {
+    else if (this.reader.match(TokenType.OPEN_PAREN)) {
       const expr = this.parseExpression();
       this.reader.consume(TokenType.CLOSE_PAREN, "Expect ')' after expression.");
       return expr;

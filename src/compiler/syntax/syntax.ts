@@ -17,6 +17,7 @@ export interface SyntaxNodeVisitor<T> {
   visitVariableLookup(node: VariableLookupSyntaxNode): T;
   visitClassDeclaration(node: ClassDeclarationSyntaxNode): T;
   visitTypeDeclaration(node: TypeDeclarationSyntaxNode): T;
+  visitObjectInstantiation(node: ObjectInstantiationSyntaxNode): T;
   visitVariableAssignment(node: VariableAssignmentSyntaxNode): T;
   visitFunctionDefinition(node: FunctionDefinitionSyntaxNode): T;
   visitFunctionCall(node: FunctionCallSyntaxNode): T;
@@ -189,6 +190,19 @@ export class ClassDeclarationSyntaxNode extends SyntaxNode {
   }
 }
 
+export class ObjectInstantiationSyntaxNode extends SyntaxNode {
+  constructor(
+    referenceToken: Token,
+    public className: Token,
+    public constructorArgumentList: Array<SyntaxNode>,
+  ) {
+    super(referenceToken)
+  }
+  accept<R>(visitor: SyntaxNodeVisitor<R>) {
+    return visitor.visitObjectInstantiation(this);
+  }
+}
+
 export class VariableAssignmentSyntaxNode extends SyntaxNode {
   constructor(
     referenceToken: Token,
@@ -209,6 +223,7 @@ export class FunctionDefinitionSyntaxNode extends SyntaxNode {
     referenceToken: Token,
     public genericDefinition: GenericDefinition | null,
     public parameterList: Array<FunctionParameter>,
+    public returnTypeAnnotation: TypeAnnotation | null,
     public statementList: Array<SyntaxNode>,
   ) {
     super(referenceToken);

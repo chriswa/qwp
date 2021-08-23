@@ -1,4 +1,4 @@
-import { BinarySyntaxNode, ClassDeclarationSyntaxNode, FunctionCallSyntaxNode, FunctionDefinitionSyntaxNode, GroupingSyntaxNode, IfStatementSyntaxNode, LiteralSyntaxNode, LogicShortCircuitSyntaxNode, ReturnStatementSyntaxNode, StatementBlockSyntaxNode, SyntaxNode, SyntaxNodeVisitor, TypeDeclarationSyntaxNode, UnarySyntaxNode, VariableAssignmentSyntaxNode, VariableLookupSyntaxNode, WhileStatementSyntaxNode } from "../syntax/syntax"
+import { BinarySyntaxNode, ClassDeclarationSyntaxNode, FunctionCallSyntaxNode, FunctionDefinitionSyntaxNode, GroupingSyntaxNode, IfStatementSyntaxNode, LiteralSyntaxNode, LogicShortCircuitSyntaxNode, ObjectInstantiationSyntaxNode, ReturnStatementSyntaxNode, StatementBlockSyntaxNode, SyntaxNode, SyntaxNodeVisitor, TypeDeclarationSyntaxNode, UnarySyntaxNode, VariableAssignmentSyntaxNode, VariableLookupSyntaxNode, WhileStatementSyntaxNode } from "../syntax/syntax"
 import { builtinsTypesByName } from "../../builtins/builtins"
 import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
 import { TokenType } from "../Token"
@@ -7,7 +7,7 @@ import { CompileError } from "../CompileError"
 import { ResolverOutput } from "./resolverOutput"
 import { ResolverScope } from "./ResolverScope"
 import { FunctionParameter } from "../syntax/FunctionParameter"
-import { ClassType, InterfaceType, primitiveTypesMap } from "../../types"
+import { ClassType, FunctionType, InterfaceType, primitiveTypesMap } from "../../types"
 import { mapMap } from "../../util"
 
 interface IResolverResponse {
@@ -26,18 +26,24 @@ export function resolve(source: string, path: string): IResolverResponse {
   return { ast, resolverOutput };
 }
 
+function getFunctionTypeFromFunctionDefinitionNode(node: FunctionDefinitionSyntaxNode, scope: ResolverScope): FunctionType {
+  const argumentTypes = node.parameterList.map((functionParameter) => scope.resolveTypeAnnotation(functionParameter.typeAnnotation));
+  const returnType = scope.resolveTypeAnnotation(node.returnTypeAnnotation);
+  return new FunctionType(argumentTypes, returnType);
+}
+
 class Resolver implements SyntaxNodeVisitor<void> {
   scope: ResolverScope;
   scopesByNode: Map<SyntaxNode, ResolverScope> = new Map();
   resolverErrors: Array<ErrorWithSourcePos> = [];
   constructor() {
-    const topScope = new ResolverScope(null, false, null);
+    const topScope = new ResolverScope(null, false, null, this.generateResolverError.bind(this));
     topScope.preinitializeIdentifiers(builtinsTypesByName);
     topScope.preinitializeTypes(primitiveTypesMap);
     this.scope = topScope;
   }
   beginScope(isFunction: boolean, node: SyntaxNode, functionParameters: Array<FunctionParameter>) {
-    const newScope = new ResolverScope(node, isFunction, this.scope);
+    const newScope = new ResolverScope(node, isFunction, this.scope, this.generateResolverError.bind(this));
     const preinitializedIdentifiers = new Map(functionParameters.map(parameter => [parameter.identifier.lexeme, newScope.resolveTypeAnnotation(parameter.typeAnnotation)]));
     newScope.preinitializeIdentifiers(preinitializedIdentifiers);
     this.scopesByNode.set(node, newScope);
@@ -132,36 +138,64 @@ class Resolver implements SyntaxNodeVisitor<void> {
     this.resolveSyntaxNode(node.left);
     this.resolveSyntaxNode(node.right);
   }
+  disallowShadowing(identifier: string, referenceNode: SyntaxNode) {
+    if (this.scope.lookupVariable(identifier) !== null) {
+      this.generateResolverError(referenceNode, `Variable/parameter/field shadowing is not allowed`);
+    }
+  }
   visitClassDeclaration(node: ClassDeclarationSyntaxNode) {
     let baseClassType: ClassType | null = null;
     if (node.baseClassName !== null) {
-      const lookedupBaseClassType = this.scope.lookupType(node.baseClassName.lexeme);
-      if (lookedupBaseClassType instanceof ClassType === false) {
-        this.generateResolverError(node, `Class declaration error: base class not declared or is not a class`);
-        return;
-      }
-      baseClassType = lookedupBaseClassType as ClassType;
+      baseClassType = this.scope.lookupTypeOrDie(ClassType, node.baseClassName.lexeme, `interface of class`);
     }
     const interfaceTypes: Array<InterfaceType> = [];
     node.implementedInterfaceNames.forEach(interfaceNameToken => {
-      const interfaceType = this.scope.lookupType(interfaceNameToken.lexeme);
-      if (interfaceType instanceof InterfaceType === false) {
-        this.generateResolverError(node, `Class declaration error: interface "${interfaceNameToken.lexeme}" not declared or is not an interface`);
-        return;
-      }
+      const interfaceType = this.scope.lookupTypeOrDie(InterfaceType, interfaceNameToken.lexeme, `interface of class`);
       interfaceTypes.push(interfaceType as InterfaceType);
     });
-    const classType = new ClassType(node.referenceToken, node.newClassName.lexeme);
-    classType.genericDefinition = node.genericDefinition;
-    classType.baseClassType = baseClassType;
-    classType.interfaceTypes = interfaceTypes;
-    classType.fields = mapMap(node.fields, (typeAnnotation) => this.scope.resolveTypeAnnotation(typeAnnotation));
-    // classType.methods = node.methods; // TODO: methods!
+    const fields = mapMap(node.fields, (typeAnnotation) => this.scope.resolveTypeAnnotation(typeAnnotation));
+    node.fields.forEach((_fieldType, fieldName) => {
+      this.disallowShadowing(fieldName, node);
+    });
+    const methods: Map<string, FunctionType> = new Map();
+    node.methods.forEach((methodNode, methodName) => {
+      for (const parameter of methodNode.parameterList) {
+        this.disallowShadowing(parameter.identifier.lexeme, methodNode);
+      }
+      const methodFunctionType = getFunctionTypeFromFunctionDefinitionNode(methodNode, this.scope);
+      methods.set(methodName, methodFunctionType);
+    });
+    const classType = new ClassType(
+      node.referenceToken, // referenceToken
+      node.newClassName.lexeme, // name
+      node.genericDefinition, // genericDefinition
+      baseClassType, // baseClassType
+      interfaceTypes, // interfaceTypes
+      fields, // fields
+      methods, // methods
+    );
     this.scope.declareType(classType.name, classType);
+
+    // traverse methods
+    this.beginScope(false, node, []);
+    this.scope.preinitializeIdentifiers(classType.fields);
+    this.scope.preinitializeIdentifiers(new Map([['this', classType]]));
+    node.methods.forEach((methodNode, _methodName) => {
+      this.beginScope(true, methodNode, methodNode.parameterList)
+      this.resolveList(methodNode.statementList)
+      this.endScope()
+    });
+    this.endScope()
   }
   visitTypeDeclaration(node: TypeDeclarationSyntaxNode) {
-    // TODO: write a type system
     this.scope.declareType(node.identifier.lexeme, this.scope.resolveTypeAnnotation(node.typeAnnotation));
+  }
+  visitObjectInstantiation(node: ObjectInstantiationSyntaxNode) {
+    const classType = this.scope.lookupTypeOrDie(ClassType, node.className.lexeme, `Undeclared class name`);
+    // TODO: verify types of arguments match classType's constructor's parameter types
+    for (const argument of node.constructorArgumentList) {
+      this.resolveSyntaxNode(argument); // ???
+    }
   }
   visitVariableLookup(node: VariableLookupSyntaxNode) {
     const identifier = node.identifier.lexeme;
@@ -184,7 +218,7 @@ class Resolver implements SyntaxNodeVisitor<void> {
     let existingVariableStatusInStack = this.scope.lookupVariable(identifier);
     if (declarationModifier !== null) {
       if (existingVariableStatusInStack !== null) {
-        this.generateResolverError(node, `Variable/parameter shadowing is not allowed`);
+        this.generateResolverError(node, `Variable/parameter/field shadowing is not allowed`);
         return;
       }
       existingVariableStatusInStack = this.scope.declareVariable(identifier, node.typeAnnotation, declarationModifier.type === TokenType.KEYWORD_CONST);
@@ -200,15 +234,13 @@ class Resolver implements SyntaxNodeVisitor<void> {
         this.generateResolverError(node, `Constant variable cannot be re-assigned to`);
         return;
       }
+      // TODO: infer type from rvalue?
       this.scope.assignVariable(identifier);
     }
   }
   visitFunctionDefinition(node: FunctionDefinitionSyntaxNode) {
     for (const parameter of node.parameterList) {
-      const parameterName = parameter.identifier.lexeme;
-      if (this.scope.lookupVariable(parameterName) !== null) {
-        this.generateResolverError(node, `Variable/parameter shadowing is not allowed`);
-      }
+      this.disallowShadowing(parameter.identifier.lexeme, node);
     }
     this.beginScope(true, node, node.parameterList);
     this.resolveList(node.statementList);

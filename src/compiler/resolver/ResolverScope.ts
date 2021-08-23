@@ -1,4 +1,5 @@
 import { ClassType, primitiveTypesMap, Type } from "../../types"
+import { AConstructorTypeOf } from "../../util"
 import { SyntaxNode } from "../syntax/syntax"
 import { TypeAnnotation } from "../syntax/TypeAnnotation"
 import { UnresolvedType } from "./UnresolvedType"
@@ -21,7 +22,8 @@ export class ResolverScope {
   public constructor(
     public referenceNode: SyntaxNode | null,
     private isFunction: boolean,
-    public parentScope: ResolverScope | null = null,
+    public parentScope: ResolverScope | null,
+    private generateResolverError: (node: SyntaxNode, message: string) => void,
   ) {
   }
   public preinitializeIdentifiers(identifiers: Map<string, Type>) {
@@ -47,6 +49,16 @@ export class ResolverScope {
   public lookupType(identifier: string): Type | null {
     return this.types.get(identifier) ?? this.parentScope?.lookupType(identifier) ?? null;
   }
+  public lookupTypeOrDie<T>(ctor: AConstructorTypeOf<T>, identifier: string, errorMessage: string): T {
+    const type = this.lookupType(identifier);
+    if (type === null) {
+      throw new Error(`type not found "${identifier}": ${errorMessage}`)
+    }
+    if (type instanceof ctor === false) {
+      throw new Error(`type found but incorrect type "${identifier}": ${errorMessage}`)
+    }
+    return type as T;
+  }
   public resolveTypeAnnotation(typeAnnotation: TypeAnnotation | null): Type {
     if (typeAnnotation === null) {
       return new UnresolvedType(null, this);
@@ -56,7 +68,7 @@ export class ResolverScope {
       throw new Error(`type "${typeAnnotation.name.lexeme}" is undeclared`); // TODO: CompilerError instead! do we need to call Resolver.generateResolverError
     }
     if (typeAnnotation.parameters.length > 0) {
-      throw new Error(`TODO: type binding`);
+      throw new Error(`TODO: parameterized type binding`);
     }
     return lookedUpType;
     // return this.resolveType(new UnresolvedType(typeAnnotation, this));

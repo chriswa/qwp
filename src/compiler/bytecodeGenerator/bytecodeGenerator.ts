@@ -1,6 +1,6 @@
 import assert from "assert"
 import { Token, TokenType } from "../Token"
-import { SyntaxNodeVisitor, SyntaxNode, BinarySyntaxNode, UnarySyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode, TypeDeclarationSyntaxNode, ClassDeclarationSyntaxNode } from "../syntax/syntax"
+import { SyntaxNodeVisitor, SyntaxNode, BinarySyntaxNode, UnarySyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode, TypeDeclarationSyntaxNode, ClassDeclarationSyntaxNode, ObjectInstantiationSyntaxNode } from "../syntax/syntax"
 import { ByteBuffer } from "../../bytecode/ByteBuffer"
 import { OpCode } from "../../bytecode/opcodes"
 import { ValueType } from "../syntax/ValueType"
@@ -206,6 +206,9 @@ class BytecodeGenerator implements SyntaxNodeVisitor<void> {
   }
   visitTypeDeclaration(_node: TypeDeclarationSyntaxNode): void {
     // pass
+  }
+  visitObjectInstantiation(node: ObjectInstantiationSyntaxNode): void {
+    // TODO: instantiate object (calling constructor), leave it on the stack
   }
   visitVariableAssignment(node: VariableAssignmentSyntaxNode): void {
     const identifier = node.identifier.lexeme;

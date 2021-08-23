@@ -66,6 +66,7 @@ addRule(filters.ALWAYS, /^type/, TokenType.KEYWORD_TYPE);
 addRule(filters.ALWAYS, /^class/, TokenType.KEYWORD_CLASS);
 addRule(filters.ALWAYS, /^extends/, TokenType.KEYWORD_EXTENDS);
 addRule(filters.ALWAYS, /^implements/, TokenType.KEYWORD_IMPLEMENTS);
+addRule(filters.ALWAYS, /^new/, TokenType.KEYWORD_NEW);
 
 addRule(filters.ALWAYS, /^[a-zA-Z][a-zA-Z0-9_]*/, TokenType.IDENTIFIER); // must be after keywords
 

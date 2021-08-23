@@ -27,21 +27,50 @@ export class InterfaceType extends Type {
   }
 }
 
+export class ClassFieldBinaryRepresentation {
+  private fieldsToByteOffsets: Map<string, number> = new Map();
+  private totalFieldBytes: number;
+  constructor(
+    fields: Map<string, Type>,
+  ) {
+    let byteOffsetCursor = 0;
+    fields.forEach((fieldType, fieldName) => {
+      this.fieldsToByteOffsets.set(fieldName, byteOffsetCursor);
+      const fieldByteLength = 4; // TODO: !!!
+      byteOffsetCursor += fieldByteLength;
+    });
+    this.totalFieldBytes = byteOffsetCursor;
+  }
+  public getFieldByteOffset(identifier: string): number {
+    const byteOffset = this.fieldsToByteOffsets.get(identifier);
+    if (byteOffset === undefined) {
+      throw new Error(`undeclared field "${identifier}"`);
+    }
+    return byteOffset;
+  }
+  public getTotalFieldBytes(): number {
+    return this.totalFieldBytes;
+  }
+}
+
 export class ClassType extends Type {
-  public genericDefinition: GenericDefinition | null = null;
-  public baseClassType: ClassType | null = null;
-  public interfaceTypes: Array<InterfaceType> = [];
-  public fields: Map<string, Type> = new Map();
-  public methods: Map<string, FunctionType> = new Map();
+  public fieldRepresentation: ClassFieldBinaryRepresentation;
   constructor(
     public referenceToken: Token,
     public name: string,
+    public genericDefinition: GenericDefinition | null,
+    public baseClassType: ClassType | null,
+    public interfaceTypes: Array<InterfaceType>,
+    public fields: Map<string, Type>,
+    public methods: Map<string, FunctionType>,
   ) {
     super();
+    this.fieldRepresentation = new ClassFieldBinaryRepresentation(this.fields);
   }
   toString() {
     return `class ${this.name}`;
   }
+
 }
 
 

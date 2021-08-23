@@ -101,7 +101,7 @@ function runSource(path: string, source: string): TestResult {
   setBuiltinPrintFunction((str: string) => {
     output += str + "\n";
     if (DEBUG_MODE) {
-      console.log(chalk.white(drawBox("BUILTIN PRINT: " + str)));
+      console.log(chalk.magentaBright("BUILTIN PRINT ➤➤➤ " + str));
     }
   });
 
