@@ -3,14 +3,14 @@ import { ByteBuffer } from "../bytecode/ByteBuffer"
 import { generateBytecode } from "../compiler/bytecodeGenerator/bytecodeGenerator"
 import { decompileOneInstruction, dumpDecompile } from "../bytecode/decompiler"
 import { VM } from "../vm/VM"
-import { getPositionInSource, printPositionInSource } from "../errorReporting"
-import { parse } from "../compiler/parser/parser"
+import { getPositionInSource } from "../errorReporting"
 import { ErrorWithSourcePos } from "../ErrorWithSourcePos"
 import { testExpectedKindStringToEnum, TestResult, TestResultKind } from "./results"
 import { drawBox, printFailedTestHeader, printTestsRunnerHeader, printTestsRunnerSuccess, reportFailedTest, reportSuccessfulTest } from "./reporting"
 import { setBuiltinPrintFunction } from "../builtins/builtins"
 import { CompileError } from "../compiler/CompileError"
 import chalk from "chalk"
+import { IInterpreterFacade, Interpreter } from "../interpreter/Interpreter"
 
 var myArgs = process.argv.slice(2);
 
@@ -53,31 +53,64 @@ process.exit(0); // success!
 function performTest(path: string): boolean {
   const source = fs.readFileSync(path, "utf8");
   const expectedResult = getExpectedResultFromSource(source);
-  const actualResult = runSource(path, source);
-  if (!actualResult.matchesDetail(expectedResult)) {
-    reportFailedTest(path, source, expectedResult, actualResult);
+
+  const interpreterResult = interpretSource(path, source);
+  if (!interpreterResult.matchesDetail(expectedResult)) {
+    reportFailedTest('interpret', path, source, expectedResult, interpreterResult);
     return false;
   }
-  else {
-    reportSuccessfulTest(path);
-    return true;
+
+  const vmResult = compileAndRunSource(path, source);
+  if (!vmResult.matchesDetail(expectedResult)) {
+    reportFailedTest('compile and vm', path, source, expectedResult, vmResult);
+    return false;
   }
+  
+  reportSuccessfulTest(path);
+  return true;
 }
 
-function runSource(path: string, source: string): TestResult {
-  // const parserResponse = parse(source, path);
-  // if (parserResponse.kind === "SYNTAX_ERROR") {
-  //   const firstError = parserResponse.syntaxErrors[0];
-  //   return new TestResult(TestResultKind.COMPILE_ERROR, generateErrorMessageWithLineNumber(path, source, firstError) + "\n", firstError);
-  // }
-  // // parserResponse.resolverOutput.varDeclarationsByBlockOrFunctionNode.forEach((resolverScopeOutput, node) => {
-  // //   printPositionInSource(path, source, node.referenceToken.charPos)
-  // //   for (const identifier in resolverScopeOutput.table) {
-  // //     const resolverVariableDetails = resolverScopeOutput.table[identifier]
-  // //     console.log(`  ${identifier}: ${resolverVariableDetails.toString()}`)
-  // //   }
-  // // });
-  // const constantBuffer = compile(parserResponse.topSyntaxNode, parserResponse.resolverOutput);
+function interpretSource(path: string, source: string): TestResult {
+  let output = '';
+  setBuiltinPrintFunction((str: string) => {
+    output += str + "\n";
+    if (DEBUG_MODE) {
+      console.log(chalk.magentaBright("BUILTIN PRINT ➤➤➤ " + str));
+    }
+  });
+
+  try {
+    const interpreter = new Interpreter(path, source, DEBUG_MODE) as IInterpreterFacade;
+    while (!interpreter.isHalted()) {
+      interpreter.runOneStep();
+    }
+    if (DEBUG_MODE) {
+      console.log(`---`)
+      console.log(`INTERPRETER HALTED`)
+    }
+  }
+  catch (err) {
+    if (err instanceof CompileError) {
+      const errOutput = err.errorsWithSourcePos.map((errorWithSourcePos) => generateErrorMessageWithLineNumber(path, source, errorWithSourcePos)).join("\n") + "\n";
+      return new TestResult(TestResultKind.COMPILE_ERROR, errOutput, err.errorsWithSourcePos);
+    }
+    else {
+      throw err;
+    }
+  }
+
+  return new TestResult(TestResultKind.COMPLETION, output, undefined)
+}
+
+function compileAndRunSource(path: string, source: string): TestResult {
+  let output = '';
+  setBuiltinPrintFunction((str: string) => {
+    output += str + "\n";
+    if (DEBUG_MODE) {
+      console.log(chalk.magentaBright("BUILTIN PRINT ➤➤➤ " + str));
+    }
+  });
+
   let constantBuffer: ByteBuffer;
   try {
     constantBuffer = generateBytecode(source, path)
@@ -88,7 +121,7 @@ function runSource(path: string, source: string): TestResult {
       return new TestResult(TestResultKind.COMPILE_ERROR, errOutput, err.errorsWithSourcePos);
     }
     else {
-      throw err
+      throw err;
     }
   }
 
@@ -96,14 +129,6 @@ function runSource(path: string, source: string): TestResult {
     console.log(chalk.magenta(drawBox(`Decompilation of ${path}`)));
     dumpDecompile(constantBuffer);
   }
-
-  let output = '';
-  setBuiltinPrintFunction((str: string) => {
-    output += str + "\n";
-    if (DEBUG_MODE) {
-      console.log(chalk.magentaBright("BUILTIN PRINT ➤➤➤ " + str));
-    }
-  });
 
   if (DEBUG_MODE) {
     console.log(chalk.cyan(drawBox("VM START")));

@@ -6,8 +6,8 @@ export function reportSuccessfulTest(path: string) {
   console.log(chalk.green(` ✓ ${path}`));
 }
 
-export function reportFailedTest(path: string, source: string, expectedResult: TestResult, actualResult: TestResult) {
-  console.log(chalk.red(` X ${path}`));
+export function reportFailedTest(testKind: string, path: string, source: string, expectedResult: TestResult, actualResult: TestResult) {
+  console.log(chalk.red(` X ${path} (${testKind})`));
   console.log();
   console.log(chalk.cyan(drawBox(`Expected: ${TestResultKind[expectedResult.kind]}`)));
   console.log(chalk.cyan(`${expectedResult.detail}`));

@@ -28,6 +28,11 @@ export function printPositionInSource(path: string, source: string, charPos: num
   const line = lineBeginning + lineEnding;
   
   const pathAndLineIdentificationString = `${path} ${lineNumber}: `
-  console.log(chalk.red(pathAndLineIdentificationString) + chalk.bgWhite.black(`${lineBeginning}${lineEnding}`));
-  console.log(chalk.white(`${" ".repeat(pathAndLineIdentificationString.length + lineBeginning.length)}▲`));
+
+  // two line strategy (arrow below charPos)
+  // console.log(chalk.red(pathAndLineIdentificationString) + chalk.bgWhite.black(`${lineBeginning}${lineEnding}`));
+  // console.log(chalk.white(`${" ".repeat(pathAndLineIdentificationString.length + lineBeginning.length)}▲`));
+
+  // one line strategy (charPos character is inverted)
+  console.log(chalk.red(pathAndLineIdentificationString) + chalk.whiteBright(`${lineBeginning}`) + chalk.bgWhite.black(`${lineEnding.substr(0, 1)}`) + chalk.whiteBright(`${lineEnding.substr(1)}`));
 }

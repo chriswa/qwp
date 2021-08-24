@@ -12,7 +12,7 @@ export class Builtin {
   constructor(
     public readonly id: number,
     public readonly name: string,
-    public readonly type: Type,
+    public readonly type: FunctionType,
     public readonly handler: BuiltinHandler,
   ) { }
 }
@@ -21,7 +21,7 @@ export const builtinsByName: Map<string, Builtin> = new Map();
 export const builtinsById: Map<number, Builtin> = new Map();
 export const builtinsTypesByName: Map<string, Type> = new Map();
 
-function registerBuiltin(id: number, name: string, type: Type, handler: BuiltinHandler) {
+function registerBuiltin(id: number, name: string, type: FunctionType, handler: BuiltinHandler) {
   if (!Number.isInteger(id) || id < 0 || id > 2 ** 16 - 1) { throw new Error(`builtin id must be uint32`) }
   const builtin = new Builtin(id, name, type, handler);
   builtinsByName.set(name, builtin);

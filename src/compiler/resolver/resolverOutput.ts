@@ -1,9 +1,9 @@
 import { SyntaxNode } from "../syntax/syntax"
-import { ResolverScope, VariableDefinition } from "./ResolverScope"
+import { IResolverScopeOutput, ResolverScope, VariableDefinition } from "./ResolverScope"
 
 export class ResolverOutput {
   constructor(
-    public scopesByNode: Map<SyntaxNode, ResolverScope>,
+    public scopesByNode: Map<SyntaxNode, IResolverScopeOutput>,
   ) {
   }
 }

@@ -111,13 +111,13 @@ class Resolver implements SyntaxNodeVisitor<void> {
       ...[...elseInitializedVars].filter(x => !thenInitializedVars.has(x)),
     ]);
     bothInitializedVars.forEach((identifier) => {
-      const parentVarStatus = this.scope.lookupVariable(identifier);
+      const parentVarStatus = this.scope.lookupVariableAndWireUpClosures(identifier);
       if (parentVarStatus !== null) {
         this.scope.assignVariable(identifier);
       }
     });
     xorInitializedVars.forEach((identifier) => {
-      const parentVarStatus = this.scope.lookupVariable(identifier);
+      const parentVarStatus = this.scope.lookupVariableAndWireUpClosures(identifier);
       if (parentVarStatus !== null && parentVarStatus.isReadOnly) {
         this.generateResolverError(node, `Late const assignment of variable "${identifier}" must occur in all branches`);
       }
@@ -128,7 +128,7 @@ class Resolver implements SyntaxNodeVisitor<void> {
     this.resolveSyntaxNode(node.loopBody);
     const loopInitializedVars = this.scopesByNode.get(node.loopBody)!.initializedVars;
     loopInitializedVars.forEach((identifier) => {
-      const parentVarStatus = this.scope.lookupVariable(identifier);
+      const parentVarStatus = this.scope.lookupVariableAndWireUpClosures(identifier);
       if (parentVarStatus !== null && parentVarStatus.isReadOnly) {
         this.generateResolverError(node, `Late const assignment of variable "${identifier}" may not occur in a loop`);
       }
@@ -139,7 +139,7 @@ class Resolver implements SyntaxNodeVisitor<void> {
     this.resolveSyntaxNode(node.right);
   }
   disallowShadowing(identifier: string, referenceNode: SyntaxNode) {
-    if (this.scope.lookupVariable(identifier) !== null) {
+    if (this.scope.lookupVariableAndWireUpClosures(identifier) !== null) {
       this.generateResolverError(referenceNode, `Variable/parameter/field shadowing is not allowed`);
     }
   }
@@ -199,7 +199,7 @@ class Resolver implements SyntaxNodeVisitor<void> {
   }
   visitVariableLookup(node: VariableLookupSyntaxNode) {
     const identifier = node.identifier.lexeme;
-    const existingVariableStatusInStack = this.scope.lookupVariable(identifier);
+    const existingVariableStatusInStack = this.scope.lookupVariableAndWireUpClosures(identifier);
     if (existingVariableStatusInStack === null) {
       this.generateResolverError(node, `Undeclared variable "${identifier}" cannot be substituted`);
     }
@@ -215,7 +215,7 @@ class Resolver implements SyntaxNodeVisitor<void> {
     }
     const declarationModifier = node.modifier;
     const identifier = node.identifier.lexeme;
-    let existingVariableStatusInStack = this.scope.lookupVariable(identifier);
+    let existingVariableStatusInStack = this.scope.lookupVariableAndWireUpClosures(identifier);
     if (declarationModifier !== null) {
       if (existingVariableStatusInStack !== null) {
         this.generateResolverError(node, `Variable/parameter/field shadowing is not allowed`);

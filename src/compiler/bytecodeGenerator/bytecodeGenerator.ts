@@ -81,8 +81,8 @@ class BytecodeGenerator implements SyntaxNodeVisitor<void> {
   }
 
   private static readonly _binaryTokenTypeToOpCodeMap: Map<TokenType, OpCode> = new Map([
-    [TokenType.MINUS, OpCode.NEGATE],
-    [TokenType.BANG, OpCode.LOGICAL_NOT],
+    // [TokenType.MINUS, OpCode.NEGATE],
+    // [TokenType.BANG, OpCode.LOGICAL_NOT],
     [TokenType.PLUS, OpCode.ADD],
     [TokenType.MINUS, OpCode.SUBTRACT],
     [TokenType.ASTERISK, OpCode.MULTIPLY],
@@ -342,9 +342,7 @@ class BytecodeGeneratorBlockScope {
     this.localsCount += 2; // support return address and callframe jumpback distance in stack
   }
   private findVarDef(identifier: string): VariableDefinition {
-    const declaredVars = this.context.resolverOutput.scopesByNode.get(this.node)?.variableDefinitions!;
-    const x = declaredVars.get(identifier)!;
-    return x ?? this.parentScope?.findVarDef(identifier);
+    return this.context.resolverOutput.scopesByNode.get(this.node)!.lookupVar(identifier)!;
   }
   public declare(identifier: string): CallFrameVarInfo {
     const varDef = this.findVarDef(identifier);

@@ -14,7 +14,15 @@ export class VariableDefinition {
   ) { }
 }
 
-export class ResolverScope {
+export interface IResolverScopeOutput {
+  lookupType(identifier: string): Type | null;
+  lookupTypeOrDie<T>(ctor: AConstructorTypeOf<T>, identifier: string, errorMessage: string): T;
+  isVarDefinedInThisScope(identifier: string): boolean;
+  lookupVar(identifier: string): VariableDefinition | null;
+  getClosedVars(): Array<string>;
+}
+
+export class ResolverScope implements IResolverScopeOutput {
   public variableDefinitions: Map<string, VariableDefinition> = new Map();
   public initializedVars: Set<string> = new Set();
   public types: Map<string, Type> = new Map();
@@ -91,13 +99,19 @@ export class ResolverScope {
   // }
 
   // variables
-  public lookupVariable(identifier: string): VariableDefinition | null {
+  public isVarDefinedInThisScope(identifier: string): boolean {
+    return this.variableDefinitions.has(identifier);
+  }
+  public lookupVar(identifier: string): VariableDefinition | null {
+    return this.variableDefinitions.get(identifier) ?? this.parentScope?.lookupVar(identifier) ?? null;
+  }
+  public lookupVariableAndWireUpClosures(identifier: string): VariableDefinition | null {
     const localVarDef = this.variableDefinitions.get(identifier);
     if (localVarDef !== undefined) {
       return localVarDef;
     }
     if (this.parentScope !== null) {
-      const ancestorVarDef = this.parentScope.lookupVariable(identifier);
+      const ancestorVarDef = this.parentScope.lookupVariableAndWireUpClosures(identifier);
       // if we needed to look above the function for this var, it must be treated as closed
       if (ancestorVarDef !== null && this.isFunction) {
         ancestorVarDef.isClosedOver = true;
