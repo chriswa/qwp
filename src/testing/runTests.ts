@@ -21,6 +21,8 @@ function isTestFileSpecified(candidateFilename: string) {
 }
 
 const DEBUG_MODE = userSpecifiedTestFile !== undefined;
+const RUN_WITH_INTERPRETER = true;
+const RUN_WITH_COMPILER_AND_VM = false;
 
 printTestsRunnerHeader();
 
@@ -51,19 +53,23 @@ printTestsRunnerSuccess(completedTestCount, skippedTestCount);
 process.exit(0); // success!
 
 function performTest(path: string): boolean {
-  const source = fs.readFileSync(path, "utf8");
-  const expectedResult = getExpectedResultFromSource(source);
+  const source = fs.readFileSync(path, "utf8")
+  const expectedResult = getExpectedResultFromSource(source)
 
-  const interpreterResult = interpretSource(path, source);
-  if (!interpreterResult.matchesDetail(expectedResult)) {
-    reportFailedTest('interpret', path, source, expectedResult, interpreterResult);
-    return false;
+  if (RUN_WITH_INTERPRETER) {
+    const interpreterResult = interpretSource(path, source)
+    if (!interpreterResult.matchesDetail(expectedResult)) {
+      reportFailedTest('interpret', path, source, expectedResult, interpreterResult)
+      return false
+    }
   }
 
-  const vmResult = compileAndRunSource(path, source);
-  if (!vmResult.matchesDetail(expectedResult)) {
-    reportFailedTest('compile and vm', path, source, expectedResult, vmResult);
-    return false;
+  if (RUN_WITH_COMPILER_AND_VM) {
+    const vmResult = compileAndRunSource(path, source)
+    if (!vmResult.matchesDetail(expectedResult)) {
+      reportFailedTest('compile and vm', path, source, expectedResult, vmResult)
+      return false
+    }
   }
   
   reportSuccessfulTest(path);

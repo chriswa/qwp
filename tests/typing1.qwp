@@ -1,7 +1,9 @@
 type Bar = uint32;
 
-const bar1 : Bar := 123;
+const bar1 : Bar = 123;
 printFloat32(bar1);
+
+const bool1 : bool32 = 123;
 
 /*
 class Foo {
@@ -11,9 +13,9 @@ class Foo {
   }
 }
 
-const foo1 := new Foo();
+const foo1 = new Foo();
 foo1.bark();
-foo1.quux := 123;
+foo1.quux = 123;
 
 */
 

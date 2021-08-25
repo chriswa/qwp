@@ -1,6 +1,6 @@
 let a;
 printFloat32(a);
-a := 1;
+a = 1;
 
 /*
 EXPECT COMPILE ERROR

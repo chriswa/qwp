@@ -1,6 +1,6 @@
 const a;
 while (true) {
-  a := 4;
+  a = 4;
 }
 printFloat32(a);
 

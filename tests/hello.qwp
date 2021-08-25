@@ -1,7 +1,7 @@
-// const foo := "bar";
+// const foo = "bar";
 // foo + foo;
 
-const f := fn(a, b) {
+const f = fn(a, b) {
   return a + b;
 };
 

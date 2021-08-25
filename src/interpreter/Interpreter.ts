@@ -2,8 +2,11 @@ import chalk from "chalk"
 import { builtinsByName } from "../builtins/builtins"
 import { resolve } from "../compiler/resolver/resolver"
 import { ResolverOutput } from "../compiler/resolver/resolverOutput"
+import { ResolverScope } from "../compiler/resolver/ResolverScope"
 import { SyntaxNode } from "../compiler/syntax/syntax"
 import { printPositionInSource } from "../errorReporting"
+import { drawBox } from "../testing/reporting"
+import { mapMap, mapMapToArray } from "../util"
 import { InterpreterNodeVisitor } from "./InterpreterNodeVisitor"
 import { InterpreterScope } from "./InterpreterScope"
 import { InterpreterValue, InterpreterValueBoolean, InterpreterValueBuiltin } from "./InterpreterValue"
@@ -34,6 +37,23 @@ export class Interpreter implements IInterpreterFacade {
     public isDebug: boolean,
   ) {
     const { ast, resolverOutput } = resolve(source, path);
+    if (isDebug) {
+      console.log(chalk.yellow(drawBox(`ResolverOutput`)));
+      resolverOutput.scopesByNode.forEach((scope, node) => {
+        printPositionInSource(this.path, this.source, node.referenceToken.charPos);
+        const closedVars = (scope as ResolverScope).getClosedVars();
+        if (closedVars.length > 0) {
+          console.log(chalk.yellow('closedVars: ') + chalk.white(closedVars.join(', ')));
+        }
+        console.log(chalk.yellow('vars: ') + chalk.white(mapMapToArray((scope as ResolverScope).variableDefinitions, (varDef, identifier) => {
+          return `${identifier}: ${varDef.type.toString()}`;
+        }).join(', ')));
+        console.log(chalk.yellow('types: ') + chalk.white(mapMapToArray((scope as ResolverScope).types, (type, identifier) => {
+          return `${identifier}: ${type.toString()}`;
+        }).join(', ')));
+      });
+      console.log(chalk.magenta(drawBox(`Interpretation Begins...`)));
+    }
     this.ast = ast;
     this.resolverOutput = resolverOutput;
     this.nodeVisitor = new InterpreterNodeVisitor(this);

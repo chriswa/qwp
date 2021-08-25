@@ -36,7 +36,6 @@ addRule(filters.ALWAYS, /^\[/, TokenType.OPEN_SQUARE);
 addRule(filters.ALWAYS, /^\]/, TokenType.CLOSE_SQUARE);
 addRule(filters.ALWAYS, /^=>/, TokenType.ARROW);
 
-addRule(filters.ALWAYS, /^:=/, TokenType.COLON_EQUAL);
 addRule(filters.ALWAYS, /^==/, TokenType.DOUBLE_EQUAL);
 addRule(filters.ALWAYS, /^!=/, TokenType.BANG_EQUAL);
 addRule(filters.ALWAYS, /^</, TokenType.LESS_THAN);
@@ -70,7 +69,7 @@ addRule(filters.ALWAYS, /^new/, TokenType.KEYWORD_NEW);
 
 addRule(filters.ALWAYS, /^[a-zA-Z][a-zA-Z0-9_]*/, TokenType.IDENTIFIER); // must be after keywords
 
-addRule(filters.ALWAYS, /^:/, TokenType.COLON); // must be after COLON_EQUAL
+addRule(filters.ALWAYS, /^:/, TokenType.COLON);
 addRule(filters.ALWAYS, /^=/, TokenType.EQUAL); // must be after DOUBLE_EQUAL and ARROW
 
 

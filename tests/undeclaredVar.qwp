@@ -1,4 +1,4 @@
-undec := 123;
+undec = 123;
 
 /*
 EXPECT COMPILE ERROR

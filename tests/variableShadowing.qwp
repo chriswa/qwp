@@ -1,11 +1,11 @@
-const a := 123; // "global";
+const a = 123; // "global";
 {
-  const showA := fn() {
+  const showA = fn() {
     printFloat32(a);
   };
 
   showA();
-  const a := 456; // "block";
+  const a = 456; // "block";
   showA();
 }
 

@@ -155,7 +155,7 @@ export class Parser {
     const identifier = this.reader.consume(TokenType.IDENTIFIER, `lvalue in variable declaration statement must be an identifier`);
     const typeAnnotation = this.helper.parseOptionalTypeAnnotation();
     let rvalue: SyntaxNode | null = null;
-    if (this.reader.match(TokenType.COLON_EQUAL)) {
+    if (this.reader.match(TokenType.EQUAL)) {
       rvalue = this.parseExpression();
     }
     this.reader.consume(TokenType.SEMICOLON, `Semicolon expected after variable assignment statement`);
@@ -209,7 +209,7 @@ export class Parser {
   }
   parseAssignmentStatement() {
     const expr = this.parseAnonymousFunction();
-    if (this.reader.match(TokenType.COLON_EQUAL)) {
+    if (this.reader.match(TokenType.EQUAL)) {
       const referenceToken = this.reader.previous();
       const rvalue = this.parseExpression();
       if (expr instanceof VariableLookupSyntaxNode) {

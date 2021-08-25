@@ -17,7 +17,6 @@ export enum TokenType {
   ARROW,
   OPERATOR,
   EQUAL,
-  COLON_EQUAL,
   DOUBLE_EQUAL,
   BANG_EQUAL,
   LESS_THAN,

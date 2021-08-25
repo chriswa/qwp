@@ -169,7 +169,13 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
   // ╚════════════════════════════════════════╝
   visitReturnStatement(node: ReturnStatementSyntaxNode): void {
     this.pushNewNode(node.retvalExpr);
-    // TODO: skip all remaining nodes in function (somehow)
+    // remove remaining nodes in function to skip out of it
+    while (true) {
+      const foo = this.interpreter.nodeStack.shift()!;
+      if (foo.node instanceof FunctionCallSyntaxNode) {
+        break;
+      }
+    }
   }
   // ╔════════════════════════════════════════╗
   // ║ Logic Short Circuit expression         ║

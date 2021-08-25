@@ -44,7 +44,7 @@ export class AstPrinter implements SyntaxNodeVisitor<string> {
     return node.identifier.lexeme;
   }
   visitVariableAssignment(node: VariableAssignmentSyntaxNode): string {
-    return (node.modifier === null ? "" : `${node.modifier.lexeme} `) + node.lvalue.lexeme + " := " + node.rvalue.acc;
+    return (node.modifier === null ? "" : `${node.modifier.lexeme} `) + node.lvalue.lexeme + " = " + node.rvalue.acc;
   }
   visitReturnStatement(node: ReturnStatementSyntaxNode): string {
     return ``;

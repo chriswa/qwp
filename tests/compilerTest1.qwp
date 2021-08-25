@@ -1,6 +1,6 @@
-const foo := 123;
+const foo = 123;
 
-const f := fn(a, b) {
+const f = fn(a, b) {
   return fn() {
     return a + b + foo;
   };
