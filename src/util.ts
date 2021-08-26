@@ -15,3 +15,7 @@ export function mapMapToArray<T, U, V>(oldMap: Map<T, U>, transformer: (value: U
   });
   return newArray;
 }
+
+export function throwExpr(error: Error): never {
+  throw error;
+}

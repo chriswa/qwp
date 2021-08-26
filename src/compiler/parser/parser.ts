@@ -1,13 +1,12 @@
 import { lex } from "../lexer/lexer";
 import { Token, TokenType } from "../Token";
-import { LiteralSyntaxNode, UnarySyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode, TypeDeclarationSyntaxNode, ClassDeclarationSyntaxNode, ObjectInstantiationSyntaxNode } from "../syntax/syntax";
+import { LiteralSyntaxNode, UnarySyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode, TypeDeclarationSyntaxNode, ClassDeclarationSyntaxNode, ObjectInstantiationSyntaxNode, MemberLookupSyntaxNode, MemberAssignmentSyntaxNode } from "../syntax/syntax";
 import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
 import { ValueType } from "../syntax/ValueType"
 import { TypeAnnotation } from "../syntax/TypeAnnotation"
 import { CompileError } from "../CompileError"
 import { TokenReader } from "./TokenReader"
 import { ParserHelper } from "./ParserHelper"
-import { GenericDefinition } from "../syntax/GenericDefinition"
 import { FunctionParameter } from "../syntax/FunctionParameter"
 
 export function parse(source: string, path: string): SyntaxNode {
@@ -131,7 +130,7 @@ export class Parser {
     const methods: Map<string, FunctionDefinitionSyntaxNode> = new Map();
     const fields: Map<string, TypeAnnotation | null> = new Map();
     while (this.reader.match(TokenType.CLOSE_BRACE) === false) {
-      const memberName = this.reader.consume(TokenType.IDENTIFIER, `identifier for member expected in class definition member block`);
+      const memberName = this.reader.consumeOneOf([TokenType.IDENTIFIER, TokenType.KEYWORD_NEW], `identifier for member expected in class definition member block`);
       // method
       if (this.reader.match(TokenType.OPEN_PAREN)) {
         const { parameterList, statementBlockNode } = this.parseFunctionAfterOpenParen() // n.b. statementBlockNode is discarded!
@@ -215,8 +214,11 @@ export class Parser {
       if (expr instanceof VariableLookupSyntaxNode) {
         return new VariableAssignmentSyntaxNode(referenceToken, null, expr.identifier, null, rvalue);
       }
+      else if (expr instanceof MemberLookupSyntaxNode) {
+        return new MemberAssignmentSyntaxNode(referenceToken, expr.object, expr.memberName, rvalue);
+      }
       else {
-        throw new Error("TODO: support object member assignment");
+        throw new Error("assignment lvalue has unexpected syntaxnode type");
       }
     }
     return expr;
@@ -287,6 +289,11 @@ export class Parser {
     while (true) {
       if (this.reader.match(TokenType.OPEN_PAREN)) {
         expr = this.parseCallParens(expr);
+      }
+      else if (this.reader.match(TokenType.DOT)) {
+        const referenceToken = this.reader.previous()
+        const memberName = this.reader.consume(TokenType.IDENTIFIER, `expected identifier after DOT (.)`);
+        expr = new MemberLookupSyntaxNode(referenceToken, expr, memberName);
       }
       else {
         break

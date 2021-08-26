@@ -1,0 +1,28 @@
+const closed1 = 789;
+
+class Foo {
+  quux: uint32;
+  new() {
+    this.quux = 123;
+  }
+  bark() {
+    printFloat32(this.quux);
+    this.flop();
+  }
+  flop() {
+    printFloat32(closed1);
+  }
+}
+
+const foo1 = new Foo();
+foo1.bark();
+foo1.quux = 456;
+foo1.bark();
+
+/*
+EXPECT COMPLETION
+printFloat32: 123
+printFloat32: 789
+printFloat32: 456
+printFloat32: 789
+*/

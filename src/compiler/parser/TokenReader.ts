@@ -54,4 +54,13 @@ export class TokenReader {
       throw this.parseErrorGenerator(this.peek(), `Parse error: ${errorMessage}`);
     }
   }
+  public consumeOneOf(requiredTypes: Array<TokenType>, errorMessage: string) {
+    if (this.checkOneOf(requiredTypes)) {
+      this.advance();
+      return this.previous();
+    }
+    else {
+      throw this.parseErrorGenerator(this.peek(), `Parse error: ${errorMessage}`);
+    }
+  }
 }

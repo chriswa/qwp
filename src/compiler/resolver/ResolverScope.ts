@@ -34,17 +34,10 @@ export class ResolverScope implements IResolverScopeOutput {
     private generateResolverError: (node: SyntaxNode, message: string) => void,
   ) {
   }
-  public preinitializeIdentifiers(identifiers: Map<string, Type>) {
-    identifiers.forEach((type, identifier) => {
-      const variableStatus = new VariableDefinition(type, true);
-      this.initializedVars.add(identifier);
-      this.variableDefinitions.set(identifier, variableStatus);
-    });
-  }
-  public preinitializeTypes(types: Map<string, Type>) {
-    types.forEach((type, typeName) => {
-      this.types.set(typeName, type);
-    });
+  public initializeVariable(identifier: string, type: Type, isReadOnly: boolean) {
+    const variableStatus = new VariableDefinition(type, isReadOnly);
+    this.initializedVars.add(identifier);
+    this.variableDefinitions.set(identifier, variableStatus);
   }
 
   // types

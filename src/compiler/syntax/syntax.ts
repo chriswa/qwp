@@ -21,6 +21,8 @@ export interface SyntaxNodeVisitor<T> {
   visitVariableAssignment(node: VariableAssignmentSyntaxNode): T;
   visitFunctionDefinition(node: FunctionDefinitionSyntaxNode): T;
   visitFunctionCall(node: FunctionCallSyntaxNode): T;
+  visitMemberLookup(node: MemberLookupSyntaxNode): T;
+  visitMemberAssignment(node: MemberAssignmentSyntaxNode): T;
 }
 
 export abstract class SyntaxNode {
@@ -243,5 +245,32 @@ export class FunctionCallSyntaxNode extends SyntaxNode {
   }
   accept<R>(visitor: SyntaxNodeVisitor<R>) {
     return visitor.visitFunctionCall(this);
+  }
+}
+
+export class MemberLookupSyntaxNode extends SyntaxNode {
+  constructor(
+    referenceToken: Token,
+    public object: SyntaxNode,
+    public memberName: Token,
+  ) {
+    super(referenceToken);
+  }
+  accept<R>(visitor: SyntaxNodeVisitor<R>) {
+    return visitor.visitMemberLookup(this);
+  }
+}
+
+export class MemberAssignmentSyntaxNode extends SyntaxNode {
+  constructor(
+    referenceToken: Token,
+    public object: SyntaxNode,
+    public memberName: Token,
+    public rvalue: SyntaxNode,
+  ) {
+    super(referenceToken);
+  }
+  accept<R>(visitor: SyntaxNodeVisitor<R>) {
+    return visitor.visitMemberAssignment(this);
   }
 }

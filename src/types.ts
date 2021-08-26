@@ -68,7 +68,7 @@ export class ClassType extends Type {
     this.fieldRepresentation = new ClassFieldBinaryRepresentation(this.fields);
   }
   toString() {
-    return `class ${this.name}`;
+    return `class(${this.name})`;
   }
 
 }

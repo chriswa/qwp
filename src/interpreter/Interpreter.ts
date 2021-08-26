@@ -1,11 +1,11 @@
 import chalk from "chalk"
 import { builtinsByName } from "../builtins/builtins"
-import { resolve } from "../compiler/resolver/resolver"
-import { ResolverOutput } from "../compiler/resolver/resolverOutput"
+import { IResolverOutput, resolve } from "../compiler/resolver/resolver"
 import { ResolverScope } from "../compiler/resolver/ResolverScope"
-import { SyntaxNode } from "../compiler/syntax/syntax"
+import { ClassDeclarationSyntaxNode, SyntaxNode } from "../compiler/syntax/syntax"
 import { printPositionInSource } from "../errorReporting"
 import { drawBox } from "../testing/reporting"
+import { ClassType } from "../types"
 import { mapMap, mapMapToArray } from "../util"
 import { InterpreterNodeVisitor } from "./InterpreterNodeVisitor"
 import { InterpreterScope } from "./InterpreterScope"
@@ -26,7 +26,7 @@ export class Interpreter implements IInterpreterFacade {
   private nodeVisitor: InterpreterNodeVisitor;
 
   ast: SyntaxNode;
-  resolverOutput: ResolverOutput;
+  resolverOutput: IResolverOutput;
   nodeStack: Array<NodeVisitationState> = [];
   valueStack: Array<InterpreterValue> = [];
   scope: InterpreterScope;
@@ -58,14 +58,14 @@ export class Interpreter implements IInterpreterFacade {
     this.resolverOutput = resolverOutput;
     this.nodeVisitor = new InterpreterNodeVisitor(this);
     this.nodeStack = [new NodeVisitationState(ast)];
-    this.scope = new InterpreterScope(null, ast, resolverOutput.scopesByNode.get(ast)!);
+    this.scope = new InterpreterScope(null, ast, resolverOutput);
     builtinsByName.forEach((builtin, builtinName) => {
       this.scope.overrideValueInThisScope(builtinName, new InterpreterValueBuiltin(builtin));
     });
   }
 
   pushScope(node: SyntaxNode) {
-    this.scope = new InterpreterScope(this.scope, node, this.resolverOutput.scopesByNode.get(node)!);
+    this.scope = new InterpreterScope(this.scope, node, this.resolverOutput);
   }
   popScope() {
     if (this.scope.parentScope === null) {

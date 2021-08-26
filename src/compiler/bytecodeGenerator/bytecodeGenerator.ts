@@ -1,3 +1,5 @@
+/*
+
 import assert from "assert"
 import { Token, TokenType } from "../Token"
 import { SyntaxNodeVisitor, SyntaxNode, BinarySyntaxNode, UnarySyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode, TypeDeclarationSyntaxNode, ClassDeclarationSyntaxNode, ObjectInstantiationSyntaxNode } from "../syntax/syntax"
@@ -370,3 +372,4 @@ class BytecodeGeneratorBlockScope {
   }
 }
 
+*/

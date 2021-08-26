@@ -28,6 +28,7 @@ export enum TokenType {
   ASTERISK,
   FORWARD_SLASH,
   BANG,
+  DOT,
   DOUBLE_AMPERSAND,
   DOUBLE_PIPE,
   KEYWORD_FALSE,

@@ -1,11 +1,13 @@
 import chalk from "chalk"
-import { FunctionParameter } from "../compiler/syntax/FunctionParameter"
-import { SyntaxNodeVisitor, SyntaxNode, BinarySyntaxNode, UnarySyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, ReturnStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, ClassDeclarationSyntaxNode, TypeDeclarationSyntaxNode, ObjectInstantiationSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode } from "../compiler/syntax/syntax"
+import { IResolverOutput } from "../compiler/resolver/resolver"
+import { SyntaxNodeVisitor, SyntaxNode, BinarySyntaxNode, UnarySyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, ReturnStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, ClassDeclarationSyntaxNode, TypeDeclarationSyntaxNode, ObjectInstantiationSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, MemberLookupSyntaxNode, MemberAssignmentSyntaxNode } from "../compiler/syntax/syntax"
 import { ValueType } from "../compiler/syntax/ValueType"
-import { Token, TokenType } from "../compiler/Token"
-import { primitiveTypes } from "../types"
+import { TokenType } from "../compiler/Token"
+import { ClassType } from "../types"
+import { throwExpr } from "../util"
 import { Interpreter } from "./Interpreter"
-import { InterpreterValue, InterpreterValueBoolean, InterpreterValueBuiltin, InterpreterValueClosure, interpreterValueFactory, InterpreterValueFloat32, InterpreterValueKind, InterpreterValueVoid } from "./InterpreterValue"
+import { InterpreterScope } from "./InterpreterScope"
+import { InterpreterValue, InterpreterValueBoolean, InterpreterValueBuiltin, InterpreterValueClosure, interpreterValueFactory, InterpreterValueFloat32, InterpreterValueObject, InterpreterValueVoid } from "./InterpreterValue"
 import { NodeVisitationState } from "./NodeVisitationState"
 
 export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
@@ -205,12 +207,6 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
     this.pushValue(this.interpreter.scope.getValue(node.identifier.lexeme));
   }
   // ╔════════════════════════════════════════╗
-  // ║ Object Instantiation                   ║
-  // ╚════════════════════════════════════════╝
-  visitObjectInstantiation(node: ObjectInstantiationSyntaxNode): void {
-    // TODO: !
-  }
-  // ╔════════════════════════════════════════╗
   // ║ Variable Assignment                    ║
   // ╚════════════════════════════════════════╝
   visitVariableAssignment(node: VariableAssignmentSyntaxNode): void {
@@ -223,6 +219,50 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
         const rvalue = this.popValue();
         // const varDef = this.interpreter.scope.getVariableDefinition(node.identifier.lexeme); // maybe needed for type coercion?
         this.interpreter.scope.setValue(node.identifier.lexeme, rvalue);
+      },
+    ]);
+  }
+  // ╔════════════════════════════════════════╗
+  // ║ Object Instantiation                   ║
+  // ╚════════════════════════════════════════╝
+  visitObjectInstantiation(node: ObjectInstantiationSyntaxNode): void {
+    this.switchState([
+      () => {
+        node.constructorArgumentList.forEach((argumentNode) => {
+          this.pushNewNode(argumentNode);
+        })
+        this.repushIncremented();
+      },
+      () => {
+        const classType = getClassTypeOrDie(this.interpreter.scope, node.className.lexeme);
+        const newObject = new InterpreterValueObject(classType as ClassType);
+        this.pushValue(newObject);
+
+        const classNode = getClassNodeForClassType(this.interpreter.resolverOutput, classType);
+        // const classScope = this.interpreter.resolverOutput.scopesByNode.get(classNode) ?? throwExpr(new Error(`couldn't look up class scope for class node`));
+
+        // call constructor
+        const argumentList = node.constructorArgumentList.map((_argumentNode) => this.popValue()).reverse();
+
+        const ctor = classNode.methods.get('new') ?? throwExpr(new Error(`TODO: support implicit constructors`));
+        
+        this.interpreter.pushScope(ctor);
+        this.interpreter.scope.overrideValueInThisScope('this', newObject);
+        const methodScope = this.interpreter.resolverOutput.scopesByNode.get(ctor) ?? throwExpr(new Error(`couldn't look up resolver scope for ctor`));
+        // methodScope.getClosedVars().forEach((identifier) => {
+        //   this.interpreter.scope.getValue(identifier);
+        // });
+        ctor.parameterList.forEach((functionParameter) => {
+          this.interpreter.scope.overrideValueInThisScope(functionParameter.identifier.lexeme, argumentList.shift()!)
+        })
+        ctor.statementList.forEach((statementNode) => {
+          this.pushNewNode(statementNode)
+        })
+        this.repushIncremented();
+
+      },
+      () => {
+        this.interpreter.popScope();
       },
     ]);
   }
@@ -244,11 +284,11 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
         if (callee instanceof InterpreterValueClosure) {
           this.interpreter.pushScope(callee.node)
           callee.closedVars.forEach((value, identifier) => {
-            this.interpreter.scope.setValue(identifier, value)
+            this.interpreter.scope.overrideValueInThisScope(identifier, value)
           })
           const functionDefinition = callee.node as FunctionDefinitionSyntaxNode
           functionDefinition.parameterList.forEach((functionParameter) => {
-            this.interpreter.scope.setValue(functionParameter.identifier.lexeme, argumentList.shift()!)
+            this.interpreter.scope.overrideValueInThisScope(functionParameter.identifier.lexeme, argumentList.shift()!)
           })
           functionDefinition.statementList.forEach((statementNode) => {
             this.pushNewNode(statementNode)
@@ -284,6 +324,50 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
     this.pushValue(value);
   }
   // ╔════════════════════════════════════════╗
+  // ║ Member Lookup                          ║
+  // ╚════════════════════════════════════════╝
+  visitMemberLookup(node: MemberLookupSyntaxNode): void {
+    this.switchState([
+      () => {
+        this.pushNewNode(node.object);
+        this.repushIncremented();
+      },
+      () => {
+        const object = this.popValue().asObject();
+        const classNode = getClassNodeForClassType(this.interpreter.resolverOutput, object.classType);
+        const propertyName = node.memberName.lexeme;
+        const method = classNode.methods.get(propertyName);
+        if (method === undefined) {
+          this.pushValue(object.getField(propertyName));
+        }
+        else {
+          const closedVars: Map<string, InterpreterValue> = new Map();
+          closedVars.set('this', object);
+          const value = new InterpreterValueClosure(method, closedVars);
+          this.pushValue(value);
+        }
+      },
+    ]);
+  }
+  // ╔════════════════════════════════════════╗
+  // ║ Member Assignment                      ║
+  // ╚════════════════════════════════════════╝
+  visitMemberAssignment(node: MemberAssignmentSyntaxNode): void {
+    this.switchState([
+      () => {
+        this.pushNewNode(node.rvalue);
+        this.pushNewNode(node.object);
+        this.repushIncremented();
+      },
+      () => {
+        const object = this.popValue().asObject();
+        const rvalue = this.popValue();
+        object.setField(node.memberName.lexeme, rvalue);
+        // this.pushValue(rvalue);
+      },
+    ]);
+  }
+  // ╔════════════════════════════════════════╗
   // ║ Class Declaration                      ║
   // ╚════════════════════════════════════════╝
   visitClassDeclaration(node: ClassDeclarationSyntaxNode): void {
@@ -295,4 +379,21 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
   visitTypeDeclaration(node: TypeDeclarationSyntaxNode): void {
     // noop
   }
+}
+
+function getClassTypeOrDie(interpreterScope: InterpreterScope, className: string): ClassType {
+  const classType = interpreterScope.getType(className);
+  if (classType instanceof ClassType) {
+    return classType;
+  }
+  else if (classType === null) {
+    throw new Error(`could not instantiate "new" object, class "${className}" not found`)
+  }
+  else {
+    throw new Error(`could not instantiate "new" object, class "${className}" is not a class`)
+  }
+}
+
+function getClassNodeForClassType(resolverOutput: IResolverOutput, classType: ClassType): ClassDeclarationSyntaxNode {
+  return resolverOutput.classNodesByClassType.get(classType) ?? throwExpr(new Error(`couldn't look up class node for classType`));
 }

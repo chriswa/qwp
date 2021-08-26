@@ -1,18 +1,22 @@
-import { BinarySyntaxNode, ClassDeclarationSyntaxNode, FunctionCallSyntaxNode, FunctionDefinitionSyntaxNode, GroupingSyntaxNode, IfStatementSyntaxNode, LiteralSyntaxNode, LogicShortCircuitSyntaxNode, ObjectInstantiationSyntaxNode, ReturnStatementSyntaxNode, StatementBlockSyntaxNode, SyntaxNode, SyntaxNodeVisitor, TypeDeclarationSyntaxNode, UnarySyntaxNode, VariableAssignmentSyntaxNode, VariableLookupSyntaxNode, WhileStatementSyntaxNode } from "../syntax/syntax"
+import { BinarySyntaxNode, ClassDeclarationSyntaxNode, FunctionCallSyntaxNode, FunctionDefinitionSyntaxNode, MemberLookupSyntaxNode, GroupingSyntaxNode, IfStatementSyntaxNode, LiteralSyntaxNode, LogicShortCircuitSyntaxNode, MemberAssignmentSyntaxNode, ObjectInstantiationSyntaxNode, ReturnStatementSyntaxNode, StatementBlockSyntaxNode, SyntaxNode, SyntaxNodeVisitor, TypeDeclarationSyntaxNode, UnarySyntaxNode, VariableAssignmentSyntaxNode, VariableLookupSyntaxNode, WhileStatementSyntaxNode } from "../syntax/syntax"
 import { builtinsTypesByName } from "../../builtins/builtins"
 import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
 import { TokenType } from "../Token"
 import { parse } from "../parser/parser"
 import { CompileError } from "../CompileError"
-import { ResolverOutput } from "./resolverOutput"
-import { ResolverScope } from "./ResolverScope"
 import { FunctionParameter } from "../syntax/FunctionParameter"
 import { ClassType, FunctionType, InterfaceType, primitiveTypesMap } from "../../types"
 import { mapMap } from "../../util"
+import { IResolverScopeOutput, ResolverScope, VariableDefinition } from "./ResolverScope"
+
+export interface IResolverOutput {
+  scopesByNode: Map<SyntaxNode, IResolverScopeOutput>,
+  classNodesByClassType: Map<ClassType, ClassDeclarationSyntaxNode>,
+}
 
 interface IResolverResponse {
   ast: SyntaxNode;
-  resolverOutput: ResolverOutput;
+  resolverOutput: IResolverOutput;
 }
 
 export function resolve(source: string, path: string): IResolverResponse {
@@ -22,7 +26,7 @@ export function resolve(source: string, path: string): IResolverResponse {
   if (resolverErrors.length > 0) {
     throw new CompileError(resolverErrors);
   }
-  const resolverOutput = new ResolverOutput(resolver.scopesByNode);
+  const resolverOutput = resolver as IResolverOutput;
   return { ast, resolverOutput };
 }
 
@@ -32,20 +36,27 @@ function getFunctionTypeFromFunctionDefinitionNode(node: FunctionDefinitionSynta
   return new FunctionType(argumentTypes, returnType);
 }
 
-class Resolver implements SyntaxNodeVisitor<void> {
+class Resolver implements SyntaxNodeVisitor<void>, IResolverOutput {
   scope: ResolverScope;
   scopesByNode: Map<SyntaxNode, ResolverScope> = new Map();
+  classNodesByClassType: Map<ClassType, ClassDeclarationSyntaxNode> = new Map();
   resolverErrors: Array<ErrorWithSourcePos> = [];
   constructor() {
     const topScope = new ResolverScope(null, false, null, this.generateResolverError.bind(this));
-    topScope.preinitializeIdentifiers(builtinsTypesByName);
-    topScope.preinitializeTypes(primitiveTypesMap);
+    builtinsTypesByName.forEach((type, builtinName) => {
+      topScope.initializeVariable(builtinName, type, true);
+    });
+    primitiveTypesMap.forEach((type, typeName) => {
+      topScope.types.set(typeName, type);
+    });
     this.scope = topScope;
   }
   beginScope(isFunction: boolean, node: SyntaxNode, functionParameters: Array<FunctionParameter>) {
     const newScope = new ResolverScope(node, isFunction, this.scope, this.generateResolverError.bind(this));
-    const preinitializedIdentifiers = new Map(functionParameters.map(parameter => [parameter.identifier.lexeme, newScope.resolveTypeAnnotation(parameter.typeAnnotation)]));
-    newScope.preinitializeIdentifiers(preinitializedIdentifiers);
+    functionParameters.forEach((functionParameter) => {
+      const type = newScope.resolveTypeAnnotation(functionParameter.typeAnnotation);
+      newScope.initializeVariable(functionParameter.identifier.lexeme, type, true);
+    });
     this.scopesByNode.set(node, newScope);
     this.scope = newScope;
   }
@@ -178,14 +189,20 @@ class Resolver implements SyntaxNodeVisitor<void> {
 
     // traverse methods
     this.beginScope(false, node, []);
-    this.scope.preinitializeIdentifiers(classType.fields);
-    this.scope.preinitializeIdentifiers(new Map([['this', classType]]));
-    node.methods.forEach((methodNode, _methodName) => {
-      this.beginScope(true, methodNode, methodNode.parameterList)
-      this.resolveList(methodNode.statementList)
-      this.endScope()
+    const classScope = this.scope;
+    classType.fields.forEach((type, fieldName) => {
+      this.scope.initializeVariable(fieldName, type, false);
     });
-    this.endScope()
+    this.scope.initializeVariable('this', classType, true);
+    node.methods.forEach((methodNode, _methodName) => {
+      this.beginScope(true, methodNode, methodNode.parameterList);
+      this.resolveList(methodNode.statementList);
+      this.endScope();
+    });
+    this.endScope();
+
+    this.classNodesByClassType.set(classType, node);
+    this.scopesByNode.set(node, classScope); // unnecessary?
   }
   visitTypeDeclaration(node: TypeDeclarationSyntaxNode) {
     this.scope.declareType(node.identifier.lexeme, this.scope.resolveTypeAnnotation(node.typeAnnotation));
@@ -256,5 +273,11 @@ class Resolver implements SyntaxNodeVisitor<void> {
     if (node.retvalExpr) {
       this.resolveSyntaxNode(node.retvalExpr);
     }
+  }
+  visitMemberLookup(node: MemberLookupSyntaxNode): void {
+    // TODO: ?
+  }
+  visitMemberAssignment(node: MemberAssignmentSyntaxNode): void {
+    // TODO: ?
   }
 }

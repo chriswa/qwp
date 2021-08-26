@@ -1,6 +1,8 @@
-import { ResolverOutput } from "../compiler/resolver/resolverOutput"
+import { IResolverOutput } from "../compiler/resolver/resolver"
 import { IResolverScopeOutput } from "../compiler/resolver/ResolverScope"
-import { SyntaxNode } from "../compiler/syntax/syntax"
+import { ClassDeclarationSyntaxNode, SyntaxNode } from "../compiler/syntax/syntax"
+import { ClassType, Type } from "../types"
+import { Interpreter } from "./Interpreter"
 import { InterpreterValue } from "./InterpreterValue"
 
 export enum InterpreterScopeType {
@@ -9,12 +11,14 @@ export enum InterpreterScopeType {
 }
 
 export class InterpreterScope {
-  private varValues: Map<string, InterpreterValue> = new Map();
+  private readonly varValues: Map<string, InterpreterValue> = new Map();
+  private readonly resolverScopeOutput: IResolverScopeOutput
   constructor(
     public readonly parentScope: InterpreterScope | null,
     private readonly node: SyntaxNode,
-    private readonly resolverScopeOutput: IResolverScopeOutput,
+    private readonly resolverOutput: IResolverOutput,
   ) {
+    this.resolverScopeOutput = this.resolverOutput.scopesByNode.get(node)!;
   }
   getVariableDefinition(identifier: string) {
     const variableDefinition = this.resolverScopeOutput.lookupVar(identifier);
@@ -28,7 +32,7 @@ export class InterpreterScope {
       return this;
     }
     if (this.parentScope === null) {
-      throw new Error(`var not found in scopes!`);
+      throw new Error(`var "${identifier}" not found in scopes!`);
     }
     return this.parentScope.findScopeForVar(identifier);
   }
@@ -51,6 +55,9 @@ export class InterpreterScope {
   }
   getClosedVars() {
     return this.resolverScopeOutput.getClosedVars()
+  }
+  getType(identifier: string): Type | null {
+    return this.resolverScopeOutput.lookupType(identifier);
   }
 
 }
