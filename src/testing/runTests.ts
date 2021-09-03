@@ -1,12 +1,11 @@
 import fs from "fs"
-import { getPositionInSource } from "../errorReporting"
-import { ErrorWithSourcePos } from "../ErrorWithSourcePos"
 import { testExpectedKindStringToEnum, TestResult, TestResultKind } from "./results"
 import { printFailedTestHeader, printTestsRunnerHeader, printTestsRunnerSuccess, reportFailedTest, reportSuccessfulTest } from "./reporting"
 import { setBuiltinPrintFunction } from "../builtins/builtins"
 import { CompileError } from "../compiler/CompileError"
 import chalk from "chalk"
 import { IInterpreterFacade, Interpreter } from "../interpreter/Interpreter"
+import { sourceReporter } from "../sourceReporter"
 
 var myArgs = process.argv.slice(2);
 
@@ -31,8 +30,10 @@ fs.readdirSync("tests/").forEach((filename) => {
   }
   const path = "tests/" + filename;
   if (fs.lstatSync(path).isFile()) {
+    const source = fs.readFileSync(path, "utf8");
+    sourceReporter.registerSource(path, source);
     try {
-      const wasSuccessful = performTest(path);
+      const wasSuccessful = performTest(path, source);
       if (!wasSuccessful) {
         process.exit(1);
       }
@@ -43,27 +44,27 @@ fs.readdirSync("tests/").forEach((filename) => {
       console.log(error);
       process.exit(1);
     }
+    sourceReporter.unregisterSource(path);
   }
 });
 printTestsRunnerSuccess(completedTestCount, skippedTestCount);
 process.exit(0); // success!
 
-function performTest(path: string): boolean {
-  const source = fs.readFileSync(path, "utf8")
-  const expectedResult = getExpectedResultFromSource(source)
+function performTest(path: string, source: string): boolean {
+  const expectedResult = getExpectedResultFromSource(source);
 
   if (RUN_WITH_INTERPRETER) {
-    const interpreterResult = interpretSource(path, source)
+    const interpreterResult = interpretSource(path, source);
     if (!interpreterResult.matchesDetail(expectedResult)) {
-      reportFailedTest('interpret', path, source, expectedResult, interpreterResult)
-      return false
+      reportFailedTest('interpret', path, expectedResult, interpreterResult);
+      return false;
     }
   }
 
   // if (RUN_WITH_COMPILER_AND_VM) {
   //   const vmResult = compileAndRunSource(path, source)
   //   if (!vmResult.matchesDetail(expectedResult)) {
-  //     reportFailedTest('compile and vm', path, source, expectedResult, vmResult)
+  //     reportFailedTest('compile and vm', path, expectedResult, vmResult)
   //     return false
   //   }
   // }
@@ -93,7 +94,7 @@ function interpretSource(path: string, source: string): TestResult {
   }
   catch (err) {
     if (err instanceof CompileError) {
-      const errOutput = err.errorsWithSourcePos.map((errorWithSourcePos) => generateErrorMessageWithLineNumber(path, source, errorWithSourcePos)).join("\n") + "\n";
+      const errOutput = err.errorsWithSourcePos.map((errorWithSourcePos) => sourceReporter.generateErrorMessageWithLineNumber(path, errorWithSourcePos)).join("\n") + "\n";
       return new TestResult(TestResultKind.COMPILE_ERROR, errOutput, err.errorsWithSourcePos);
     }
     else {
@@ -119,7 +120,7 @@ function interpretSource(path: string, source: string): TestResult {
 //   }
 //   catch (err) {
 //     if (err instanceof CompileError) {
-//       const errOutput = err.errorsWithSourcePos.map((errorWithSourcePos) => generateErrorMessageWithLineNumber(path, source, errorWithSourcePos)).join("\n") + "\n";
+//       const errOutput = err.errorsWithSourcePos.map((errorWithSourcePos) => sourceReporter.generateErrorMessageWithLineNumber(path, errorWithSourcePos)).join("\n") + "\n";
 //       return new TestResult(TestResultKind.COMPILE_ERROR, errOutput, err.errorsWithSourcePos);
 //     }
 //     else {
@@ -158,11 +159,6 @@ function interpretSource(path: string, source: string): TestResult {
 //   }
 //   return new TestResult(TestResultKind.COMPLETION, output, undefined);
 // }
-
-function generateErrorMessageWithLineNumber(path: string, source: string, errorWithSourcePos: ErrorWithSourcePos) {
-  const { row, col } = getPositionInSource(path, source, errorWithSourcePos.charPos);
-  return `${errorWithSourcePos.message} at line ${row}, col ${col}`;
-}
 
 function getExpectedResultFromSource(source: string): TestResult {
   const matches = source.match(/\/\*\nEXPECT (COMPILE ERROR|RUNTIME ERROR|COMPLETION)\n((?:(?!\*\/).+))\*\//ms);

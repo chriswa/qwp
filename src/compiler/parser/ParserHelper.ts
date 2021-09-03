@@ -1,5 +1,5 @@
 import { GenericDefinition } from "../syntax/GenericDefinition"
-import { BinarySyntaxNode, SyntaxNode } from "../syntax/syntax"
+import { FunctionCallSyntaxNode, SyntaxNode, VariableLookupSyntaxNode } from "../syntax/syntax"
 import { TypeAnnotation } from "../syntax/TypeAnnotation"
 import { Token, TokenType } from "../Token"
 import { TokenReader } from "./TokenReader"
@@ -56,7 +56,9 @@ export class ParserHelper {
     while (this.reader.matchOneOf(operatorTokens)) {
       const op = this.reader.previous();
       const right = subGrammar();
-      expr = new BinarySyntaxNode(op, expr, op, right);
+      // rewrite infix notation as function call
+      // expr = new BinarySyntaxNode(op, expr, op, right);
+      expr = new FunctionCallSyntaxNode(op, new VariableLookupSyntaxNode(op, op), [expr, right]);
     }
     return expr;
   }

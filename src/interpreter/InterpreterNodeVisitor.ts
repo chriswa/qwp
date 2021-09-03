@@ -1,9 +1,9 @@
 import chalk from "chalk"
 import { IResolverOutput } from "../compiler/resolver/resolver"
-import { SyntaxNodeVisitor, SyntaxNode, BinarySyntaxNode, UnarySyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, ReturnStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, ClassDeclarationSyntaxNode, TypeDeclarationSyntaxNode, ObjectInstantiationSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, MemberLookupSyntaxNode, MemberAssignmentSyntaxNode } from "../compiler/syntax/syntax"
+import { SyntaxNodeVisitor, SyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, ReturnStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, ClassDeclarationSyntaxNode, TypeDeclarationSyntaxNode, ObjectInstantiationSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, MemberLookupSyntaxNode, MemberAssignmentSyntaxNode } from "../compiler/syntax/syntax"
 import { ValueType } from "../compiler/syntax/ValueType"
 import { TokenType } from "../compiler/Token"
-import { ClassType } from "../types"
+import { TypeWrapper } from "../types/types"
 import { throwExpr } from "../util"
 import { Interpreter } from "./Interpreter"
 import { InterpreterScope } from "./InterpreterScope"
@@ -64,51 +64,51 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
   // ╔════════════════════════════════════════╗
   // ║ Binary expression                      ║
   // ╚════════════════════════════════════════╝
-  visitBinary(node: BinarySyntaxNode): void {
-    this.switchState([
-      () => {
-        this.pushNewNode(node.left);
-        this.pushNewNode(node.right);
-        this.repushIncremented();
-      },
-      () => {
-        const left = this.popValue();
-        const right = this.popValue();
-        switch (node.op.type) {
-          case TokenType.PLUS: /* OpCode.ADD */ this.pushValue(new InterpreterValueFloat32(left.asFloat32().value + right.asFloat32().value)); break;
-          case TokenType.MINUS: /* OpCode.SUBTRACT */ this.pushValue(new InterpreterValueFloat32(left.asFloat32().value - right.asFloat32().value)); break;
-          case TokenType.ASTERISK: /* OpCode.MULTIPLY */ this.pushValue(new InterpreterValueFloat32(left.asFloat32().value * right.asFloat32().value)); break;
-          case TokenType.FORWARD_SLASH: /* OpCode.DIVIDE */ this.pushValue(new InterpreterValueFloat32(left.asFloat32().value / right.asFloat32().value)); break;
-          case TokenType.LESS_THAN: /* OpCode.LT */ this.pushValue(new InterpreterValueBoolean(left.asFloat32().value < right.asFloat32().value)); break;
-          case TokenType.LESS_THAN_OR_EQUAL: /* OpCode.LTE */ this.pushValue(new InterpreterValueBoolean(left.asFloat32().value <= right.asFloat32().value)); break;
-          case TokenType.GREATER_THAN: /* OpCode.GT */ this.pushValue(new InterpreterValueBoolean(left.asFloat32().value > right.asFloat32().value)); break;
-          case TokenType.GREATER_THAN_OR_EQUAL: /* OpCode.GTE */ this.pushValue(new InterpreterValueBoolean(left.asFloat32().value >= right.asFloat32().value)); break;
-          case TokenType.DOUBLE_EQUAL: /* OpCode.EQ */ this.pushValue(new InterpreterValueBoolean(left.compareStrictEquality(right) === true)); break;
-          case TokenType.BANG_EQUAL: /* OpCode.NEQ */ this.pushValue(new InterpreterValueBoolean(left.compareStrictEquality(right) === false)); break;
-          default: throw new Error(`unknown binary op`);
-        }
-      },
-    ]);
-  }
+  // visitBinary(node: BinarySyntaxNode): void {
+  //   this.switchState([
+  //     () => {
+  //       this.pushNewNode(node.left);
+  //       this.pushNewNode(node.right);
+  //       this.repushIncremented();
+  //     },
+  //     () => {
+  //       const left = this.popValue();
+  //       const right = this.popValue();
+  //       switch (node.op.type) {
+  //         case TokenType.PLUS: /* OpCode.ADD */ this.pushValue(new InterpreterValueFloat32(left.asFloat32().value + right.asFloat32().value)); break;
+  //         case TokenType.MINUS: /* OpCode.SUBTRACT */ this.pushValue(new InterpreterValueFloat32(left.asFloat32().value - right.asFloat32().value)); break;
+  //         case TokenType.ASTERISK: /* OpCode.MULTIPLY */ this.pushValue(new InterpreterValueFloat32(left.asFloat32().value * right.asFloat32().value)); break;
+  //         case TokenType.FORWARD_SLASH: /* OpCode.DIVIDE */ this.pushValue(new InterpreterValueFloat32(left.asFloat32().value / right.asFloat32().value)); break;
+  //         case TokenType.LESS_THAN: /* OpCode.LT */ this.pushValue(new InterpreterValueBoolean(left.asFloat32().value < right.asFloat32().value)); break;
+  //         case TokenType.LESS_THAN_OR_EQUAL: /* OpCode.LTE */ this.pushValue(new InterpreterValueBoolean(left.asFloat32().value <= right.asFloat32().value)); break;
+  //         case TokenType.GREATER_THAN: /* OpCode.GT */ this.pushValue(new InterpreterValueBoolean(left.asFloat32().value > right.asFloat32().value)); break;
+  //         case TokenType.GREATER_THAN_OR_EQUAL: /* OpCode.GTE */ this.pushValue(new InterpreterValueBoolean(left.asFloat32().value >= right.asFloat32().value)); break;
+  //         case TokenType.DOUBLE_EQUAL: /* OpCode.EQ */ this.pushValue(new InterpreterValueBoolean(left.compareStrictEquality(right) === true)); break;
+  //         case TokenType.BANG_EQUAL: /* OpCode.NEQ */ this.pushValue(new InterpreterValueBoolean(left.compareStrictEquality(right) === false)); break;
+  //         default: throw new Error(`unknown binary op`);
+  //       }
+  //     },
+  //   ]);
+  // }
   // ╔════════════════════════════════════════╗
   // ║ Unary expression                       ║
   // ╚════════════════════════════════════════╝
-  visitUnary(node: UnarySyntaxNode): void {
-    this.switchState([
-      () => {
-        this.pushNewNode(node.right);
-        this.repushIncremented();
-      },
-      () => {
-        const right = this.popValue();
-        switch (node.op.type) {
-          case TokenType.MINUS: /* OpCode.SUBTRACT */ this.pushValue(new InterpreterValueFloat32(-right.asFloat32().value)); break;
-          case TokenType.BANG: /* OpCode.MULTIPLY */ this.pushValue(new InterpreterValueBoolean(!right.asBoolean().value)); break;
-          default: throw new Error(`unknown unary op`);
-        }
-      },
-    ]);
-  }
+  // visitUnary(node: UnarySyntaxNode): void {
+  //   this.switchState([
+  //     () => {
+  //       this.pushNewNode(node.right);
+  //       this.repushIncremented();
+  //     },
+  //     () => {
+  //       const right = this.popValue();
+  //       switch (node.op.type) {
+  //         case TokenType.MINUS: /* OpCode.SUBTRACT */ this.pushValue(new InterpreterValueFloat32(-right.asFloat32().value)); break;
+  //         case TokenType.BANG: /* OpCode.MULTIPLY */ this.pushValue(new InterpreterValueBoolean(!right.asBoolean().value)); break;
+  //         default: throw new Error(`unknown unary op`);
+  //       }
+  //     },
+  //   ]);
+  // }
   // ╔════════════════════════════════════════╗
   // ║ Literal expression                     ║
   // ╚════════════════════════════════════════╝
@@ -234,11 +234,11 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
         this.repushIncremented();
       },
       () => {
-        const classType = getClassTypeOrDie(this.interpreter.scope, node.className.lexeme);
-        const newObject = new InterpreterValueObject(classType as ClassType);
+        const classTypeWrapper = this.interpreter.scope.getTypeWrapper(node.className.lexeme) ?? throwExpr(new Error(`cannot find class name for "new"`));
+        const newObject = new InterpreterValueObject(classTypeWrapper);
         this.pushValue(newObject);
 
-        const classNode = getClassNodeForClassType(this.interpreter.resolverOutput, classType);
+        const classNode = getClassNodeForClassType(this.interpreter.resolverOutput, classTypeWrapper);
         // const classScope = this.interpreter.resolverOutput.scopesByNode.get(classNode) ?? throwExpr(new Error(`couldn't look up class scope for class node`));
 
         // call constructor
@@ -298,7 +298,7 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
         else if (callee instanceof InterpreterValueBuiltin) {
           const args = argumentList.map((interpreterValue, index) => interpreterValue.toJavascriptValue());
           const retval = callee.builtin.handler(args);
-          const retvalInterpreterValue = interpreterValueFactory(callee.builtin.type.returnType, retval);
+          const retvalInterpreterValue = interpreterValueFactory(callee.builtin.typeWrapper.getFunctionType().returnTypeWrapper, retval);
           if (retvalInterpreterValue instanceof InterpreterValueVoid === false) {
             this.pushValue(retvalInterpreterValue);
           }
@@ -334,7 +334,7 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
       },
       () => {
         const object = this.popValue().asObject();
-        const classNode = getClassNodeForClassType(this.interpreter.resolverOutput, object.classType);
+        const classNode = getClassNodeForClassType(this.interpreter.resolverOutput, object.classTypeWrapper);
         const propertyName = node.memberName.lexeme;
         const method = classNode.methods.get(propertyName);
         if (method === undefined) {
@@ -381,19 +381,6 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
   }
 }
 
-function getClassTypeOrDie(interpreterScope: InterpreterScope, className: string): ClassType {
-  const classType = interpreterScope.getType(className);
-  if (classType instanceof ClassType) {
-    return classType;
-  }
-  else if (classType === null) {
-    throw new Error(`could not instantiate "new" object, class "${className}" not found`)
-  }
-  else {
-    throw new Error(`could not instantiate "new" object, class "${className}" is not a class`)
-  }
-}
-
-function getClassNodeForClassType(resolverOutput: IResolverOutput, classType: ClassType): ClassDeclarationSyntaxNode {
-  return resolverOutput.classNodesByClassType.get(classType) ?? throwExpr(new Error(`couldn't look up class node for classType`));
+function getClassNodeForClassType(resolverOutput: IResolverOutput, classTypeWrapper: TypeWrapper): ClassDeclarationSyntaxNode {
+  return resolverOutput.classNodesByClassTypeWrapper.get(classTypeWrapper) ?? throwExpr(new Error(`couldn't look up class node for class TypeWrapper`));
 }

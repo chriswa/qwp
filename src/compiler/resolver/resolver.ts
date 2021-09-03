@@ -1,17 +1,20 @@
-import { BinarySyntaxNode, ClassDeclarationSyntaxNode, FunctionCallSyntaxNode, FunctionDefinitionSyntaxNode, MemberLookupSyntaxNode, GroupingSyntaxNode, IfStatementSyntaxNode, LiteralSyntaxNode, LogicShortCircuitSyntaxNode, MemberAssignmentSyntaxNode, ObjectInstantiationSyntaxNode, ReturnStatementSyntaxNode, StatementBlockSyntaxNode, SyntaxNode, SyntaxNodeVisitor, TypeDeclarationSyntaxNode, UnarySyntaxNode, VariableAssignmentSyntaxNode, VariableLookupSyntaxNode, WhileStatementSyntaxNode } from "../syntax/syntax"
-import { builtinsTypesByName } from "../../builtins/builtins"
+import { ClassDeclarationSyntaxNode, FunctionCallSyntaxNode, FunctionDefinitionSyntaxNode, MemberLookupSyntaxNode, GroupingSyntaxNode, IfStatementSyntaxNode, LiteralSyntaxNode, LogicShortCircuitSyntaxNode, MemberAssignmentSyntaxNode, ObjectInstantiationSyntaxNode, ReturnStatementSyntaxNode, StatementBlockSyntaxNode, SyntaxNode, SyntaxNodeVisitor, TypeDeclarationSyntaxNode, VariableAssignmentSyntaxNode, VariableLookupSyntaxNode, WhileStatementSyntaxNode } from "../syntax/syntax"
 import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
 import { TokenType } from "../Token"
 import { parse } from "../parser/parser"
 import { CompileError } from "../CompileError"
 import { FunctionParameter } from "../syntax/FunctionParameter"
-import { ClassType, FunctionType, InterfaceType, primitiveTypesMap } from "../../types"
-import { mapMap } from "../../util"
-import { IResolverScopeOutput, ResolverScope, VariableDefinition } from "./ResolverScope"
+import { mapMap, throwExpr } from "../../util"
+import { IResolverScopeOutput, ResolverScope } from "./ResolverScope"
+import { ValueType } from "../syntax/ValueType"
+import { ClassType, FunctionType, primitiveTypes, primitiveTypesMap, ReadOnlyStatus, TypeWrapper, UnresolvedAnnotatedType } from "../../types/types"
+import { builtinsTypeWrappersByName } from "../../builtins/builtins"
+import { InferenceEngine } from "../../types/InferenceEngine"
+import { TypeAnnotation } from "../syntax/TypeAnnotation"
 
 export interface IResolverOutput {
   scopesByNode: Map<SyntaxNode, IResolverScopeOutput>,
-  classNodesByClassType: Map<ClassType, ClassDeclarationSyntaxNode>,
+  classNodesByClassTypeWrapper: Map<TypeWrapper, ClassDeclarationSyntaxNode>,
 }
 
 interface IResolverResponse {
@@ -30,35 +33,37 @@ export function resolve(source: string, path: string): IResolverResponse {
   return { ast, resolverOutput };
 }
 
-function getFunctionTypeFromFunctionDefinitionNode(node: FunctionDefinitionSyntaxNode, scope: ResolverScope): FunctionType {
-  const argumentTypes = node.parameterList.map((functionParameter) => scope.resolveTypeAnnotation(functionParameter.typeAnnotation));
-  const returnType = scope.resolveTypeAnnotation(node.returnTypeAnnotation);
-  return new FunctionType(argumentTypes, returnType);
-}
-
-class Resolver implements SyntaxNodeVisitor<void>, IResolverOutput {
+export class Resolver implements SyntaxNodeVisitor<TypeWrapper>, IResolverOutput {
   scope: ResolverScope;
   scopesByNode: Map<SyntaxNode, ResolverScope> = new Map();
-  classNodesByClassType: Map<ClassType, ClassDeclarationSyntaxNode> = new Map();
+  classNodesByClassTypeWrapper: Map<TypeWrapper, ClassDeclarationSyntaxNode> = new Map();
+  inferenceEngine: InferenceEngine = new InferenceEngine();
   resolverErrors: Array<ErrorWithSourcePos> = [];
   constructor() {
-    const topScope = new ResolverScope(null, false, null, this.generateResolverError.bind(this));
-    builtinsTypesByName.forEach((type, builtinName) => {
-      topScope.initializeVariable(builtinName, type, true);
+    const topScope = new ResolverScope(this, null, false, null);
+    builtinsTypeWrappersByName.forEach((typeWrapper, builtinName) => {
+      topScope.initializeVariable(builtinName, typeWrapper, ReadOnlyStatus.ReadOnly);
     });
     primitiveTypesMap.forEach((type, typeName) => {
-      topScope.types.set(typeName, type);
+      topScope.typeWrappers.set(typeName, new TypeWrapper(`primitiveType(${typeName})`, type));
     });
     this.scope = topScope;
   }
-  beginScope(isFunction: boolean, node: SyntaxNode, functionParameters: Array<FunctionParameter>) {
-    const newScope = new ResolverScope(node, isFunction, this.scope, this.generateResolverError.bind(this));
-    functionParameters.forEach((functionParameter) => {
-      const type = newScope.resolveTypeAnnotation(functionParameter.typeAnnotation);
-      newScope.initializeVariable(functionParameter.identifier.lexeme, type, true);
-    });
+  beginScope(isFunction: boolean, node: SyntaxNode) {
+    const newScope = new ResolverScope(this, node, isFunction, this.scope);
     this.scopesByNode.set(node, newScope);
     this.scope = newScope;
+  }
+  initializeFunctionParameters(node: SyntaxNode, functionParameters: Array<FunctionParameter>): Array<TypeWrapper> {
+    return functionParameters.map((functionParameter) => {
+      const parameterName = functionParameter.identifier.lexeme;
+      this.disallowShadowing(parameterName, node);
+      const parameterTypeWrapper = new TypeWrapper(node, primitiveTypes.any);
+      this.inferenceEngine.applyAnnotationConstraint(parameterTypeWrapper, this.scope, functionParameter.typeAnnotation);
+      this.scope.initializeVariable(parameterName, parameterTypeWrapper, ReadOnlyStatus.ReadOnly);
+      return parameterTypeWrapper;
+    });
+
   }
   endScope() {
     if (this.scope.parentScope === null) {
@@ -77,36 +82,42 @@ class Resolver implements SyntaxNodeVisitor<void>, IResolverOutput {
   resolve(node: SyntaxNode): Array<ErrorWithSourcePos> {
     this.resolverErrors = [];
     this.resolveSyntaxNode(node);
+    if (this.resolverErrors.length > 0) {
+      return this.resolverErrors;
+    }
+    this.inferenceEngine.solve();
     return this.resolverErrors;
   }
 
-  resolveSyntaxNode(node: SyntaxNode) {
-    node.accept(this);
+  resolveSyntaxNode(node: SyntaxNode): TypeWrapper {
+    return node.accept(this);
   }
   resolveList(nodeList: Array<SyntaxNode>) {
     for (const node of nodeList) {
       this.resolveSyntaxNode(node);
     }
   }
-  visitBinary(node: BinarySyntaxNode) {
-    this.resolveSyntaxNode(node.left);
-    this.resolveSyntaxNode(node.right);
+  visitLiteral(node: LiteralSyntaxNode): TypeWrapper {
+    if (node.type === ValueType.BOOLEAN) {
+      return new TypeWrapper(node, primitiveTypes.bool32);
+    }
+    else if (node.type === ValueType.NUMBER) {
+      return new TypeWrapper(node, primitiveTypes.float32);
+    }
+    else {
+      throw new Error(`TODO: other literal types`);
+    }
   }
-  visitUnary(node: UnarySyntaxNode) {
-    this.resolveSyntaxNode(node.right);
+  visitGrouping(node: GroupingSyntaxNode): TypeWrapper {
+    return this.resolveSyntaxNode(node.expr);
   }
-  visitLiteral(node: LiteralSyntaxNode) {
-    // pass
-  }
-  visitGrouping(node: GroupingSyntaxNode) {
-    this.resolveSyntaxNode(node.expr);
-  }
-  visitStatementBlock(node: StatementBlockSyntaxNode) {
-    this.beginScope(false, node, []);
+  visitStatementBlock(node: StatementBlockSyntaxNode): TypeWrapper {
+    this.beginScope(false, node);
     this.resolveList(node.statementList);
     this.endScope();
+    return new TypeWrapper(node, primitiveTypes.never);
   }
-  visitIfStatement(node: IfStatementSyntaxNode) {
+  visitIfStatement(node: IfStatementSyntaxNode): TypeWrapper {
     this.resolveSyntaxNode(node.cond);
     this.resolveSyntaxNode(node.thenBranch);
     if (node.elseBranch !== null) {
@@ -129,155 +140,203 @@ class Resolver implements SyntaxNodeVisitor<void>, IResolverOutput {
     });
     xorInitializedVars.forEach((identifier) => {
       const parentVarStatus = this.scope.lookupVariableAndWireUpClosures(identifier);
-      if (parentVarStatus !== null && parentVarStatus.isReadOnly) {
-        this.generateResolverError(node, `Late const assignment of variable "${identifier}" must occur in all branches`);
+      if (parentVarStatus !== null && parentVarStatus.isReadOnly()) {
+        throw new Error(`Late const assignment of variable "${identifier}" must occur in all branches`);
       }
     });
+    return new TypeWrapper(node, primitiveTypes.never);
   }
-  visitWhileStatement(node: WhileStatementSyntaxNode) {
+  visitWhileStatement(node: WhileStatementSyntaxNode): TypeWrapper {
     this.resolveSyntaxNode(node.cond);
     this.resolveSyntaxNode(node.loopBody);
     const loopInitializedVars = this.scopesByNode.get(node.loopBody)!.initializedVars;
     loopInitializedVars.forEach((identifier) => {
       const parentVarStatus = this.scope.lookupVariableAndWireUpClosures(identifier);
-      if (parentVarStatus !== null && parentVarStatus.isReadOnly) {
-        this.generateResolverError(node, `Late const assignment of variable "${identifier}" may not occur in a loop`);
+      if (parentVarStatus !== null && parentVarStatus.isReadOnly()) {
+        throw new Error(`Late const assignment of variable "${identifier}" may not occur in a loop`);
       }
     });
+    return new TypeWrapper(node, primitiveTypes.never);
   }
-  visitLogicShortCircuit(node: LogicShortCircuitSyntaxNode) {
-    this.resolveSyntaxNode(node.left);
-    this.resolveSyntaxNode(node.right);
+  visitLogicShortCircuit(node: LogicShortCircuitSyntaxNode): TypeWrapper {
+    const leftTypeWrapper = this.resolveSyntaxNode(node.left);
+    const rightTypeWrapper = this.resolveSyntaxNode(node.right);
+    return this.inferenceEngine.addCoercion(node, [leftTypeWrapper, rightTypeWrapper]);
   }
   disallowShadowing(identifier: string, referenceNode: SyntaxNode) {
     if (this.scope.lookupVariableAndWireUpClosures(identifier) !== null) {
       this.generateResolverError(referenceNode, `Variable/parameter/field shadowing is not allowed`);
     }
   }
-  visitClassDeclaration(node: ClassDeclarationSyntaxNode) {
-    let baseClassType: ClassType | null = null;
+  visitClassDeclaration(node: ClassDeclarationSyntaxNode): TypeWrapper {
+    const className = node.newClassName.lexeme;
+    let baseClassTypeWrapper: TypeWrapper | null = null;
     if (node.baseClassName !== null) {
-      baseClassType = this.scope.lookupTypeOrDie(ClassType, node.baseClassName.lexeme, `interface of class`);
+      baseClassTypeWrapper = this.scope.lookupTypeWrapper(node.baseClassName.lexeme) ?? throwExpr(new Error(`failed to lookup base class`));
     }
-    const interfaceTypes: Array<InterfaceType> = [];
+    const interfaceTypeWrappers: Array<TypeWrapper> = [];
     node.implementedInterfaceNames.forEach(interfaceNameToken => {
-      const interfaceType = this.scope.lookupTypeOrDie(InterfaceType, interfaceNameToken.lexeme, `interface of class`);
-      interfaceTypes.push(interfaceType as InterfaceType);
+      const interfaceTypeWrapper = this.scope.lookupTypeWrapper(interfaceNameToken.lexeme) ?? throwExpr(new Error(`failed to lookup interface`));
+      interfaceTypeWrappers.push(interfaceTypeWrapper);
     });
-    const fields = mapMap(node.fields, (typeAnnotation) => this.scope.resolveTypeAnnotation(typeAnnotation));
-    node.fields.forEach((_fieldType, fieldName) => {
+
+    const classTypeWrapper = new TypeWrapper(node, new UnresolvedAnnotatedType(this.scope, new TypeAnnotation(node.newClassName, undefined)));
+
+    const fields: Map<string, TypeWrapper> = new Map();
+    node.fields.forEach((typeAnnotation, fieldName) => {
       this.disallowShadowing(fieldName, node);
+      const fieldTypeWrapper = this.inferenceEngine.getPropertyTypeWrapper(classTypeWrapper, fieldName);
+      this.inferenceEngine.applyAnnotationConstraint(fieldTypeWrapper, this.scope, typeAnnotation);
+      fields.set(fieldName, fieldTypeWrapper);
     });
-    const methods: Map<string, FunctionType> = new Map();
-    node.methods.forEach((methodNode, methodName) => {
-      for (const parameter of methodNode.parameterList) {
-        this.disallowShadowing(parameter.identifier.lexeme, methodNode);
-      }
-      const methodFunctionType = getFunctionTypeFromFunctionDefinitionNode(methodNode, this.scope);
-      methods.set(methodName, methodFunctionType);
+    const methods: Map<string, TypeWrapper> = new Map();
+    node.methods.forEach((typeAnnotation, methodName) => {
+      this.disallowShadowing(methodName, node);
+      const methodTypeWrapper = this.inferenceEngine.getPropertyTypeWrapper(classTypeWrapper, methodName);
+      methods.set(methodName, methodTypeWrapper);
     });
     const classType = new ClassType(
+      this.scope, // resolverScope
       node.referenceToken, // referenceToken
-      node.newClassName.lexeme, // name
+      className, // name
       node.genericDefinition, // genericDefinition
-      baseClassType, // baseClassType
-      interfaceTypes, // interfaceTypes
+      baseClassTypeWrapper, // baseClassType
+      interfaceTypeWrappers, // interfaceTypes
       fields, // fields
       methods, // methods
     );
-    this.scope.declareType(classType.name, classType);
+    classTypeWrapper.type = classType;
+    this.scope.declareType(classType.name, classTypeWrapper);
 
     // traverse methods
-    this.beginScope(false, node, []);
+    this.beginScope(false, node); // field scope
     const classScope = this.scope;
-    classType.fields.forEach((type, fieldName) => {
-      this.scope.initializeVariable(fieldName, type, false);
+    classType.fields.forEach((typeWrapper, fieldName) => {
+      this.scope.initializeVariable(fieldName, typeWrapper, ReadOnlyStatus.Mutable);
     });
-    this.scope.initializeVariable('this', classType, true);
-    node.methods.forEach((methodNode, _methodName) => {
-      this.beginScope(true, methodNode, methodNode.parameterList);
+    this.scope.initializeVariable('this', classTypeWrapper, ReadOnlyStatus.ReadOnly);
+    node.methods.forEach((methodNode, methodName) => {
+      this.beginScope(true, methodNode);
+      const parameterTypeWrappers = this.initializeFunctionParameters(methodNode, methodNode.parameterList);
       this.resolveList(methodNode.statementList);
+      const observedReturnTypeWrappers = this.scope.getObservedReturnTypeWrappers();
+      const inferredReturnTypeWrapper = this.inferenceEngine.addCoercion(methodNode, observedReturnTypeWrappers);
       this.endScope();
+
+      const methodTypeWrapper = this.inferenceEngine.getPropertyTypeWrapper(classTypeWrapper, methodName);
+      this.inferenceEngine.applyFunctionConstraints(methodTypeWrapper, this.scope, methodNode.parameterList.map(fp => fp.typeAnnotation), methodNode.returnTypeAnnotation, inferredReturnTypeWrapper);
     });
     this.endScope();
 
-    this.classNodesByClassType.set(classType, node);
-    this.scopesByNode.set(node, classScope); // unnecessary?
+    this.classNodesByClassTypeWrapper.set(classTypeWrapper, node);
+    this.scopesByNode.set(node, classScope) // unnecessary?
+
+    return new TypeWrapper(node, primitiveTypes.never);
   }
-  visitTypeDeclaration(node: TypeDeclarationSyntaxNode) {
-    this.scope.declareType(node.identifier.lexeme, this.scope.resolveTypeAnnotation(node.typeAnnotation));
+  visitTypeDeclaration(node: TypeDeclarationSyntaxNode): TypeWrapper {
+    const typeWrapper = new TypeWrapper(node, primitiveTypes.any);
+    this.inferenceEngine.applyAnnotationConstraint(typeWrapper, this.scope, node.typeAnnotation);
+    this.scope.declareType(node.identifier.lexeme, typeWrapper);
+    return new TypeWrapper(node, primitiveTypes.never);
   }
-  visitObjectInstantiation(node: ObjectInstantiationSyntaxNode) {
-    const classType = this.scope.lookupTypeOrDie(ClassType, node.className.lexeme, `Undeclared class name`);
-    // TODO: verify types of arguments match classType's constructor's parameter types
+  visitObjectInstantiation(node: ObjectInstantiationSyntaxNode): TypeWrapper {
+    const classType = this.scope.lookupTypeWrapper(node.className.lexeme) ?? throwExpr(new Error(`could not find class referenced by "new"`));
     for (const argument of node.constructorArgumentList) {
-      this.resolveSyntaxNode(argument); // ???
+      const argumentTypeWrapper = this.resolveSyntaxNode(argument);
+      // TODO: verify types of arguments match classType's constructor's parameter types
     }
+    return classType;
   }
-  visitVariableLookup(node: VariableLookupSyntaxNode) {
+  visitVariableLookup(node: VariableLookupSyntaxNode): TypeWrapper {
     const identifier = node.identifier.lexeme;
     const existingVariableStatusInStack = this.scope.lookupVariableAndWireUpClosures(identifier);
     if (existingVariableStatusInStack === null) {
-      this.generateResolverError(node, `Undeclared variable "${identifier}" cannot be substituted`);
+      throw new Error(`Undeclared variable "${identifier}" cannot be substituted`)
     }
     else {
       if (!this.scope.isVariableInitialized(identifier)) {
-        this.generateResolverError(node, `Uninitialized variable "${identifier}" cannot be substituted`)
+        throw new Error(`Uninitialized variable "${identifier}" cannot be substituted`)
       }
     }
+    return existingVariableStatusInStack.typeWrapper;
   }
-  visitVariableAssignment(node: VariableAssignmentSyntaxNode) {
-    if (node.rvalue !== null) {
-      this.resolveSyntaxNode(node.rvalue);
-    }
+  visitVariableAssignment(node: VariableAssignmentSyntaxNode): TypeWrapper {
     const declarationModifier = node.modifier;
     const identifier = node.identifier.lexeme;
     let existingVariableStatusInStack = this.scope.lookupVariableAndWireUpClosures(identifier);
     if (declarationModifier !== null) {
       if (existingVariableStatusInStack !== null) {
-        this.generateResolverError(node, `Variable/parameter/field shadowing is not allowed`);
-        return;
+        throw new Error(`Variable/parameter/field shadowing is not allowed`);
       }
-      existingVariableStatusInStack = this.scope.declareVariable(identifier, node.typeAnnotation, declarationModifier.type === TokenType.KEYWORD_CONST);
+      const typeWrapper = new TypeWrapper(node, primitiveTypes.any);
+      this.inferenceEngine.applyAnnotationConstraint(typeWrapper, this.scope, node.typeAnnotation);
+      const readOnlyStatus = declarationModifier.type === TokenType.KEYWORD_CONST ? ReadOnlyStatus.ReadOnly : ReadOnlyStatus.Mutable;
+      existingVariableStatusInStack = this.scope.declareVariable(identifier, typeWrapper, readOnlyStatus);
     }
     else {
       if (existingVariableStatusInStack === null) {
-        this.generateResolverError(node, `Undeclared variable cannot be assigned to`);
-        return;
+        throw new Error(`Undeclared variable cannot be assigned to`);
       }
     }
     if (node.rvalue !== null) {
-      if (this.scope.isVariableInitialized(identifier) && existingVariableStatusInStack.isReadOnly) {
-        this.generateResolverError(node, `Constant variable cannot be re-assigned to`);
-        return;
+      if (this.scope.isVariableInitialized(identifier) && existingVariableStatusInStack.isReadOnly()) {
+        throw new Error(`Constant variable cannot be re-assigned to`);
       }
-      // TODO: infer type from rvalue?
       this.scope.assignVariable(identifier);
+      let rvalueTypeWrapper: TypeWrapper = this.resolveSyntaxNode(node.rvalue);
+      this.inferenceEngine.addAssignmentConstraint(existingVariableStatusInStack.typeWrapper, rvalueTypeWrapper);
     }
+    return existingVariableStatusInStack.typeWrapper;
   }
-  visitFunctionDefinition(node: FunctionDefinitionSyntaxNode) {
-    for (const parameter of node.parameterList) {
-      this.disallowShadowing(parameter.identifier.lexeme, node);
-    }
-    this.beginScope(true, node, node.parameterList);
+  visitFunctionDefinition(node: FunctionDefinitionSyntaxNode): TypeWrapper {
+    this.beginScope(true, node)
+    const parameterTypeWrappers = this.initializeFunctionParameters(node, node.parameterList);
     this.resolveList(node.statementList);
+    const observedReturnTypeWrappers = this.scope.getObservedReturnTypeWrappers();
+    const inferredReturnTypeWrapper = this.inferenceEngine.addCoercion(node, observedReturnTypeWrappers);
     this.endScope();
+
+    const functionTypeWrapper = new TypeWrapper(node, primitiveTypes.any); // TODO: maybe: lookup hoisted functions?
+    this.inferenceEngine.applyFunctionConstraints(functionTypeWrapper, this.scope, node.parameterList.map(fp => fp.typeAnnotation), node.returnTypeAnnotation, inferredReturnTypeWrapper);
+    return functionTypeWrapper;
   }
-  visitFunctionCall(node: FunctionCallSyntaxNode) {
-    this.resolveSyntaxNode(node.callee);
-    for (const argument of node.argumentList) {
-      this.resolveSyntaxNode(argument);
-    }
+  visitFunctionCall(node: FunctionCallSyntaxNode): TypeWrapper {
+    const calleeTypeWrapper = this.resolveSyntaxNode(node.callee);
+    const argumentTypeWrappers: Array<TypeWrapper> = [];
+    node.argumentList.forEach((argumentNode) => {
+      const argumentTypeWrapper = this.resolveSyntaxNode(argumentNode);
+      argumentTypeWrappers.push(argumentTypeWrapper);
+    });
+    const returnTypeWrapper = this.inferenceEngine.getReturnTypeWrapperForCall(calleeTypeWrapper, argumentTypeWrappers);
+    return returnTypeWrapper;
   }
-  visitReturnStatement(node: ReturnStatementSyntaxNode) {
+  visitReturnStatement(node: ReturnStatementSyntaxNode): TypeWrapper {
+    let returnTypeWrapper: TypeWrapper = new TypeWrapper(node.retvalExpr ?? `implied void return value`, primitiveTypes.void);
     if (node.retvalExpr) {
-      this.resolveSyntaxNode(node.retvalExpr);
+      returnTypeWrapper = this.resolveSyntaxNode(node.retvalExpr)
     }
+    this.scope.findClosestFunctionScope().registerObservedReturnTypeWrapper(returnTypeWrapper);
+    return returnTypeWrapper;
   }
-  visitMemberLookup(node: MemberLookupSyntaxNode): void {
-    // TODO: ?
+  visitMemberLookup(node: MemberLookupSyntaxNode): TypeWrapper {
+    const objectTypeWrapper = this.resolveSyntaxNode(node.object);
+    const propertyTypeWrapper = this.inferenceEngine.getPropertyTypeWrapper(objectTypeWrapper, node.memberName.lexeme);
+    return propertyTypeWrapper;
+    // const classType = objectTypeWrapper.getClassType();
+    // const propertyTypeWrapper = classType.getPropertyTypeWrapper(node.memberName.lexeme);
+    // return propertyTypeWrapper;
   }
-  visitMemberAssignment(node: MemberAssignmentSyntaxNode): void {
-    // TODO: ?
+  visitMemberAssignment(node: MemberAssignmentSyntaxNode): TypeWrapper {
+    const rvalueTypeWrapper = this.resolveSyntaxNode(node.rvalue);
+    const objectTypeWrapper = this.resolveSyntaxNode(node.object);
+
+    const propertyTypeWrapper = this.inferenceEngine.getPropertyTypeWrapper(objectTypeWrapper, node.memberName.lexeme);
+    this.inferenceEngine.addAssignmentConstraint(propertyTypeWrapper, rvalueTypeWrapper);
+    return propertyTypeWrapper;
+
+    // const classType = objectTypeWrapper.getClassType();
+    // const propertyTypeWrapper = classType.getFieldTypeWrapper(node.memberName.lexeme);
+    // propertyTypeWrapper.addAssignmentConstraint(rvalueTypeWrapper);
+    // return propertyTypeWrapper;
   }
 }

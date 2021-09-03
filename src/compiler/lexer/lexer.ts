@@ -51,22 +51,22 @@ addRule(filters.ALWAYS, /^!/, TokenType.BANG);
 addRule(filters.ALWAYS, /^&&/, TokenType.DOUBLE_AMPERSAND);
 addRule(filters.ALWAYS, /^\|\|/, TokenType.DOUBLE_PIPE);
 
-addRule(filters.ALWAYS, /^false/, TokenType.KEYWORD_FALSE);
-addRule(filters.ALWAYS, /^true/, TokenType.KEYWORD_TRUE);
-addRule(filters.ALWAYS, /^null/, TokenType.KEYWORD_NULL);
+addRule(filters.ALWAYS, /^false\b/, TokenType.KEYWORD_FALSE);
+addRule(filters.ALWAYS, /^true\b/, TokenType.KEYWORD_TRUE);
+addRule(filters.ALWAYS, /^null\b/, TokenType.KEYWORD_NULL);
 
-addRule(filters.ALWAYS, /^if/, TokenType.KEYWORD_IF);
-addRule(filters.ALWAYS, /^else/, TokenType.KEYWORD_ELSE);
-addRule(filters.ALWAYS, /^while/, TokenType.KEYWORD_WHILE);
-addRule(filters.ALWAYS, /^const/, TokenType.KEYWORD_CONST);
-addRule(filters.ALWAYS, /^let/, TokenType.KEYWORD_LET);
-addRule(filters.ALWAYS, /^fn/, TokenType.KEYWORD_FN);
-addRule(filters.ALWAYS, /^return/, TokenType.KEYWORD_RETURN);
-addRule(filters.ALWAYS, /^type/, TokenType.KEYWORD_TYPE);
-addRule(filters.ALWAYS, /^class/, TokenType.KEYWORD_CLASS);
-addRule(filters.ALWAYS, /^extends/, TokenType.KEYWORD_EXTENDS);
-addRule(filters.ALWAYS, /^implements/, TokenType.KEYWORD_IMPLEMENTS);
-addRule(filters.ALWAYS, /^new/, TokenType.KEYWORD_NEW);
+addRule(filters.ALWAYS, /^if\b/, TokenType.KEYWORD_IF);
+addRule(filters.ALWAYS, /^else\b/, TokenType.KEYWORD_ELSE);
+addRule(filters.ALWAYS, /^while\b/, TokenType.KEYWORD_WHILE);
+addRule(filters.ALWAYS, /^const\b/, TokenType.KEYWORD_CONST);
+addRule(filters.ALWAYS, /^let\b/, TokenType.KEYWORD_LET);
+addRule(filters.ALWAYS, /^fn\b/, TokenType.KEYWORD_FN);
+addRule(filters.ALWAYS, /^return\b/, TokenType.KEYWORD_RETURN);
+addRule(filters.ALWAYS, /^type\b/, TokenType.KEYWORD_TYPE);
+addRule(filters.ALWAYS, /^class\b/, TokenType.KEYWORD_CLASS);
+addRule(filters.ALWAYS, /^extends\b/, TokenType.KEYWORD_EXTENDS);
+addRule(filters.ALWAYS, /^implements\b/, TokenType.KEYWORD_IMPLEMENTS);
+addRule(filters.ALWAYS, /^new\b/, TokenType.KEYWORD_NEW);
 
 addRule(filters.ALWAYS, /^[a-zA-Z][a-zA-Z0-9_]*/, TokenType.IDENTIFIER); // must be after keywords
 

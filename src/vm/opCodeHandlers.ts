@@ -1,6 +1,6 @@
-import { FunctionType, primitiveTypes } from "../types"
 import { Builtin, builtinsById } from "../builtins/builtins"
 import { OpCode } from "../bytecode/opcodes"
+import { primitiveTypes } from "../types/types"
 import { VM } from "./VM"
 
 export const opCodeHandlers: Array<(vm: VM) => void> = [];
@@ -166,15 +166,15 @@ opCodeHandlers[OpCode.CALL] = (vm: VM) => {
   }
 }
 function callBuiltin(vm: VM, builtin: Builtin, argumentCount: number) {
-  const builtinFunctionType = builtin.type as FunctionType;
-  if (argumentCount !== builtinFunctionType.argumentTypes.length) { throw new Error(`incorrect argument count for builtin`) }
+  const builtinFunctionType = builtin.typeWrapper.getFunctionType();
+  if (argumentCount !== builtinFunctionType.parameterTypeWrappers.length) { throw new Error(`incorrect argument count for builtin`) }
   const builtinArgs: Array<number> = [];
   for (let i = argumentCount - 1; i >= 0; i -= 1) {
-    const argType = builtinFunctionType.argumentTypes[i];
-    if (argType === primitiveTypes.uint32) {
+    const parameterTypeWrapper = builtinFunctionType.parameterTypeWrappers[i];
+    if (parameterTypeWrapper.type === primitiveTypes.uint32) {
       builtinArgs.unshift(vm.ramBuffer.popUint32()); // unshift to avoid reversing the list
     }
-    else if (argType === primitiveTypes.float32) {
+    else if (parameterTypeWrapper.type === primitiveTypes.float32) {
       builtinArgs.unshift(vm.ramBuffer.popFloat32()); // unshift to avoid reversing the list
     }
     else {
@@ -182,12 +182,12 @@ function callBuiltin(vm: VM, builtin: Builtin, argumentCount: number) {
     }
   }
   const retval = builtin.handler(builtinArgs);
-  if (builtinFunctionType.returnType !== primitiveTypes.void) {
-    const returnType = builtinFunctionType.returnType;
-    if (returnType === primitiveTypes.uint32) {
+  if (builtinFunctionType.returnTypeWrapper.type !== primitiveTypes.void) {
+    const returnTypeWrapper = builtinFunctionType.returnTypeWrapper;
+    if (returnTypeWrapper.type === primitiveTypes.uint32) {
       vm.ramBuffer.pushUint32(retval);
     }
-    else if (returnType === primitiveTypes.float32) {
+    else if (returnTypeWrapper.type === primitiveTypes.float32) {
       vm.ramBuffer.pushFloat32(retval);
     }
     else {

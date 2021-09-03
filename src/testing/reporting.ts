@@ -1,12 +1,12 @@
 import chalk from "chalk"
-import { printPositionInSource } from "../errorReporting"
+import { sourceReporter } from "../sourceReporter"
 import { TestResult, TestResultKind } from "./results"
 
 export function reportSuccessfulTest(path: string) {
   console.log(chalk.green(` ✓ ${path}`));
 }
 
-export function reportFailedTest(testKind: string, path: string, source: string, expectedResult: TestResult, actualResult: TestResult) {
+export function reportFailedTest(testKind: string, path: string, expectedResult: TestResult, actualResult: TestResult) {
   console.log(chalk.red(` X ${path} (${testKind})`));
   console.log();
   console.log(chalk.cyan(drawBox(`Expected: ${TestResultKind[expectedResult.kind]}`)));
@@ -15,7 +15,7 @@ export function reportFailedTest(testKind: string, path: string, source: string,
   console.log(chalk.yellow(actualResult.detail));
   if (actualResult.errorsWithSourcePos !== undefined) {
     actualResult.errorsWithSourcePos.forEach((errorWithSourcePos) => {
-      printPositionInSource(errorWithSourcePos.path, source, errorWithSourcePos.charPos);
+      sourceReporter.printPositionInSource(errorWithSourcePos.path, errorWithSourcePos.charPos);
     });
   }
 }

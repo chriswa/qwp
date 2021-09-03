@@ -5,8 +5,8 @@ import { FunctionParameter } from "./FunctionParameter"
 import { GenericDefinition } from "./GenericDefinition"
 
 export interface SyntaxNodeVisitor<T> {
-  visitBinary(node: BinarySyntaxNode): T;
-  visitUnary(node: UnarySyntaxNode): T;
+  // visitBinary(node: BinarySyntaxNode): T;
+  // visitUnary(node: UnarySyntaxNode): T;
   visitLiteral(node: LiteralSyntaxNode): T;
   visitGrouping(node: GroupingSyntaxNode): T;
   visitStatementBlock(node: StatementBlockSyntaxNode): T;
@@ -32,32 +32,32 @@ export abstract class SyntaxNode {
   public abstract accept<R>(visitor: SyntaxNodeVisitor<R>): R;
 }
 
-export class BinarySyntaxNode extends SyntaxNode {
-  constructor(
-    referenceToken: Token,
-    public left: SyntaxNode,
-    public op: Token,
-    public right: SyntaxNode,
-  ) {
-    super(referenceToken);
-  }
-  accept<R>(visitor: SyntaxNodeVisitor<R>) {
-    return visitor.visitBinary(this);
-  }
-}
+// export class BinarySyntaxNode extends SyntaxNode {
+//   constructor(
+//     referenceToken: Token,
+//     public left: SyntaxNode,
+//     public op: Token,
+//     public right: SyntaxNode,
+//   ) {
+//     super(referenceToken);
+//   }
+//   accept<R>(visitor: SyntaxNodeVisitor<R>) {
+//     return visitor.visitBinary(this);
+//   }
+// }
 
-export class UnarySyntaxNode extends SyntaxNode {
-  constructor(
-    referenceToken: Token,
-    public op: Token,
-    public right: SyntaxNode,
-  ) {
-    super(referenceToken);
-  }
-  accept<R>(visitor: SyntaxNodeVisitor<R>) {
-    return visitor.visitUnary(this);
-  }
-}
+// export class UnarySyntaxNode extends SyntaxNode {
+//   constructor(
+//     referenceToken: Token,
+//     public op: Token,
+//     public right: SyntaxNode,
+//   ) {
+//     super(referenceToken);
+//   }
+//   accept<R>(visitor: SyntaxNodeVisitor<R>) {
+//     return visitor.visitUnary(this);
+//   }
+// }
 
 export class LiteralSyntaxNode extends SyntaxNode {
   constructor(

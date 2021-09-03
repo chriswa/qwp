@@ -1,7 +1,7 @@
 import { IResolverOutput } from "../compiler/resolver/resolver"
 import { IResolverScopeOutput } from "../compiler/resolver/ResolverScope"
 import { ClassDeclarationSyntaxNode, SyntaxNode } from "../compiler/syntax/syntax"
-import { ClassType, Type } from "../types"
+import { TypeWrapper } from "../types/types"
 import { Interpreter } from "./Interpreter"
 import { InterpreterValue } from "./InterpreterValue"
 
@@ -56,8 +56,8 @@ export class InterpreterScope {
   getClosedVars() {
     return this.resolverScopeOutput.getClosedVars()
   }
-  getType(identifier: string): Type | null {
-    return this.resolverScopeOutput.lookupType(identifier);
+  getTypeWrapper(identifier: string): TypeWrapper | null {
+    return this.resolverScopeOutput.lookupTypeWrapper(identifier);
   }
 
 }

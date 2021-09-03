@@ -1,22 +1,26 @@
-import { ClassType, primitiveTypesMap, Type } from "../../types"
-import { AConstructorTypeOf } from "../../util"
+import { ReadOnlyStatus, TypeWrapper } from "../../types/types"
+import { throwExpr } from "../../util"
 import { SyntaxNode } from "../syntax/syntax"
-import { TypeAnnotation } from "../syntax/TypeAnnotation"
-import { UnresolvedType } from "./UnresolvedType"
+import { Resolver } from "./resolver"
 
 export class VariableDefinition {
   public isRef = false;
   public isClosedOver = false;
   public isFromClosure = false;
   constructor(
-    public type: Type,
-    public isReadOnly: boolean,
+    public typeWrapper: TypeWrapper,
+    public readonlyStatus: ReadOnlyStatus,
   ) { }
+  isReadOnly() {
+    return this.readonlyStatus === ReadOnlyStatus.ReadOnly;
+  }
+  isMutable() {
+    return this.readonlyStatus === ReadOnlyStatus.Mutable;
+  }
 }
 
 export interface IResolverScopeOutput {
-  lookupType(identifier: string): Type | null;
-  lookupTypeOrDie<T>(ctor: AConstructorTypeOf<T>, identifier: string, errorMessage: string): T;
+  lookupTypeWrapper(identifier: string): TypeWrapper | null;
   isVarDefinedInThisScope(identifier: string): boolean;
   lookupVar(identifier: string): VariableDefinition | null;
   getClosedVars(): Array<string>;
@@ -25,71 +29,32 @@ export interface IResolverScopeOutput {
 export class ResolverScope implements IResolverScopeOutput {
   public variableDefinitions: Map<string, VariableDefinition> = new Map();
   public initializedVars: Set<string> = new Set();
-  public types: Map<string, Type> = new Map();
+  public typeWrappers: Map<string, TypeWrapper> = new Map();
+  private observedReturnTypeWrappers: Array<TypeWrapper> = []; // only used if `this.isFunction`
 
   public constructor(
+    private resolver: Resolver,
     public referenceNode: SyntaxNode | null,
     private isFunction: boolean,
     public parentScope: ResolverScope | null,
-    private generateResolverError: (node: SyntaxNode, message: string) => void,
   ) {
   }
-  public initializeVariable(identifier: string, type: Type, isReadOnly: boolean) {
-    const variableStatus = new VariableDefinition(type, isReadOnly);
+  public initializeVariable(identifier: string, typeWrapper: TypeWrapper, readOnlyStatus: ReadOnlyStatus) {
+    const variableStatus = new VariableDefinition(typeWrapper, readOnlyStatus);
     this.initializedVars.add(identifier);
     this.variableDefinitions.set(identifier, variableStatus);
   }
 
   // types
-  public declareType(identifier: string, type: Type): void {
-    if (this.lookupType(identifier) !== null) {
+  public declareType(identifier: string, typeWrapper: TypeWrapper): void {
+    if (this.lookupTypeWrapper(identifier) !== null) {
       throw new Error(`cannot define type "${identifier}": already defined in stack!`);
     }
-    this.types.set(identifier, type);
+    this.typeWrappers.set(identifier, typeWrapper);
   }
-  public lookupType(identifier: string): Type | null {
-    return this.types.get(identifier) ?? this.parentScope?.lookupType(identifier) ?? null;
+  public lookupTypeWrapper(identifier: string): TypeWrapper | null {
+    return this.typeWrappers.get(identifier) ?? this.parentScope?.lookupTypeWrapper(identifier) ?? null;
   }
-  public lookupTypeOrDie<T>(ctor: AConstructorTypeOf<T>, identifier: string, errorMessage: string): T {
-    const type = this.lookupType(identifier);
-    if (type === null) {
-      throw new Error(`type not found "${identifier}": ${errorMessage}`)
-    }
-    if (type instanceof ctor === false) {
-      throw new Error(`type found but incorrect type "${identifier}": ${errorMessage}`)
-    }
-    return type as T;
-  }
-  public resolveTypeAnnotation(typeAnnotation: TypeAnnotation | null): Type {
-    if (typeAnnotation === null) {
-      return new UnresolvedType(null, this);
-    }
-    const lookedUpType = this.lookupType(typeAnnotation.name.lexeme);
-    if (lookedUpType === null) {
-      throw new Error(`type "${typeAnnotation.name.lexeme}" is undeclared`); // TODO: CompilerError instead! do we need to call Resolver.generateResolverError
-    }
-    if (typeAnnotation.parameters.length > 0) {
-      throw new Error(`TODO: parameterized type binding`);
-    }
-    return lookedUpType;
-    // return this.resolveType(new UnresolvedType(typeAnnotation, this));
-  }
-  // public resolveType(inputType: Type): Type {
-  //   if (inputType instanceof UnresolvedType && inputType.typeAnnotation !== null) {
-  //   }
-  //   return inputType;
-  // }
-
-  // classes
-  // public declareClass(identifier: string, classType: ClassType): void {
-  //   if (this.lookupClass(identifier) !== null) {
-  //     throw new Error(`cannot define type "${identifier}": already defined in stack!`);
-  //   }
-  //   this.classDeclarations.set(identifier, classType);
-  // }
-  // public lookupClass(identifier: string): ClassType | null {
-  //   return this.classDeclarations.get(identifier) ?? this.parentScope?.lookupClass(identifier) ?? null;
-  // }
 
   // variables
   public isVarDefinedInThisScope(identifier: string): boolean {
@@ -109,7 +74,7 @@ export class ResolverScope implements IResolverScopeOutput {
       if (ancestorVarDef !== null && this.isFunction) {
         ancestorVarDef.isClosedOver = true;
         ancestorVarDef.isRef = true;
-        const newVarDef = new VariableDefinition(ancestorVarDef.type, ancestorVarDef.isReadOnly);
+        const newVarDef = new VariableDefinition(ancestorVarDef.typeWrapper, ancestorVarDef.readonlyStatus);
         newVarDef.isRef = true;
         newVarDef.isFromClosure = true;
         this.initializedVars.add(identifier); // must be set on vars from closure to avoid failing "uninitialized variable" rule
@@ -120,8 +85,8 @@ export class ResolverScope implements IResolverScopeOutput {
     }
     return null;
   }
-  public declareVariable(identifier: string, typeAnnotation: TypeAnnotation | null, isReadOnly: boolean): VariableDefinition {
-    const variableStatus = new VariableDefinition(this.resolveTypeAnnotation(typeAnnotation), isReadOnly);
+  public declareVariable(identifier: string, typeWrapper: TypeWrapper, readOnlyStatus: ReadOnlyStatus): VariableDefinition {
+    const variableStatus = new VariableDefinition(typeWrapper, readOnlyStatus);
     this.variableDefinitions.set(identifier, variableStatus);
     return variableStatus;
   }
@@ -140,5 +105,16 @@ export class ResolverScope implements IResolverScopeOutput {
       }
     });
     return closedVars;
+  }
+
+  public findClosestFunctionScope(): ResolverScope {
+    return this.isFunction ? this : (this.parentScope?.findClosestFunctionScope() ?? throwExpr(new Error(`findClosestFunctionScope could not find a function scope`)));
+  }
+  public registerObservedReturnTypeWrapper(returnTypeWrapper: TypeWrapper) {
+    if (this.isFunction === false) { throw new Error(`can only be called on function scope`); }
+    this.observedReturnTypeWrappers.push(returnTypeWrapper);
+  }
+  public getObservedReturnTypeWrappers(): Array<TypeWrapper> {
+    return this.observedReturnTypeWrappers;
   }
 }

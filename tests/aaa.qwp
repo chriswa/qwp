@@ -1,0 +1,7 @@
+const foo = 123;
+printFloat32(foo);
+
+/*
+EXPECT COMPLETION
+printFloat32: 123
+*/

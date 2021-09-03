@@ -1,6 +1,6 @@
 import { lex } from "../lexer/lexer";
 import { Token, TokenType } from "../Token";
-import { LiteralSyntaxNode, UnarySyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode, TypeDeclarationSyntaxNode, ClassDeclarationSyntaxNode, ObjectInstantiationSyntaxNode, MemberLookupSyntaxNode, MemberAssignmentSyntaxNode } from "../syntax/syntax";
+import { LiteralSyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode, TypeDeclarationSyntaxNode, ClassDeclarationSyntaxNode, ObjectInstantiationSyntaxNode, MemberLookupSyntaxNode, MemberAssignmentSyntaxNode } from "../syntax/syntax";
 import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
 import { ValueType } from "../syntax/ValueType"
 import { TypeAnnotation } from "../syntax/TypeAnnotation"
@@ -280,7 +280,9 @@ export class Parser {
     if (this.reader.matchOneOf([TokenType.BANG, TokenType.MINUS])) {
       const op = this.reader.previous();
       const right = this.parseUnaryExpression();
-      return new UnarySyntaxNode(op, op, right);
+      // rewrite unary notation as function call
+      // return new UnarySyntaxNode(op, op, right);
+      return new FunctionCallSyntaxNode(op, new VariableLookupSyntaxNode(op, op), [right]);
     }
     return this.parseFunctionCallExpression();
   }

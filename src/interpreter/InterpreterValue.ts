@@ -1,23 +1,23 @@
 import { Builtin } from "../builtins/builtins"
 import { SyntaxNode } from "../compiler/syntax/syntax"
-import { ClassType, primitiveTypes, Type } from "../types"
+import { primitiveTypes, TypeWrapper } from "../types/types"
 import { mapMapToArray } from "../util"
 
-export function interpreterValueFactory(type: Type, javascriptValue: boolean | number | null): InterpreterValue {
-  if (type === primitiveTypes.bool32) {
+export function interpreterValueFactory(typeWrapper: TypeWrapper, javascriptValue: boolean | number | null): InterpreterValue {
+  if (typeWrapper.type === primitiveTypes.bool32) {
     return new InterpreterValueBoolean(javascriptValue as boolean)
   }
-  else if (type === primitiveTypes.float32) {
+  else if (typeWrapper.type === primitiveTypes.float32) {
     return new InterpreterValueFloat32(javascriptValue as number);
   }
-  // else if (type === primitiveTypes.uint32) {
+  // else if (typeWrapper.type === primitiveTypes.uint32) {
   //   return new InterpreterValueUint32(javascriptValue);
   // }
-  else if (type === primitiveTypes.void) {
+  else if (typeWrapper.type === primitiveTypes.void) {
     return new InterpreterValueVoid();
   }
   else {
-    throw new Error(`runtime: cannot create InterpreterValue for Type: ${type.toString()}`);
+    throw new Error(`runtime: cannot create InterpreterValue for TypeWrapper: ${typeWrapper.toString()}`);
   }
 }
 
@@ -135,7 +135,7 @@ export class InterpreterValueBuiltin extends InterpreterValue {
 export class InterpreterValueObject extends InterpreterValue {
   public fields: Map<string, InterpreterValue> = new Map();
   constructor(
-    public classType: ClassType,
+    public classTypeWrapper: TypeWrapper,
   ) {
     super();
   }
@@ -143,7 +143,7 @@ export class InterpreterValueObject extends InterpreterValue {
     throw new Error(`InterpreterValueObject cannot be converted to javascript value`);
   }
   toString() {
-    return `Object(${this.classType.name})`;
+    return `Object(${this.classTypeWrapper.toString()})`;
   }
   getField(propertyName: string): InterpreterValue {
     const fieldValue = this.fields.get(propertyName);
@@ -153,7 +153,7 @@ export class InterpreterValueObject extends InterpreterValue {
     throw new Error(`internal error: property not defined or not initialized`);
   }
   setField(fieldName: string, newValue: InterpreterValue) {
-    if (this.classType.fields.has(fieldName) === false) {
+    if (this.classTypeWrapper.getClassType().fields.has(fieldName) === false) {
       throw new Error(`internal error: field not defined`);
     }
     this.fields.set(fieldName, newValue);

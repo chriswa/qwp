@@ -1,7 +1,7 @@
 const closed1 = 789;
 
 class Foo {
-  quux: uint32;
+  quux: float32;
   new() {
     this.quux = 123;
   }
@@ -12,12 +12,21 @@ class Foo {
   flop() {
     printFloat32(closed1);
   }
+  generateSetter() {
+    return fn(newQuux: float32) {
+      this.quux = newQuux;
+    };
+  }
 }
 
-const foo1 = new Foo();
+const foo1: Foo = new Foo();
 foo1.bark();
 foo1.quux = 456;
 foo1.bark();
+
+const fooQuuxSetter = foo1.generateSetter();
+fooQuuxSetter(777);
+printFloat32(foo1.quux);
 
 /*
 EXPECT COMPLETION
@@ -25,4 +34,5 @@ printFloat32: 123
 printFloat32: 789
 printFloat32: 456
 printFloat32: 789
+printFloat32: 777
 */
