@@ -1,6 +1,6 @@
 import chalk from "chalk"
 import { IResolverOutput } from "../compiler/resolver/resolver"
-import { SyntaxNodeVisitor, SyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, ReturnStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, ClassDeclarationSyntaxNode, TypeDeclarationSyntaxNode, ObjectInstantiationSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, MemberLookupSyntaxNode, MemberAssignmentSyntaxNode } from "../compiler/syntax/syntax"
+import { SyntaxNodeVisitor, SyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, ReturnStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, ClassDeclarationSyntaxNode, TypeDeclarationSyntaxNode, ObjectInstantiationSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, MemberLookupSyntaxNode, MemberAssignmentSyntaxNode, FunctionDefinitionOverloadSyntaxNode } from "../compiler/syntax/syntax"
 import { ValueType } from "../compiler/syntax/ValueType"
 import { TokenType } from "../compiler/Token"
 import { TypeWrapper } from "../types/types"
@@ -246,16 +246,19 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
 
         const ctor = classNode.methods.get('new') ?? throwExpr(new Error(`TODO: support implicit constructors`));
         
+        throw new Error(`TODO: select which ctor overload to call based on data from resolver...`);
+        const ctorOverload = ctor.overloads[999999] // TODO: !!!
+
         this.interpreter.pushScope(ctor);
         this.interpreter.scope.overrideValueInThisScope('this', newObject);
         const methodScope = this.interpreter.resolverOutput.scopesByNode.get(ctor) ?? throwExpr(new Error(`couldn't look up resolver scope for ctor`));
         // methodScope.getClosedVars().forEach((identifier) => {
         //   this.interpreter.scope.getValue(identifier);
         // });
-        ctor.parameterList.forEach((functionParameter) => {
+        ctorOverload.parameterList.forEach((functionParameter) => {
           this.interpreter.scope.overrideValueInThisScope(functionParameter.identifier.lexeme, argumentList.shift()!)
         })
-        ctor.statementList.forEach((statementNode) => {
+        ctorOverload.statementList.forEach((statementNode) => {
           this.pushNewNode(statementNode)
         })
         this.repushIncremented();
@@ -287,18 +290,29 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
             this.interpreter.scope.overrideValueInThisScope(identifier, value)
           })
           const functionDefinition = callee.node as FunctionDefinitionSyntaxNode
-          functionDefinition.parameterList.forEach((functionParameter) => {
+
+          if (functionDefinition.overloads.length > 1) {
+            throw new Error(`TODO: select which function overload to call based on data from resolver...`);
+          }
+          const functionDefinitionOverload = functionDefinition.overloads[0] // TODO: !!!
+
+          functionDefinitionOverload.parameterList.forEach((functionParameter) => {
             this.interpreter.scope.overrideValueInThisScope(functionParameter.identifier.lexeme, argumentList.shift()!)
           })
-          functionDefinition.statementList.forEach((statementNode) => {
+          functionDefinitionOverload.statementList.forEach((statementNode) => {
             this.pushNewNode(statementNode)
           })
           this.repushIncremented();
         }
         else if (callee instanceof InterpreterValueBuiltin) {
+          if (callee.builtin.overloads.length > 1) {
+            throw new Error(`TODO: select which builtin overload to call based on data from resolver...`);
+          }
+          const builtinOverload = callee.builtin.overloads[0] // TODO: !!!
+
           const args = argumentList.map((interpreterValue, index) => interpreterValue.toJavascriptValue());
-          const retval = callee.builtin.handler(args);
-          const retvalInterpreterValue = interpreterValueFactory(callee.builtin.typeWrapper.getFunctionType().returnTypeWrapper, retval);
+          const retval = builtinOverload.handler(args);
+          const retvalInterpreterValue = interpreterValueFactory(builtinOverload.typeWrapper.getFunctionOverloadType().returnTypeWrapper, retval);
           if (retvalInterpreterValue instanceof InterpreterValueVoid === false) {
             this.pushValue(retvalInterpreterValue);
           }
@@ -322,6 +336,12 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
     });
     const value = new InterpreterValueClosure(node, closedVars);
     this.pushValue(value);
+  }
+  // ╔════════════════════════════════════════╗
+  // ║ Function Definition Overload           ║
+  // ╚════════════════════════════════════════╝
+  visitFunctionDefinitionOverload(node: FunctionDefinitionOverloadSyntaxNode): void {
+    // UNUSED FOR NOW
   }
   // ╔════════════════════════════════════════╗
   // ║ Member Lookup                          ║

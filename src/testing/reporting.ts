@@ -25,7 +25,7 @@ export function printFailedTestHeader(path: string, reason: string) {
 }
 
 export function printTestsRunnerHeader() {
-  console.log(chalk.blueBright(drawBox(`Running tests...`)));
+  console.log(chalk.bgWhite.black(drawBox(`Running tests...`)));
 }
 
 export function printTestsRunnerSuccess(completedTests: number, skippedTests: number) {

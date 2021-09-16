@@ -1,6 +1,6 @@
 import { lex } from "../lexer/lexer";
 import { Token, TokenType } from "../Token";
-import { LiteralSyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode, TypeDeclarationSyntaxNode, ClassDeclarationSyntaxNode, ObjectInstantiationSyntaxNode, MemberLookupSyntaxNode, MemberAssignmentSyntaxNode } from "../syntax/syntax";
+import { LiteralSyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode, TypeDeclarationSyntaxNode, ClassDeclarationSyntaxNode, ObjectInstantiationSyntaxNode, MemberLookupSyntaxNode, MemberAssignmentSyntaxNode, FunctionDefinitionOverloadSyntaxNode } from "../syntax/syntax";
 import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
 import { ValueType } from "../syntax/ValueType"
 import { TypeAnnotation } from "../syntax/TypeAnnotation"
@@ -8,6 +8,7 @@ import { CompileError } from "../CompileError"
 import { TokenReader } from "./TokenReader"
 import { ParserHelper } from "./ParserHelper"
 import { FunctionParameter } from "../syntax/FunctionParameter"
+import { mapGetOrPut } from "../../util"
 
 export function parse(source: string, path: string): SyntaxNode {
   const tokens = lex(source, path);
@@ -127,7 +128,7 @@ export class Parser {
     }
     
     this.reader.consume(TokenType.OPEN_BRACE, `expected opening brace as part of class definition`);
-    const methods: Map<string, FunctionDefinitionSyntaxNode> = new Map();
+    const methodOverloads: Map<string, Array<FunctionDefinitionOverloadSyntaxNode>> = new Map();
     const fields: Map<string, TypeAnnotation | null> = new Map();
     while (this.reader.match(TokenType.CLOSE_BRACE) === false) {
       const memberName = this.reader.consumeOneOf([TokenType.IDENTIFIER, TokenType.KEYWORD_NEW], `identifier for member expected in class definition member block`);
@@ -135,7 +136,9 @@ export class Parser {
       if (this.reader.match(TokenType.OPEN_PAREN)) {
         const { parameterList, statementBlockNode } = this.parseFunctionAfterOpenParen() // n.b. statementBlockNode is discarded!
         const returnTypeAnnotation = this.helper.parseOptionalTypeAnnotation();
-        methods.set(memberName.lexeme, new FunctionDefinitionSyntaxNode(memberName, null, parameterList, returnTypeAnnotation, statementBlockNode.statementList));
+        const overload = new FunctionDefinitionOverloadSyntaxNode(memberName, null, parameterList, returnTypeAnnotation, statementBlockNode.statementList);
+        const methodOverloadList = mapGetOrPut(methodOverloads, memberName.lexeme, () => []);
+        methodOverloadList.push(overload);
       }
       // or field
       else {
@@ -147,6 +150,10 @@ export class Parser {
         this.reader.consume(TokenType.SEMICOLON, `expected semicolon after class field definition`);
       }
     }
+    const methods: Map<string, FunctionDefinitionSyntaxNode> = new Map();
+    methodOverloads.forEach((overloads, methodName) => {
+      methods.set(methodName, new FunctionDefinitionSyntaxNode(overloads));
+    });
     return new ClassDeclarationSyntaxNode(classKeywordToken, newClassName, genericDefinition, baseClassName, implementedInterfaceNames, methods, fields);
   }
   parseVariableDeclarationStatement() {
@@ -237,12 +244,16 @@ export class Parser {
     return { parameterList, returnTypeAnnotation, statementBlockNode }
   }
   parseAnonymousFunction() {
-    if (this.reader.match(TokenType.KEYWORD_FN)) {
+    const overloads: Array<FunctionDefinitionOverloadSyntaxNode> = [];
+    while (this.reader.match(TokenType.KEYWORD_FN)) {
       const referenceToken = this.reader.previous();
       const genericDefinition = this.helper.parseOptionalGenericDefinition();
       this.reader.consume(TokenType.OPEN_PAREN, `function/method definition requires "(" for parameter list`);
       const { parameterList, returnTypeAnnotation, statementBlockNode } = this.parseFunctionAfterOpenParen(); // n.b. statementBlockNode is discarded!
-      return new FunctionDefinitionSyntaxNode(referenceToken, genericDefinition, parameterList, returnTypeAnnotation, statementBlockNode.statementList);
+      overloads.push(new FunctionDefinitionOverloadSyntaxNode(referenceToken, genericDefinition, parameterList, returnTypeAnnotation, statementBlockNode.statementList));
+    }
+    if (overloads.length > 0) {
+      return new FunctionDefinitionSyntaxNode(overloads);
     }
     return this.parseOrExpression();
   }

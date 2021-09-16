@@ -1,5 +1,11 @@
 const foo = 123;
-printFloat32(foo);
+
+// printFloat32(foo);
+
+const f = fn (arg: float32): void {
+  // printFloat32(arg);
+};
+f(foo);
 
 /*
 EXPECT COMPLETION

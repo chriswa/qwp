@@ -1,4 +1,4 @@
-import { TypeWrapper, BuiltinFunctionType, Type, primitiveTypes } from "../types/types"
+import { TypeWrapper, BuiltinFunctionType, Type, primitiveTypes, BuiltinFunctionOverloadType } from "../types/types"
 
 let printFunction: (str: string) => void = console.log;
 
@@ -8,45 +8,86 @@ export function setBuiltinPrintFunction(f: typeof printFunction) {
 
 type BuiltinHandler = (args: Array<unknown>) => number;
 
-export class Builtin {
+export class BuiltinOverload {
   constructor(
-    public readonly id: number,
-    public readonly name: string,
     public readonly typeWrapper: TypeWrapper,
     public readonly handler: BuiltinHandler,
   ) { }
 }
 
+export class Builtin {
+  constructor(
+    public readonly id: number,
+    public readonly name: string,
+    public readonly overloads: Array<BuiltinOverload> = [],
+    public readonly typeWrapper: TypeWrapper,
+  ) { }
+}
+
 export const builtinsByName: Map<string, Builtin> = new Map();
 export const builtinsById: Map<number, Builtin> = new Map();
-export const builtinsTypeWrappersByName: Map<string, TypeWrapper> = new Map();
 
-function registerBuiltin(id: number, name: string, argumentTypes: Array<Type>, returnType: Type, handler: BuiltinHandler) {
-  const argumentTypeWrappers = argumentTypes.map((argumentType, index) => new TypeWrapper(`builtin(${name}).arg[${index}]`, argumentType));
-  const returnTypeWrapper = new TypeWrapper(`builtin(${name}).return`, returnType);
-  const typeWrapper = new TypeWrapper(`builtin(${name})`, new BuiltinFunctionType(argumentTypeWrappers, returnTypeWrapper));
+function registerBuiltin(id: number, name: string, overloadDefs: Array<{ args: Array<Type>, ret: Type, handler: BuiltinHandler }>) {
+  const overloads = overloadDefs.map(({ args, ret, handler }) => {
+    const argumentTypeWrappers = args.map((argumentType, index) => new TypeWrapper(`builtin(${name}).arg[${index}]`, argumentType));
+    const returnTypeWrapper = new TypeWrapper(`builtin(${name}).return`, ret);
+    const typeWrapper = new TypeWrapper(`builtin(${name})`, new BuiltinFunctionOverloadType(argumentTypeWrappers, returnTypeWrapper));
+    return new BuiltinOverload(typeWrapper, handler);
+  });
   if (!Number.isInteger(id) || id < 0 || id > 2 ** 16 - 1) { throw new Error(`builtin id must be uint32`) }
-  const builtin = new Builtin(id, name, typeWrapper, handler);
+  const builtinTypeWrapper = new BuiltinFunctionType(overloads.map(overload => overload.typeWrapper));
+  const builtin = new Builtin(id, name, overloads, new TypeWrapper(`builtin(${name})`, builtinTypeWrapper));
   builtinsByName.set(name, builtin);
   builtinsById.set(id, builtin);
-  builtinsTypeWrappersByName.set(name, builtin.typeWrapper);
 }
 
 let incId = 0;
 
-registerBuiltin(incId++, "printFloat32", [primitiveTypes.float32], primitiveTypes.void, (args) => {
-  printFunction(`printFloat32: ${args}`)
-  return 0;
-});
+registerBuiltin(incId++, "printFloat32", [
+  {
+    args: [primitiveTypes.float32], ret: primitiveTypes.void, handler: (args) => {
+      printFunction(`printFloat32: ${args}`)
+      return 0; // ???
+    }
+  },
+]);
 
-registerBuiltin(incId++, "printUint32", [primitiveTypes.uint32], primitiveTypes.void, (args) => {
-  printFunction(`printUint32: ${args}`)
-  return 0;
-});
+registerBuiltin(incId++, "printUint32", [
+  {
+    args: [primitiveTypes.uint32], ret: primitiveTypes.void, handler: (args) => {
+      printFunction(`printUint32: ${args}`)
+      return 0; // ???
+    }
+  },
+]);
 
-registerBuiltin(incId++, "+", [primitiveTypes.float32, primitiveTypes.float32], primitiveTypes.float32, (args: any) => {
-  return args[0] + args[1]
-});
+registerBuiltin(incId++, "print", [
+  {
+    args: [primitiveTypes.uint32], ret: primitiveTypes.void, handler: (args) => {
+      printFunction(`print: ${args}`)
+      return 0; // ???
+    }
+  },
+  {
+    args: [primitiveTypes.float32], ret: primitiveTypes.void, handler: (args) => {
+      printFunction(`print: ${args}`)
+      return 0; // ???
+    }
+  },
+]);
+
+registerBuiltin(incId++, "+", [
+  {
+    args: [primitiveTypes.float32, primitiveTypes.float32], ret: primitiveTypes.float32, handler: (args: any) => {
+      return args[0] + args[1];
+    }
+  },
+  {
+    args: [primitiveTypes.uint32, primitiveTypes.uint32], ret: primitiveTypes.uint32, handler: (args: any) => {
+      return args[0] + args[1];
+    }
+  },
+]);
 
 // case TokenType.PLUS: /* OpCode.ADD */ this.pushValue(new InterpreterValueFloat32(left.asFloat32().value + right.asFloat32().value)); break;
 // case TokenType.MINUS: /* OpCode.SUBTRACT */ this.pushValue(new InterpreterValueFloat32(left.asFloat32().value - right.asFloat32().value)); break;

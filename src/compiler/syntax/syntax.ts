@@ -20,6 +20,7 @@ export interface SyntaxNodeVisitor<T> {
   visitObjectInstantiation(node: ObjectInstantiationSyntaxNode): T;
   visitVariableAssignment(node: VariableAssignmentSyntaxNode): T;
   visitFunctionDefinition(node: FunctionDefinitionSyntaxNode): T;
+  visitFunctionDefinitionOverload(node: FunctionDefinitionOverloadSyntaxNode): T;
   visitFunctionCall(node: FunctionCallSyntaxNode): T;
   visitMemberLookup(node: MemberLookupSyntaxNode): T;
   visitMemberAssignment(node: MemberAssignmentSyntaxNode): T;
@@ -30,34 +31,8 @@ export abstract class SyntaxNode {
     public referenceToken: Token,
   ) { }
   public abstract accept<R>(visitor: SyntaxNodeVisitor<R>): R;
+  public abstract kind(): string;
 }
-
-// export class BinarySyntaxNode extends SyntaxNode {
-//   constructor(
-//     referenceToken: Token,
-//     public left: SyntaxNode,
-//     public op: Token,
-//     public right: SyntaxNode,
-//   ) {
-//     super(referenceToken);
-//   }
-//   accept<R>(visitor: SyntaxNodeVisitor<R>) {
-//     return visitor.visitBinary(this);
-//   }
-// }
-
-// export class UnarySyntaxNode extends SyntaxNode {
-//   constructor(
-//     referenceToken: Token,
-//     public op: Token,
-//     public right: SyntaxNode,
-//   ) {
-//     super(referenceToken);
-//   }
-//   accept<R>(visitor: SyntaxNodeVisitor<R>) {
-//     return visitor.visitUnary(this);
-//   }
-// }
 
 export class LiteralSyntaxNode extends SyntaxNode {
   constructor(
@@ -69,6 +44,9 @@ export class LiteralSyntaxNode extends SyntaxNode {
   }
   accept<R>(visitor: SyntaxNodeVisitor<R>) {
     return visitor.visitLiteral(this);
+  }
+  kind() {
+    return 'Literal';
   }
 }
 
@@ -82,6 +60,9 @@ export class GroupingSyntaxNode extends SyntaxNode {
   accept<R>(visitor: SyntaxNodeVisitor<R>) {
     return visitor.visitGrouping(this);
   }
+  kind() {
+    return 'Grouping';
+  }
 }
 
 export class StatementBlockSyntaxNode extends SyntaxNode {
@@ -93,6 +74,9 @@ export class StatementBlockSyntaxNode extends SyntaxNode {
   }
   accept<R>(visitor: SyntaxNodeVisitor<R>) {
     return visitor.visitStatementBlock(this);
+  }
+  kind() {
+    return 'StatementBlock';
   }
 }
 
@@ -108,6 +92,9 @@ export class IfStatementSyntaxNode extends SyntaxNode {
   accept<R>(visitor: SyntaxNodeVisitor<R>) {
     return visitor.visitIfStatement(this);
   }
+  kind() {
+    return 'IfStatement';
+  }
 }
 
 export class WhileStatementSyntaxNode extends SyntaxNode {
@@ -121,6 +108,9 @@ export class WhileStatementSyntaxNode extends SyntaxNode {
   accept<R>(visitor: SyntaxNodeVisitor<R>) {
     return visitor.visitWhileStatement(this);
   }
+  kind() {
+    return 'WhileStatement';
+  }
 }
 
 export class ReturnStatementSyntaxNode extends SyntaxNode {
@@ -132,6 +122,9 @@ export class ReturnStatementSyntaxNode extends SyntaxNode {
   }
   accept<R>(visitor: SyntaxNodeVisitor<R>) {
     return visitor.visitReturnStatement(this);
+  }
+  kind() {
+    return 'ReturnStatement';
   }
 }
 
@@ -147,6 +140,9 @@ export class LogicShortCircuitSyntaxNode extends SyntaxNode {
   accept<R>(visitor: SyntaxNodeVisitor<R>) {
     return visitor.visitLogicShortCircuit(this);
   }
+  kind() {
+    return 'LogicShortCircuit';
+  }
 }
 
 export class VariableLookupSyntaxNode extends SyntaxNode {
@@ -158,6 +154,9 @@ export class VariableLookupSyntaxNode extends SyntaxNode {
   }
   accept<R>(visitor: SyntaxNodeVisitor<R>) {
     return visitor.visitVariableLookup(this);
+  }
+  kind() {
+    return 'VariableLookup';
   }
 }
 
@@ -172,6 +171,9 @@ export class TypeDeclarationSyntaxNode extends SyntaxNode {
   }
   accept<R>(visitor: SyntaxNodeVisitor<R>) {
     return visitor.visitTypeDeclaration(this);
+  }
+  kind() {
+    return 'TypeDeclaration';
   }
 }
 
@@ -190,6 +192,9 @@ export class ClassDeclarationSyntaxNode extends SyntaxNode {
   accept<R>(visitor: SyntaxNodeVisitor<R>) {
     return visitor.visitClassDeclaration(this);
   }
+  kind() {
+    return 'ClassDeclaration';
+  }
 }
 
 export class ObjectInstantiationSyntaxNode extends SyntaxNode {
@@ -202,6 +207,9 @@ export class ObjectInstantiationSyntaxNode extends SyntaxNode {
   }
   accept<R>(visitor: SyntaxNodeVisitor<R>) {
     return visitor.visitObjectInstantiation(this);
+  }
+  kind() {
+    return 'ObjectInstantiation';
   }
 }
 
@@ -218,9 +226,12 @@ export class VariableAssignmentSyntaxNode extends SyntaxNode {
   accept<R>(visitor: SyntaxNodeVisitor<R>) {
     return visitor.visitVariableAssignment(this);
   }
+  kind() {
+    return 'VariableAssignment';
+  }
 }
 
-export class FunctionDefinitionSyntaxNode extends SyntaxNode {
+export class FunctionDefinitionOverloadSyntaxNode extends SyntaxNode {
   constructor(
     referenceToken: Token,
     public genericDefinition: GenericDefinition | null,
@@ -231,7 +242,28 @@ export class FunctionDefinitionSyntaxNode extends SyntaxNode {
     super(referenceToken);
   }
   accept<R>(visitor: SyntaxNodeVisitor<R>) {
+    return visitor.visitFunctionDefinitionOverload(this);
+  }
+  kind() {
+    return 'FunctionDefinition';
+  }
+}
+
+export class FunctionDefinitionSyntaxNode extends SyntaxNode {
+  constructor(
+    public overloads: Array<FunctionDefinitionOverloadSyntaxNode>,
+    // public genericDefinition: GenericDefinition | null,
+    // public parameterList: Array<FunctionParameter>,
+    // public returnTypeAnnotation: TypeAnnotation | null,
+    // public statementList: Array<SyntaxNode>,
+  ) {
+    super(overloads[0].referenceToken);
+  }
+  accept<R>(visitor: SyntaxNodeVisitor<R>) {
     return visitor.visitFunctionDefinition(this);
+  }
+  kind() {
+    return 'FunctionDefinition';
   }
 }
 
@@ -246,6 +278,9 @@ export class FunctionCallSyntaxNode extends SyntaxNode {
   accept<R>(visitor: SyntaxNodeVisitor<R>) {
     return visitor.visitFunctionCall(this);
   }
+  kind() {
+    return 'FunctionCall';
+  }
 }
 
 export class MemberLookupSyntaxNode extends SyntaxNode {
@@ -258,6 +293,9 @@ export class MemberLookupSyntaxNode extends SyntaxNode {
   }
   accept<R>(visitor: SyntaxNodeVisitor<R>) {
     return visitor.visitMemberLookup(this);
+  }
+  kind() {
+    return 'MemberLookup';
   }
 }
 
@@ -272,5 +310,8 @@ export class MemberAssignmentSyntaxNode extends SyntaxNode {
   }
   accept<R>(visitor: SyntaxNodeVisitor<R>) {
     return visitor.visitMemberAssignment(this);
+  }
+  kind() {
+    return 'MemberAssignment';
   }
 }

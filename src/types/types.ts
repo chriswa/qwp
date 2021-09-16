@@ -17,6 +17,7 @@ export class TypeWrapper {
   ) {
   }
   public toString() {
+    // return `[${ this.referenceNode instanceof SyntaxNode ? this.referenceNode.kind() : this.referenceNode }]${ this.type.toString() }`;
     return this.type.toString();
   }
   public isEqualTo(other: TypeWrapper) {
@@ -24,6 +25,9 @@ export class TypeWrapper {
   }
   public getFunctionType() {
     return (this.type instanceof FunctionType || this.type instanceof BuiltinFunctionType) ? this.type as IFunctionType : throwExpr(new Error(`not an IFunctionType wrapper!`));
+  }
+  public getFunctionOverloadType() {
+    return (this.type instanceof FunctionOverloadType || this.type instanceof BuiltinFunctionOverloadType) ? this.type as IFunctionOverloadType : throwExpr(new Error(`not an IFunctionOverloadType wrapper!`));
   }
   public getClassType() {
     return this.type instanceof ClassType ? this.type as ClassType : throwExpr(new Error(`not a FunctionType wrapper!`));
@@ -118,18 +122,24 @@ export const primitiveTypes = {
   bool32: new PrimitiveType('bool32'),
   func: new PrimitiveType('func'),
   void: new PrimitiveType('void'),
-  any: new PrimitiveType('any'),
   never: new PrimitiveType('never'),
+  duck: new PrimitiveType('duck'),
 };
+
+export const untypedType = new PrimitiveType('untyped');
 
 export const primitiveTypesMap = new Map(Object.entries(primitiveTypes));
 
-export interface IFunctionType {
+export interface IFunctionOverloadType {
   parameterTypeWrappers: Array<TypeWrapper>;
   returnTypeWrapper: TypeWrapper;
 }
 
-export class FunctionType extends Type implements IFunctionType {
+export interface IFunctionType {
+  overloadTypeWrappers: Array<TypeWrapper>;
+}
+
+export class FunctionOverloadType extends Type implements IFunctionOverloadType {
   constructor(
     public resolverScope: ResolverScope,
     public parameterTypeWrappers: Array<TypeWrapper>,
@@ -138,11 +148,22 @@ export class FunctionType extends Type implements IFunctionType {
     super();
   }
   toString() {
-    return `fn((${this.parameterTypeWrappers.map(parameterTypeWrapper => parameterTypeWrapper.toString()).join(', ')}) => ${this.returnTypeWrapper.toString()})`;
+    return `fnoverload((${this.parameterTypeWrappers.map(parameterTypeWrapper => parameterTypeWrapper.toString()).join(', ')}) => ${this.returnTypeWrapper.toString()})`;
   }
 }
 
-export class BuiltinFunctionType extends Type implements IFunctionType {
+export class FunctionType extends Type implements IFunctionType {
+  constructor(
+    public overloadTypeWrappers: Array<TypeWrapper>,
+  ) {
+    super();
+  }
+  toString() {
+    return `fn(${this.overloadTypeWrappers.map(o => o.type.toString()).join('; ')})`;
+  }
+}
+
+export class BuiltinFunctionOverloadType extends Type implements IFunctionOverloadType {
   constructor(
     public parameterTypeWrappers: Array<TypeWrapper>,
     public returnTypeWrapper: TypeWrapper,
@@ -150,7 +171,18 @@ export class BuiltinFunctionType extends Type implements IFunctionType {
     super();
   }
   toString() {
-    return `fn((${this.parameterTypeWrappers.map(parameterTypeWrapper => parameterTypeWrapper.toString()).join(', ')}) => ${this.returnTypeWrapper.toString()})`;
+    return `builtinfnoverload((${this.parameterTypeWrappers.map(parameterTypeWrapper => parameterTypeWrapper.toString()).join(', ')}) => ${this.returnTypeWrapper.toString()})`;
+  }
+}
+
+export class BuiltinFunctionType extends Type implements IFunctionType {
+  constructor(
+    public overloadTypeWrappers: Array<TypeWrapper>,
+  ) {
+    super();
+  }
+  toString() {
+    return `builtinfn(${this.overloadTypeWrappers.map(o => o.type.toString()).join('; ')})`;
   }
 }
 

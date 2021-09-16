@@ -167,10 +167,15 @@ opCodeHandlers[OpCode.CALL] = (vm: VM) => {
 }
 function callBuiltin(vm: VM, builtin: Builtin, argumentCount: number) {
   const builtinFunctionType = builtin.typeWrapper.getFunctionType();
-  if (argumentCount !== builtinFunctionType.parameterTypeWrappers.length) { throw new Error(`incorrect argument count for builtin`) }
+  
+  throw new Error(`TODO: determine which overload to use based on information from resolver`);
+  const builtinOverload = builtin.overloads[999999];
+  const builtinFunctionOverloadType = builtinOverload.typeWrapper.getFunctionOverloadType();
+  
+  if (argumentCount !== builtinFunctionOverloadType.parameterTypeWrappers.length) { throw new Error(`incorrect argument count for builtin`) }
   const builtinArgs: Array<number> = [];
   for (let i = argumentCount - 1; i >= 0; i -= 1) {
-    const parameterTypeWrapper = builtinFunctionType.parameterTypeWrappers[i];
+    const parameterTypeWrapper = builtinFunctionOverloadType.parameterTypeWrappers[i];
     if (parameterTypeWrapper.type === primitiveTypes.uint32) {
       builtinArgs.unshift(vm.ramBuffer.popUint32()); // unshift to avoid reversing the list
     }
@@ -181,9 +186,9 @@ function callBuiltin(vm: VM, builtin: Builtin, argumentCount: number) {
       throw new Error(`callBuiltin has no logic for this builtin argument type`);
     }
   }
-  const retval = builtin.handler(builtinArgs);
-  if (builtinFunctionType.returnTypeWrapper.type !== primitiveTypes.void) {
-    const returnTypeWrapper = builtinFunctionType.returnTypeWrapper;
+  const retval = builtinOverload.handler(builtinArgs);
+  if (builtinFunctionOverloadType.returnTypeWrapper.type !== primitiveTypes.void) {
+    const returnTypeWrapper = builtinFunctionOverloadType.returnTypeWrapper;
     if (returnTypeWrapper.type === primitiveTypes.uint32) {
       vm.ramBuffer.pushUint32(retval);
     }

@@ -1,101 +1,17 @@
 import chalk from "chalk"
 import { SyntaxNode } from "../compiler/syntax/syntax"
-import { TypeWrapper } from "./types"
-
-export class CoercionConstraint {
-  constructor(
-    public inputTypeWrappers: Array<TypeWrapper>,
-    public outputTypeWrapper: TypeWrapper,
-  ) { }
-}
-
-// export class AssignmentConstraint {
-//   constructor(
-//     public lvalueTypeWrapper: TypeWrapper,
-//     public rvalueTypeWrapper: TypeWrapper,
-//   ) { }
-// }
-
-export class ArgumentConstraint {
-  constructor(
-    public calleeTypeWrapper: TypeWrapper,
-    public argumentTypeWrappers: Array<TypeWrapper>,
-  ) { }
-}
-
-export class ReturnConstraint {
-  constructor(
-    public calleeTypeWrapper: TypeWrapper,
-    public returnTypeWrapper: TypeWrapper,
-  ) { }
-}
-
-export class PropertyConstraint {
-  constructor(
-    public objectTypeWrapper: TypeWrapper,
-    public propertyName: string,
-    public propertyTypeWrapper: TypeWrapper, // ?
-  ) { }
-}
-
-export class InferenceEngineState {
-  public coercionConstraints: Array<CoercionConstraint> = []; // one or more types being coerced into another type
-  // public assignmentConstraints: Array<AssignmentConstraint> = []; // one type being assigned to another type [is this the same as coercionConstraints?]
-  public argumentConstraints: Array<ArgumentConstraint> = []; // argument constraints
-  public returnConstraints: Array<ReturnConstraint> = []; // return constraints (both inferred (from function body) and consumed (from usages))
-  public propertyConstraints: Array<PropertyConstraint> = []; // a class type has a field/method with a type
-}
-
-function displayNodeSourcePosition(label: string, referenceNodeOrDescription: SyntaxNode | string) {
-  if (referenceNodeOrDescription instanceof SyntaxNode) {
-    referenceNodeOrDescription.referenceToken.printPositionInSource(label);
-  }
-  else {
-    console.log(chalk.cyan(label + ': ') + referenceNodeOrDescription);
-  }
-}
+import { drawBox } from "../testing/reporting"
+import { mapGetOrPut } from "../util"
+import { CoercionConstraint, InferenceEngineConstraints } from "./constraints"
+import { primitiveTypes, Type, TypeWrapper, untypedType } from "./types"
 
 export class InferenceEngineSolver {
   constructor(
-    public state: InferenceEngineState,
-  ) { }
+    public constraints: InferenceEngineConstraints,
+  ) {
+  }
   solve() {
-    this.state.coercionConstraints.forEach(coercionConstraint => {
-      console.log(chalk.bgWhite.black(`coercionConstraint: ${coercionConstraint.inputTypeWrappers.map(x => x.toString()).join(', ')} => ${coercionConstraint.outputTypeWrapper.toString()}`));
-      coercionConstraint.inputTypeWrappers.forEach(inputTypeWrapper => {
-        displayNodeSourcePosition('input', inputTypeWrapper.referenceNode);
-      });
-      displayNodeSourcePosition('output', coercionConstraint.outputTypeWrapper.referenceNode);
-      if (coercionConstraint.inputTypeWrappers.every(inputTypeWrapper => inputTypeWrapper.isEqualTo(coercionConstraint.outputTypeWrapper))) {
-        console.log(`TODO: constraint is resolved, remove it`)
-      }
-    });
-    // this.state.assignmentConstraints.forEach(assignmentConstraint => {
-    //   console.log(chalk.bgWhite.black(`assignmentConstraint: ${assignmentConstraint.rvalueTypeWrapper.toString()} => ${assignmentConstraint.lvalueTypeWrapper.toString()}`));
-    //   displayNodeSourcePosition('rvalue', assignmentConstraint.rvalueTypeWrapper.referenceNode);
-    //   displayNodeSourcePosition('lvalue', assignmentConstraint.lvalueTypeWrapper.referenceNode);
-    //   if (assignmentConstraint.lvalueTypeWrapper.isEqualTo(assignmentConstraint.rvalueTypeWrapper)) {
-    //     console.log(`TODO: constraint is resolved, remove it`);
-    //   }
-    // });
-    this.state.argumentConstraints.forEach(argumentConstraint => {
-      console.log(chalk.bgWhite.black(`argumentConstraint: call ${argumentConstraint.calleeTypeWrapper.toString()} with (${argumentConstraint.argumentTypeWrappers.map(x => x.toString()).join(', ')})`));
-      displayNodeSourcePosition('callee', argumentConstraint.calleeTypeWrapper.referenceNode);
-      argumentConstraint.argumentTypeWrappers.forEach(argumentTypeWrapper => {
-        displayNodeSourcePosition('argument', argumentTypeWrapper.referenceNode);
-      });
-    });
-    this.state.returnConstraints.forEach(returnConstraint => {
-      console.log(chalk.bgWhite.black(`returnConstraint: call ${returnConstraint.calleeTypeWrapper.toString()} returns ${returnConstraint.returnTypeWrapper.toString()}`));
-      displayNodeSourcePosition('callee', returnConstraint.calleeTypeWrapper.referenceNode);
-      displayNodeSourcePosition('return', returnConstraint.returnTypeWrapper.referenceNode);
-    });
-    this.state.propertyConstraints.forEach(propertyConstraint => {
-      console.log(chalk.bgWhite.black(`propertyConstraint: ${propertyConstraint.objectTypeWrapper.toString()} dot "${propertyConstraint.propertyName}" => ${propertyConstraint.propertyTypeWrapper.toString()}`));
-      displayNodeSourcePosition('object', propertyConstraint.objectTypeWrapper.referenceNode);
-      displayNodeSourcePosition('property', propertyConstraint.propertyTypeWrapper.referenceNode);
-    });
-
+    console.log(chalk.yellow(drawBox(`InferenceEngineSolver.solve`)));
     let shouldContinue = true;
     let iterationCount = 0;
     while (shouldContinue) {
@@ -103,13 +19,79 @@ export class InferenceEngineSolver {
       if (iterationCount > 100) {
         throw new Error(`InferenceEngine.solve max iteration count exceeded!`);
       }
+      console.log(chalk.bgMagenta.black("=== INFERENCE ENGINE ITERATION ==="));
       shouldContinue = this.iterate();
     }
+    console.log(chalk.bgMagenta.black("=== INFERENCE ENGINE ITERATION COMPLETE === no more work to do!"));
 
   }
   iterate(): boolean {
     let hasProgressBeenMade = false;
-    throw new Error(`TODO: iterate!`);
+    this.constraints.forEachCoercionConstraint(coercionConstraint => {
+      coercionConstraint.dump();
+      // if types are the same, remove the constaint
+      if (coercionConstraint.inputTypeWrappers.every(inputTypeWrapper => inputTypeWrapper.isEqualTo(coercionConstraint.outputTypeWrapper))) {
+        console.log(chalk.yellow(`-> types are the same, remove`));
+        this.constraints.removeCoercionConstraint(coercionConstraint);
+        hasProgressBeenMade = true;
+        return;
+      };
+      // if output is untyped and all inputs are typed, set output type to least general of all inputs
+      const leastGeneralType = coercionConstraint.inputTypeWrappers.map(typeWrapper => typeWrapper.type).reduce(getLeastGeneralCoercedType);
+      if (leastGeneralType.isEqualTo(untypedType) === false && coercionConstraint.outputTypeWrapper.type.isEqualTo(untypedType)) {
+        console.log(chalk.yellow(`-> output is untyped and all inputs are typed, set output type to least general of all inputs`));
+        coercionConstraint.outputTypeWrapper.type = leastGeneralType;
+        hasProgressBeenMade = true;
+        return;
+      }
+      // if output is void, discard the constraint, since the value is being discarded [this special case will go away once "output is typed" case supports implicitly casting anything to void]
+      if (coercionConstraint.outputTypeWrapper.type.isEqualTo(primitiveTypes.void)) {
+        coercionConstraint.inputTypeWrappers.forEach((inputTypeWrapper) => {
+          if (inputTypeWrapper.type.isEqualTo(untypedType)) {
+            inputTypeWrapper.type = coercionConstraint.outputTypeWrapper.type
+          }
+        });
+        console.log(chalk.yellow(`-> output is void, all untyped inputs are set to void and consrtaint removed`));
+        this.constraints.removeCoercionConstraint(coercionConstraint);
+        hasProgressBeenMade = true;
+        return;
+      }
+      // if output is typed, set all untyped inputs to it
+      if (coercionConstraint.outputTypeWrapper.type.isEqualTo(untypedType) === false) {
+        coercionConstraint.inputTypeWrappers.forEach((inputTypeWrapper) => {
+          if (inputTypeWrapper.isEqualTo(coercionConstraint.outputTypeWrapper) === false) {
+            if (inputTypeWrapper.type.isEqualTo(untypedType)) {
+              console.log(chalk.yellow(`-> output is typed, set all untyped inputs to it`));
+              inputTypeWrapper.type = coercionConstraint.outputTypeWrapper.type;
+              this.constraints.removeCoercionConstraint(coercionConstraint);
+              hasProgressBeenMade = true;
+            }
+            else {
+              throw new Error(`TODO: output type is specified, but one or more input types differ and are not untyped!`);
+            }
+          }
+        });
+      }
+    });
+    this.constraints.callConstraints.forEach(callConstraint => {
+      callConstraint.dump();
+    });
+    this.constraints.functionConstraints.forEach(functionConstraint => {
+      functionConstraint.dump();
+    });
+    this.constraints.propertyConstraints.forEach(propertyConstraint => {
+      propertyConstraint.dump();
+    });
     return hasProgressBeenMade;
   }
+}
+
+function getLeastGeneralCoercedType(a: Type, b: Type) {
+  if (a.isEqualTo(b)) {
+    return a;
+  }
+  if (a.isEqualTo(untypedType) || b.isEqualTo(untypedType)) {
+    return untypedType;
+  }
+  return primitiveTypes.duck; // !!!
 }
