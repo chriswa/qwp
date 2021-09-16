@@ -1,7 +1,7 @@
 import fs from "fs"
 import { testExpectedKindStringToEnum, TestResult, TestResultKind } from "./results"
 import { printFailedTestHeader, printTestsRunnerHeader, printTestsRunnerSuccess, reportFailedTest, reportSuccessfulTest } from "./reporting"
-import { setBuiltinPrintFunction } from "../builtins/builtins"
+import { setBuiltinPrintCallback } from "../builtins/builtins"
 import { CompileError } from "../compiler/CompileError"
 import chalk from "chalk"
 import { IInterpreterFacade, Interpreter } from "../interpreter/Interpreter"
@@ -75,7 +75,7 @@ function performTest(path: string, source: string): boolean {
 
 function interpretSource(path: string, source: string): TestResult {
   let output = '';
-  setBuiltinPrintFunction((str: string) => {
+  setBuiltinPrintCallback((str: string) => {
     output += str + "\n";
     if (DEBUG_MODE) {
       console.log(chalk.magentaBright("BUILTIN PRINT ➤➤➤ " + str));
@@ -107,7 +107,7 @@ function interpretSource(path: string, source: string): TestResult {
 
 // function compileAndRunSource(path: string, source: string): TestResult {
 //   let output = '';
-//   setBuiltinPrintFunction((str: string) => {
+//   setBuiltinPrintCallback((str: string) => {
 //     output += str + "\n";
 //     if (DEBUG_MODE) {
 //       console.log(chalk.magentaBright("BUILTIN PRINT ➤➤➤ " + str));

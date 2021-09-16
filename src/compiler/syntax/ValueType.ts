@@ -3,6 +3,6 @@ export enum ValueType {
   NUMBER, // TODO: not just float32?
   STRING,
   NULL,
-  USER_FUNCTION,
-  BUILTIN_FUNCTION,
+  USER_FUNCTION_HOMONYM,
+  BUILTIN_FUNCTION_HOMONYM,
 }

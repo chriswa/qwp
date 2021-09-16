@@ -1,5 +1,5 @@
 import { TokenType } from "../Token"
-import { SyntaxNodeVisitor, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionCallSyntaxNode, FunctionDefinitionSyntaxNode, ReturnStatementSyntaxNode } from "./syntax"
+import { SyntaxNodeVisitor, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionCallSyntaxNode, FunctionHomonymSyntaxNode, ReturnStatementSyntaxNode } from "./syntax"
 
 /*
 export class AstPrinter implements SyntaxNodeVisitor<string> {
@@ -49,7 +49,7 @@ export class AstPrinter implements SyntaxNodeVisitor<string> {
   visitReturnStatement(node: ReturnStatementSyntaxNode): string {
     return ``;
   }
-  visitFunctionDefinition(node: FunctionDefinitionSyntaxNode): string {
+  visitFunctionHomonym(node: FunctionDefinitionSyntaxNode): string {
     return ``;
   }
   visitFunctionCall(node: FunctionCallSyntaxNode): string {

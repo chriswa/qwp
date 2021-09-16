@@ -19,8 +19,8 @@ export interface SyntaxNodeVisitor<T> {
   visitTypeDeclaration(node: TypeDeclarationSyntaxNode): T;
   visitObjectInstantiation(node: ObjectInstantiationSyntaxNode): T;
   visitVariableAssignment(node: VariableAssignmentSyntaxNode): T;
-  visitFunctionDefinition(node: FunctionDefinitionSyntaxNode): T;
-  visitFunctionDefinitionOverload(node: FunctionDefinitionOverloadSyntaxNode): T;
+  visitFunctionHomonym(node: FunctionHomonymSyntaxNode): T;
+  visitFunctionOverload(node: FunctionOverloadSyntaxNode): T;
   visitFunctionCall(node: FunctionCallSyntaxNode): T;
   visitMemberLookup(node: MemberLookupSyntaxNode): T;
   visitMemberAssignment(node: MemberAssignmentSyntaxNode): T;
@@ -184,7 +184,7 @@ export class ClassDeclarationSyntaxNode extends SyntaxNode {
     public genericDefinition: GenericDefinition | null,
     public baseClassName: Token | null,
     public implementedInterfaceNames: Array<Token>,
-    public methods: Map<string, FunctionDefinitionSyntaxNode>,
+    public methods: Map<string, FunctionHomonymSyntaxNode>,
     public fields: Map<string, TypeAnnotation | null>,
   ) {
     super(referenceToken);
@@ -231,7 +231,7 @@ export class VariableAssignmentSyntaxNode extends SyntaxNode {
   }
 }
 
-export class FunctionDefinitionOverloadSyntaxNode extends SyntaxNode {
+export class FunctionOverloadSyntaxNode extends SyntaxNode {
   constructor(
     referenceToken: Token,
     public genericDefinition: GenericDefinition | null,
@@ -242,28 +242,25 @@ export class FunctionDefinitionOverloadSyntaxNode extends SyntaxNode {
     super(referenceToken);
   }
   accept<R>(visitor: SyntaxNodeVisitor<R>) {
-    return visitor.visitFunctionDefinitionOverload(this);
+    return visitor.visitFunctionOverload(this);
   }
   kind() {
-    return 'FunctionDefinition';
+    return 'FunctionOverload';
   }
 }
 
-export class FunctionDefinitionSyntaxNode extends SyntaxNode {
+export class FunctionHomonymSyntaxNode extends SyntaxNode {
   constructor(
-    public overloads: Array<FunctionDefinitionOverloadSyntaxNode>,
+    public overloads: Array<FunctionOverloadSyntaxNode>,
     // public genericDefinition: GenericDefinition | null,
-    // public parameterList: Array<FunctionParameter>,
-    // public returnTypeAnnotation: TypeAnnotation | null,
-    // public statementList: Array<SyntaxNode>,
   ) {
     super(overloads[0].referenceToken);
   }
   accept<R>(visitor: SyntaxNodeVisitor<R>) {
-    return visitor.visitFunctionDefinition(this);
+    return visitor.visitFunctionHomonym(this);
   }
   kind() {
-    return 'FunctionDefinition';
+    return 'FunctionHomonym';
   }
 }
 

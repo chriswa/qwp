@@ -1,9 +1,9 @@
-import { TypeWrapper, BuiltinFunctionType, Type, primitiveTypes, BuiltinFunctionOverloadType } from "../types/types"
+import { TypeWrapper, BuiltinFunctionHomonymType, Type, primitiveTypes, BuiltinFunctionOverloadType } from "../types/types"
 
-let printFunction: (str: string) => void = console.log;
+let printCallback: (str: string) => void = console.log;
 
-export function setBuiltinPrintFunction(f: typeof printFunction) {
-  printFunction = f;
+export function setBuiltinPrintCallback(f: typeof printCallback) {
+  printCallback = f;
 }
 
 type BuiltinHandler = (args: Array<unknown>) => number;
@@ -35,7 +35,7 @@ function registerBuiltin(id: number, name: string, overloadDefs: Array<{ args: A
     return new BuiltinOverload(typeWrapper, handler);
   });
   if (!Number.isInteger(id) || id < 0 || id > 2 ** 16 - 1) { throw new Error(`builtin id must be uint32`) }
-  const builtinTypeWrapper = new BuiltinFunctionType(overloads.map(overload => overload.typeWrapper));
+  const builtinTypeWrapper = new BuiltinFunctionHomonymType(overloads.map(overload => overload.typeWrapper));
   const builtin = new Builtin(id, name, overloads, new TypeWrapper(`builtin(${name})`, builtinTypeWrapper));
   builtinsByName.set(name, builtin);
   builtinsById.set(id, builtin);
@@ -46,7 +46,7 @@ let incId = 0;
 registerBuiltin(incId++, "printFloat32", [
   {
     args: [primitiveTypes.float32], ret: primitiveTypes.void, handler: (args) => {
-      printFunction(`printFloat32: ${args}`)
+      printCallback(`printFloat32: ${args}`)
       return 0; // ???
     }
   },
@@ -55,7 +55,7 @@ registerBuiltin(incId++, "printFloat32", [
 registerBuiltin(incId++, "printUint32", [
   {
     args: [primitiveTypes.uint32], ret: primitiveTypes.void, handler: (args) => {
-      printFunction(`printUint32: ${args}`)
+      printCallback(`printUint32: ${args}`)
       return 0; // ???
     }
   },
@@ -64,13 +64,13 @@ registerBuiltin(incId++, "printUint32", [
 registerBuiltin(incId++, "print", [
   {
     args: [primitiveTypes.uint32], ret: primitiveTypes.void, handler: (args) => {
-      printFunction(`print: ${args}`)
+      printCallback(`print: ${args}`)
       return 0; // ???
     }
   },
   {
     args: [primitiveTypes.float32], ret: primitiveTypes.void, handler: (args) => {
-      printFunction(`print: ${args}`)
+      printCallback(`print: ${args}`)
       return 0; // ???
     }
   },

@@ -56,8 +56,6 @@ export class ParserHelper {
     while (this.reader.matchOneOf(operatorTokens)) {
       const op = this.reader.previous();
       const right = subGrammar();
-      // rewrite infix notation as function call
-      // expr = new BinarySyntaxNode(op, expr, op, right);
       expr = new FunctionCallSyntaxNode(op, new VariableLookupSyntaxNode(op, op), [expr, right]);
     }
     return expr;

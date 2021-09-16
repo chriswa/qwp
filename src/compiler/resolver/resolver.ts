@@ -1,4 +1,4 @@
-import { ClassDeclarationSyntaxNode, FunctionCallSyntaxNode, FunctionDefinitionSyntaxNode, MemberLookupSyntaxNode, GroupingSyntaxNode, IfStatementSyntaxNode, LiteralSyntaxNode, LogicShortCircuitSyntaxNode, MemberAssignmentSyntaxNode, ObjectInstantiationSyntaxNode, ReturnStatementSyntaxNode, StatementBlockSyntaxNode, SyntaxNode, SyntaxNodeVisitor, TypeDeclarationSyntaxNode, VariableAssignmentSyntaxNode, VariableLookupSyntaxNode, WhileStatementSyntaxNode, FunctionDefinitionOverloadSyntaxNode } from "../syntax/syntax"
+import { ClassDeclarationSyntaxNode, FunctionCallSyntaxNode, FunctionHomonymSyntaxNode, MemberLookupSyntaxNode, GroupingSyntaxNode, IfStatementSyntaxNode, LiteralSyntaxNode, LogicShortCircuitSyntaxNode, MemberAssignmentSyntaxNode, ObjectInstantiationSyntaxNode, ReturnStatementSyntaxNode, StatementBlockSyntaxNode, SyntaxNode, SyntaxNodeVisitor, TypeDeclarationSyntaxNode, VariableAssignmentSyntaxNode, VariableLookupSyntaxNode, WhileStatementSyntaxNode, FunctionOverloadSyntaxNode } from "../syntax/syntax"
 import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
 import { TokenType } from "../Token"
 import { parse } from "../parser/parser"
@@ -7,7 +7,7 @@ import { FunctionParameter } from "../syntax/FunctionParameter"
 import { mapMap, throwExpr } from "../../util"
 import { IResolverScopeOutput, ResolverScope } from "./ResolverScope"
 import { ValueType } from "../syntax/ValueType"
-import { ClassType, FunctionType, primitiveTypes, primitiveTypesMap, ReadOnlyStatus, TypeWrapper, UnresolvedAnnotatedType, untypedType } from "../../types/types"
+import { ClassType, FunctionHomonymType, primitiveTypes, primitiveTypesMap, ReadOnlyStatus, TypeWrapper, UnresolvedAnnotatedType, untypedType } from "../../types/types"
 import { builtinsByName } from "../../builtins/builtins"
 import { InferenceEngine } from "../../types/InferenceEngine"
 import { TypeAnnotation } from "../syntax/TypeAnnotation"
@@ -49,8 +49,8 @@ export class Resolver implements SyntaxNodeVisitor<TypeWrapper>, IResolverOutput
     });
     this.scope = topScope;
   }
-  beginScope(isFunction: boolean, node: SyntaxNode) {
-    const newScope = new ResolverScope(this, node, isFunction, this.scope);
+  beginScope(isFunctionScope: boolean, node: SyntaxNode) {
+    const newScope = new ResolverScope(this, node, isFunctionScope, this.scope);
     this.scopesByNode.set(node, newScope);
     this.scope = newScope;
   }
@@ -228,7 +228,7 @@ export class Resolver implements SyntaxNodeVisitor<TypeWrapper>, IResolverOutput
 
         const methodOverloadTypeWrapper = new TypeWrapper(methodOverloadNode, untypedType);
         const methodTypeWrapper = this.inferenceEngine.getPropertyTypeWrapper(classTypeWrapper, methodName)
-        this.inferenceEngine.applyFunctionConstraints(
+        this.inferenceEngine.applyFunctionOverloadConstraints(
           this.scope,
           methodOverloadTypeWrapper,
           parameterTypeWrappers,
@@ -300,7 +300,7 @@ export class Resolver implements SyntaxNodeVisitor<TypeWrapper>, IResolverOutput
     }
     return existingVariableStatusInStack.typeWrapper;
   }
-  visitFunctionDefinition(node: FunctionDefinitionSyntaxNode): TypeWrapper {
+  visitFunctionHomonym(node: FunctionHomonymSyntaxNode): TypeWrapper {
     const overloadTypeWrappers = node.overloads.map((overload) => {
       this.beginScope(true, node)
       const parameterTypeWrappers = this.initializeFunctionParameters(node, overload.parameterList)
@@ -310,7 +310,7 @@ export class Resolver implements SyntaxNodeVisitor<TypeWrapper>, IResolverOutput
       this.endScope()
 
       const functionOverloadTypeWrapper = new TypeWrapper(node, untypedType)
-      this.inferenceEngine.applyFunctionConstraints(
+      this.inferenceEngine.applyFunctionOverloadConstraints(
         this.scope,
         functionOverloadTypeWrapper,
         parameterTypeWrappers,
@@ -320,9 +320,9 @@ export class Resolver implements SyntaxNodeVisitor<TypeWrapper>, IResolverOutput
       );
       return functionOverloadTypeWrapper;
     });
-    return new TypeWrapper(node, new FunctionType(overloadTypeWrappers));
+    return new TypeWrapper(node, new FunctionHomonymType(overloadTypeWrappers));
   }
-  visitFunctionDefinitionOverload(node: FunctionDefinitionOverloadSyntaxNode): TypeWrapper {
+  visitFunctionOverload(node: FunctionOverloadSyntaxNode): TypeWrapper {
     // UNUSED FOR NOW
     return new TypeWrapper(node, primitiveTypes.never);
   }

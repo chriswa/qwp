@@ -166,10 +166,12 @@ opCodeHandlers[OpCode.CALL] = (vm: VM) => {
   }
 }
 function callBuiltin(vm: VM, builtin: Builtin, argumentCount: number) {
-  const builtinFunctionType = builtin.typeWrapper.getFunctionType();
+  const builtinFunctionHomonymType = builtin.typeWrapper.getFunctionHomonymType();
   
-  throw new Error(`TODO: determine which overload to use based on information from resolver`);
-  const builtinOverload = builtin.overloads[999999];
+  if (builtin.overloads.length > 1) {
+    throw new Error(`TODO: determine which overload to use based on information from resolver`)
+  }
+  const builtinOverload = builtin.overloads[0];
   const builtinFunctionOverloadType = builtinOverload.typeWrapper.getFunctionOverloadType();
   
   if (argumentCount !== builtinFunctionOverloadType.parameterTypeWrappers.length) { throw new Error(`incorrect argument count for builtin`) }

@@ -3,9 +3,9 @@ import { ResolverScope } from "../compiler/resolver/ResolverScope"
 import { SyntaxNode } from "../compiler/syntax/syntax"
 import { TypeAnnotation } from "../compiler/syntax/TypeAnnotation"
 import { mapGetOrPut, throwExpr } from "../util"
-import { CallConstraint, CoercionConstraint, FunctionConstraint, InferenceEngineConstraints, PropertyConstraint } from "./constraints"
+import { FunctionCallConstraint, CoercionConstraint, FunctionOverloadConstraint, InferenceEngineConstraints, PropertyConstraint } from "./constraints"
 import { InferenceEngineSolver } from "./InferenceEngineSolver"
-import { TypeWrapper, primitiveTypes, FunctionType, untypedType, FunctionOverloadType } from "./types"
+import { TypeWrapper, primitiveTypes, FunctionHomonymType, untypedType, FunctionOverloadType } from "./types"
 
 class UnappliedTypeAnnotation {
   constructor(
@@ -15,7 +15,7 @@ class UnappliedTypeAnnotation {
   ) { }
 }
 
-class UnappliedFunctionAnnotation {
+class UnappliedFunctionOverloadAnnotation {
   constructor(
     public resolverScope: ResolverScope,
     public functionOverloadTypeWrapper: TypeWrapper,
@@ -30,7 +30,7 @@ export class InferenceEngine {
   private solver: InferenceEngineSolver = new InferenceEngineSolver(this.constraints);
   private classPropertyCache: Map<TypeWrapper, Map<string, TypeWrapper>> = new Map();
   private unappliedTypeAnnotations: Array<UnappliedTypeAnnotation> = []; // annotations for vars, function/method parameters, class fields, and declared types
-  private unappliedFunctionAnnotations: Array<UnappliedFunctionAnnotation> = []; // annotations for params and return type
+  private unappliedFunctionOverloadAnnotations: Array<UnappliedFunctionOverloadAnnotation> = []; // annotations for params and return type
 
   applyAnnotationConstraint(typeWrapper: TypeWrapper, resolverScope: ResolverScope, typeAnnotation: TypeAnnotation | null) {
     if (typeAnnotation !== null) {
@@ -49,19 +49,19 @@ export class InferenceEngine {
     const coercionConstraint = this.constraints.getOrCreateCoercionConstraintByOutputTypeWrapper(lvalueTypeWrapper);
     coercionConstraint.inputTypeWrappers.push(rvalueTypeWrapper);
   }
-  applyFunctionConstraints(
+  applyFunctionOverloadConstraints(
     resolverScope: ResolverScope,
-    functionTypeWrapper: TypeWrapper,
+    functionOverloadTypeWrapper: TypeWrapper,
     parameterTypeWrappers: Array<TypeWrapper>,
     parameterTypeAnnotations: Array<TypeAnnotation | null>,
     returnTypeAnnotation: TypeAnnotation | null,
     returnTypeWrapper: TypeWrapper,
   ) {
-    this.unappliedFunctionAnnotations.push(new UnappliedFunctionAnnotation(resolverScope, functionTypeWrapper, parameterTypeWrappers, parameterTypeAnnotations, returnTypeAnnotation))
-    this.constraints.functionConstraints.push(new FunctionConstraint(functionTypeWrapper, parameterTypeWrappers, returnTypeWrapper));
+    this.unappliedFunctionOverloadAnnotations.push(new UnappliedFunctionOverloadAnnotation(resolverScope, functionOverloadTypeWrapper, parameterTypeWrappers, parameterTypeAnnotations, returnTypeAnnotation))
+    this.constraints.functionOverloadConstraints.push(new FunctionOverloadConstraint(functionOverloadTypeWrapper, parameterTypeWrappers, returnTypeWrapper));
   }
   addCallConstraint(calleeTypeWrapper: TypeWrapper, argumentTypeWrappers: Array<TypeWrapper>, returnTypeWrapper: TypeWrapper): TypeWrapper {
-    this.constraints.callConstraints.push(new CallConstraint(calleeTypeWrapper, argumentTypeWrappers, returnTypeWrapper))
+    this.constraints.functionCallConstraints.push(new FunctionCallConstraint(calleeTypeWrapper, argumentTypeWrappers, returnTypeWrapper))
     return returnTypeWrapper
   }
   getPropertyTypeWrapper(objectTypeWrapper: TypeWrapper, propertyName: string): TypeWrapper {
@@ -73,7 +73,7 @@ export class InferenceEngine {
 
   solve() {
     this.finalizeTypeAnnotations();
-    this.finalizeFunctionAnnotations();
+    this.finalizeFunctionOverloadAnnotations();
     this.solver.solve();
   }
 
@@ -86,10 +86,10 @@ export class InferenceEngine {
       uta.typeWrapper.type = foundTypeWrapper.type;
     });
   }
-  finalizeFunctionAnnotations() {
-    this.unappliedFunctionAnnotations.forEach(ufa => {
+  finalizeFunctionOverloadAnnotations() {
+    this.unappliedFunctionOverloadAnnotations.forEach(ufa => {
       if (ufa.functionOverloadTypeWrapper.type !== untypedType) {
-        throw new Error(`InferenceEngine failed to finalize finalizeFunctionAnnotations: typeWrapper expected to be any, but was "${ufa.functionOverloadTypeWrapper.toString()}"`);
+        throw new Error(`InferenceEngine failed to finalize finalizeFunctionOverloadAnnotations: typeWrapper expected to be any, but was "${ufa.functionOverloadTypeWrapper.toString()}"`);
       }
       let returnTypeWrapper = new TypeWrapper(ufa.functionOverloadTypeWrapper.referenceNode, untypedType);
       if (ufa.returnTypeAnnotation) {

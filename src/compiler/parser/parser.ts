@@ -1,6 +1,6 @@
 import { lex } from "../lexer/lexer";
 import { Token, TokenType } from "../Token";
-import { LiteralSyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode, TypeDeclarationSyntaxNode, ClassDeclarationSyntaxNode, ObjectInstantiationSyntaxNode, MemberLookupSyntaxNode, MemberAssignmentSyntaxNode, FunctionDefinitionOverloadSyntaxNode } from "../syntax/syntax";
+import { LiteralSyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionHomonymSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode, TypeDeclarationSyntaxNode, ClassDeclarationSyntaxNode, ObjectInstantiationSyntaxNode, MemberLookupSyntaxNode, MemberAssignmentSyntaxNode, FunctionOverloadSyntaxNode } from "../syntax/syntax";
 import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
 import { ValueType } from "../syntax/ValueType"
 import { TypeAnnotation } from "../syntax/TypeAnnotation"
@@ -128,15 +128,14 @@ export class Parser {
     }
     
     this.reader.consume(TokenType.OPEN_BRACE, `expected opening brace as part of class definition`);
-    const methodOverloads: Map<string, Array<FunctionDefinitionOverloadSyntaxNode>> = new Map();
+    const methodOverloads: Map<string, Array<FunctionOverloadSyntaxNode>> = new Map();
     const fields: Map<string, TypeAnnotation | null> = new Map();
     while (this.reader.match(TokenType.CLOSE_BRACE) === false) {
       const memberName = this.reader.consumeOneOf([TokenType.IDENTIFIER, TokenType.KEYWORD_NEW], `identifier for member expected in class definition member block`);
       // method
       if (this.reader.match(TokenType.OPEN_PAREN)) {
-        const { parameterList, statementBlockNode } = this.parseFunctionAfterOpenParen() // n.b. statementBlockNode is discarded!
-        const returnTypeAnnotation = this.helper.parseOptionalTypeAnnotation();
-        const overload = new FunctionDefinitionOverloadSyntaxNode(memberName, null, parameterList, returnTypeAnnotation, statementBlockNode.statementList);
+        const { parameterList, statementBlockNode, returnTypeAnnotation } = this.parseFunctionOverloadAfterOpenParen() // n.b. statementBlockNode is discarded!
+        const overload = new FunctionOverloadSyntaxNode(memberName, null, parameterList, returnTypeAnnotation, statementBlockNode.statementList);
         const methodOverloadList = mapGetOrPut(methodOverloads, memberName.lexeme, () => []);
         methodOverloadList.push(overload);
       }
@@ -150,9 +149,9 @@ export class Parser {
         this.reader.consume(TokenType.SEMICOLON, `expected semicolon after class field definition`);
       }
     }
-    const methods: Map<string, FunctionDefinitionSyntaxNode> = new Map();
+    const methods: Map<string, FunctionHomonymSyntaxNode> = new Map();
     methodOverloads.forEach((overloads, methodName) => {
-      methods.set(methodName, new FunctionDefinitionSyntaxNode(overloads));
+      methods.set(methodName, new FunctionHomonymSyntaxNode(overloads));
     });
     return new ClassDeclarationSyntaxNode(classKeywordToken, newClassName, genericDefinition, baseClassName, implementedInterfaceNames, methods, fields);
   }
@@ -214,7 +213,7 @@ export class Parser {
     return this.parseAssignmentStatement()
   }
   parseAssignmentStatement() {
-    const expr = this.parseAnonymousFunction();
+    const expr = this.parseAnonymousFunctionHomonym();
     if (this.reader.match(TokenType.EQUAL)) {
       const referenceToken = this.reader.previous();
       const rvalue = this.parseExpression();
@@ -230,7 +229,7 @@ export class Parser {
     }
     return expr;
   }
-  parseFunctionAfterOpenParen(): { parameterList: Array<FunctionParameter>, returnTypeAnnotation: TypeAnnotation | null, statementBlockNode: StatementBlockSyntaxNode } {
+  parseFunctionOverloadAfterOpenParen(): { parameterList: Array<FunctionParameter>, returnTypeAnnotation: TypeAnnotation | null, statementBlockNode: StatementBlockSyntaxNode } {
     const parameterList: Array<FunctionParameter> = [];
     this.helper.parseDelimitedList(TokenType.COMMA, TokenType.CLOSE_PAREN, 0, () => {
       const parameterIdentifier = this.reader.consume(TokenType.IDENTIFIER, `identifier expected in function/method argument list`);
@@ -243,17 +242,17 @@ export class Parser {
     this.reader.consume(TokenType.CLOSE_BRACE, `function/method body must end with "}"`);
     return { parameterList, returnTypeAnnotation, statementBlockNode }
   }
-  parseAnonymousFunction() {
-    const overloads: Array<FunctionDefinitionOverloadSyntaxNode> = [];
+  parseAnonymousFunctionHomonym() {
+    const overloads: Array<FunctionOverloadSyntaxNode> = [];
     while (this.reader.match(TokenType.KEYWORD_FN)) {
       const referenceToken = this.reader.previous();
       const genericDefinition = this.helper.parseOptionalGenericDefinition();
       this.reader.consume(TokenType.OPEN_PAREN, `function/method definition requires "(" for parameter list`);
-      const { parameterList, returnTypeAnnotation, statementBlockNode } = this.parseFunctionAfterOpenParen(); // n.b. statementBlockNode is discarded!
-      overloads.push(new FunctionDefinitionOverloadSyntaxNode(referenceToken, genericDefinition, parameterList, returnTypeAnnotation, statementBlockNode.statementList));
+      const { parameterList, returnTypeAnnotation, statementBlockNode } = this.parseFunctionOverloadAfterOpenParen(); // n.b. statementBlockNode is discarded!
+      overloads.push(new FunctionOverloadSyntaxNode(referenceToken, genericDefinition, parameterList, returnTypeAnnotation, statementBlockNode.statementList));
     }
     if (overloads.length > 0) {
-      return new FunctionDefinitionSyntaxNode(overloads);
+      return new FunctionHomonymSyntaxNode(overloads);
     }
     return this.parseOrExpression();
   }
@@ -291,8 +290,6 @@ export class Parser {
     if (this.reader.matchOneOf([TokenType.BANG, TokenType.MINUS])) {
       const op = this.reader.previous();
       const right = this.parseUnaryExpression();
-      // rewrite unary notation as function call
-      // return new UnarySyntaxNode(op, op, right);
       return new FunctionCallSyntaxNode(op, new VariableLookupSyntaxNode(op, op), [right]);
     }
     return this.parseFunctionCallExpression();

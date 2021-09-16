@@ -30,12 +30,12 @@ export class ResolverScope implements IResolverScopeOutput {
   public variableDefinitions: Map<string, VariableDefinition> = new Map();
   public initializedVars: Set<string> = new Set();
   public typeWrappers: Map<string, TypeWrapper> = new Map();
-  private observedReturnTypeWrappers: Array<TypeWrapper> = []; // only used if `this.isFunction`
+  private observedReturnTypeWrappers: Array<TypeWrapper> = []; // only used if `this.isFunctionScope`
 
   public constructor(
     private resolver: Resolver,
     public referenceNode: SyntaxNode | null,
-    private isFunction: boolean,
+    private isFunctionScope: boolean,
     public parentScope: ResolverScope | null,
   ) {
   }
@@ -70,8 +70,8 @@ export class ResolverScope implements IResolverScopeOutput {
     }
     if (this.parentScope !== null) {
       const ancestorVarDef = this.parentScope.lookupVariableAndWireUpClosures(identifier);
-      // if we needed to look above the function for this var, it must be treated as closed
-      if (ancestorVarDef !== null && this.isFunction) {
+      // if we needed to look above the function scope for this var, it must be treated as closed
+      if (ancestorVarDef !== null && this.isFunctionScope) {
         ancestorVarDef.isClosedOver = true;
         ancestorVarDef.isRef = true;
         const newVarDef = new VariableDefinition(ancestorVarDef.typeWrapper, ancestorVarDef.readonlyStatus);
@@ -108,10 +108,10 @@ export class ResolverScope implements IResolverScopeOutput {
   }
 
   public findClosestFunctionScope(): ResolverScope {
-    return this.isFunction ? this : (this.parentScope?.findClosestFunctionScope() ?? throwExpr(new Error(`findClosestFunctionScope could not find a function scope`)));
+    return this.isFunctionScope ? this : (this.parentScope?.findClosestFunctionScope() ?? throwExpr(new Error(`findClosestFunctionScope could not find a function scope`)));
   }
   public registerObservedReturnTypeWrapper(returnTypeWrapper: TypeWrapper) {
-    if (this.isFunction === false) { throw new Error(`can only be called on function scope`); }
+    if (this.isFunctionScope === false) { throw new Error(`can only be called on function scope`); }
     this.observedReturnTypeWrappers.push(returnTypeWrapper);
   }
   public getObservedReturnTypeWrappers(): Array<TypeWrapper> {

@@ -17,7 +17,7 @@ export class CoercionConstraint {
   }
 }
 
-export class CallConstraint {
+export class FunctionCallConstraint {
   constructor(
     public calleeTypeWrapper: TypeWrapper,
     public argumentTypeWrappers: Array<TypeWrapper>,
@@ -33,14 +33,14 @@ export class CallConstraint {
   }
 }
 
-export class FunctionConstraint {
+export class FunctionOverloadConstraint {
   constructor(
     public calleeTypeWrapper: TypeWrapper,
     public parameterTypeWrappers: Array<TypeWrapper>,
     public returnTypeWrapper: TypeWrapper,
   ) { }
   dump() {
-    console.log(chalk.bgBlue.whiteBright(`functionConstraint: ${this.calleeTypeWrapper.toString()} takes params (${this.parameterTypeWrappers.map(x => x.toString()).join(', ')}) and returns ${this.returnTypeWrapper.toString()}`));
+    console.log(chalk.bgBlue.whiteBright(`functionOverloadConstraint: ${this.calleeTypeWrapper.toString()} takes params (${this.parameterTypeWrappers.map(x => x.toString()).join(', ')}) and returns ${this.returnTypeWrapper.toString()}`));
     displayNodeSourcePosition('callee', this.calleeTypeWrapper.referenceNode);
     this.parameterTypeWrappers.forEach(parameterTypeWrapper => {
       displayNodeSourcePosition('parameter', parameterTypeWrapper.referenceNode);
@@ -64,8 +64,8 @@ export class PropertyConstraint {
 
 export class InferenceEngineConstraints {
   private coercionConstraints: Map<TypeWrapper, CoercionConstraint> = new Map();
-  public callConstraints: Array<CallConstraint> = [];
-  public functionConstraints: Array<FunctionConstraint> = [];
+  public functionCallConstraints: Array<FunctionCallConstraint> = [];
+  public functionOverloadConstraints: Array<FunctionOverloadConstraint> = [];
   public propertyConstraints: Array<PropertyConstraint> = []; // a class type has a field/method with a type
   public addCoercionConstraint(newCoercionConstraint: CoercionConstraint) {
     if (this.coercionConstraints.has(newCoercionConstraint.outputTypeWrapper)) {

@@ -1,6 +1,6 @@
 import chalk from "chalk"
 import { IResolverOutput } from "../compiler/resolver/resolver"
-import { SyntaxNodeVisitor, SyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, ReturnStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, ClassDeclarationSyntaxNode, TypeDeclarationSyntaxNode, ObjectInstantiationSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, MemberLookupSyntaxNode, MemberAssignmentSyntaxNode, FunctionDefinitionOverloadSyntaxNode } from "../compiler/syntax/syntax"
+import { SyntaxNodeVisitor, SyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, ReturnStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, ClassDeclarationSyntaxNode, TypeDeclarationSyntaxNode, ObjectInstantiationSyntaxNode, VariableAssignmentSyntaxNode, FunctionHomonymSyntaxNode, FunctionCallSyntaxNode, MemberLookupSyntaxNode, MemberAssignmentSyntaxNode, FunctionOverloadSyntaxNode } from "../compiler/syntax/syntax"
 import { ValueType } from "../compiler/syntax/ValueType"
 import { TokenType } from "../compiler/Token"
 import { TypeWrapper } from "../types/types"
@@ -34,12 +34,12 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
   getState() {
     return this.nodeVisitationState!.state;
   }
-  switchState(stateFunctions: Array<() => void>) {
+  switchState(stateCallbacks: Array<() => void>) {
     const state = this.getState();
-    if (state > stateFunctions.length - 1) {
+    if (state > stateCallbacks.length - 1) {
       throw new Error(`switchState state logic fail!`);
     }
-    stateFunctions[state]();
+    stateCallbacks[state]();
   }
   pushValue(interpreterValue: InterpreterValue) {
     if (this.interpreter.isDebug) {
@@ -171,7 +171,7 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
   // ╚════════════════════════════════════════╝
   visitReturnStatement(node: ReturnStatementSyntaxNode): void {
     this.pushNewNode(node.retvalExpr);
-    // remove remaining nodes in function to skip out of it
+    // remove remaining nodes in function call to skip out of it
     while (true) {
       const foo = this.interpreter.nodeStack.shift()!;
       if (foo.node instanceof FunctionCallSyntaxNode) {
@@ -244,14 +244,16 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
         // call constructor
         const argumentList = node.constructorArgumentList.map((_argumentNode) => this.popValue()).reverse();
 
-        const ctor = classNode.methods.get('new') ?? throwExpr(new Error(`TODO: support implicit constructors`));
+        const ctorHomonym = classNode.methods.get('new') ?? throwExpr(new Error(`TODO: support implicit constructors`));
         
-        throw new Error(`TODO: select which ctor overload to call based on data from resolver...`);
-        const ctorOverload = ctor.overloads[999999] // TODO: !!!
+        if (ctorHomonym.overloads.length > 1) {
+          throw new Error(`TODO: select which ctor overload to call based on data from resolver...`)
+        }
+        const ctorOverload = ctorHomonym.overloads[0] // TODO: !!!
 
-        this.interpreter.pushScope(ctor);
+        this.interpreter.pushScope(ctorHomonym);
         this.interpreter.scope.overrideValueInThisScope('this', newObject);
-        const methodScope = this.interpreter.resolverOutput.scopesByNode.get(ctor) ?? throwExpr(new Error(`couldn't look up resolver scope for ctor`));
+        const methodScope = this.interpreter.resolverOutput.scopesByNode.get(ctorHomonym) ?? throwExpr(new Error(`couldn't look up resolver scope for ctor`));
         // methodScope.getClosedVars().forEach((identifier) => {
         //   this.interpreter.scope.getValue(identifier);
         // });
@@ -289,17 +291,17 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
           callee.closedVars.forEach((value, identifier) => {
             this.interpreter.scope.overrideValueInThisScope(identifier, value)
           })
-          const functionDefinition = callee.node as FunctionDefinitionSyntaxNode
+          const functionHomonym = callee.node as FunctionHomonymSyntaxNode
 
-          if (functionDefinition.overloads.length > 1) {
+          if (functionHomonym.overloads.length > 1) {
             throw new Error(`TODO: select which function overload to call based on data from resolver...`);
           }
-          const functionDefinitionOverload = functionDefinition.overloads[0] // TODO: !!!
+          const functionOverload = functionHomonym.overloads[0] // TODO: !!!
 
-          functionDefinitionOverload.parameterList.forEach((functionParameter) => {
+          functionOverload.parameterList.forEach((functionParameter) => {
             this.interpreter.scope.overrideValueInThisScope(functionParameter.identifier.lexeme, argumentList.shift()!)
           })
-          functionDefinitionOverload.statementList.forEach((statementNode) => {
+          functionOverload.statementList.forEach((statementNode) => {
             this.pushNewNode(statementNode)
           })
           this.repushIncremented();
@@ -327,9 +329,9 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
     ]);
   }
   // ╔════════════════════════════════════════╗
-  // ║ Function Definition                    ║
+  // ║ Function Homonym                       ║
   // ╚════════════════════════════════════════╝
-  visitFunctionDefinition(node: FunctionDefinitionSyntaxNode): void {
+  visitFunctionHomonym(node: FunctionHomonymSyntaxNode): void {
     const closedVars: Map<string, InterpreterValue> = new Map();
     this.interpreter.resolverOutput.scopesByNode.get(node)!.getClosedVars().forEach((identifier) => {
       closedVars.set(identifier, this.interpreter.scope.getValue(identifier));
@@ -338,9 +340,9 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
     this.pushValue(value);
   }
   // ╔════════════════════════════════════════╗
-  // ║ Function Definition Overload           ║
+  // ║ Function Overload                      ║
   // ╚════════════════════════════════════════╝
-  visitFunctionDefinitionOverload(node: FunctionDefinitionOverloadSyntaxNode): void {
+  visitFunctionOverload(node: FunctionOverloadSyntaxNode): void {
     // UNUSED FOR NOW
   }
   // ╔════════════════════════════════════════╗

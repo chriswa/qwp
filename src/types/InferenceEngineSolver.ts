@@ -73,11 +73,11 @@ export class InferenceEngineSolver {
         });
       }
     });
-    this.constraints.callConstraints.forEach(callConstraint => {
+    this.constraints.functionCallConstraints.forEach(callConstraint => {
       callConstraint.dump();
     });
-    this.constraints.functionConstraints.forEach(functionConstraint => {
-      functionConstraint.dump();
+    this.constraints.functionOverloadConstraints.forEach(functionOverloadConstraint => {
+      functionOverloadConstraint.dump();
     });
     this.constraints.propertyConstraints.forEach(propertyConstraint => {
       propertyConstraint.dump();

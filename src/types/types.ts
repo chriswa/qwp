@@ -23,14 +23,14 @@ export class TypeWrapper {
   public isEqualTo(other: TypeWrapper) {
     return this.type.isEqualTo(other.type);
   }
-  public getFunctionType() {
-    return (this.type instanceof FunctionType || this.type instanceof BuiltinFunctionType) ? this.type as IFunctionType : throwExpr(new Error(`not an IFunctionType wrapper!`));
+  public getFunctionHomonymType() {
+    return (this.type instanceof FunctionHomonymType || this.type instanceof BuiltinFunctionHomonymType) ? this.type as IFunctionHomonymType : throwExpr(new Error(`not an IFunctionHomonymType wrapper!`));
   }
   public getFunctionOverloadType() {
     return (this.type instanceof FunctionOverloadType || this.type instanceof BuiltinFunctionOverloadType) ? this.type as IFunctionOverloadType : throwExpr(new Error(`not an IFunctionOverloadType wrapper!`));
   }
   public getClassType() {
-    return this.type instanceof ClassType ? this.type as ClassType : throwExpr(new Error(`not a FunctionType wrapper!`));
+    return this.type instanceof ClassType ? this.type as ClassType : throwExpr(new Error(`not a ClassType wrapper!`));
   }
 }
 
@@ -135,7 +135,7 @@ export interface IFunctionOverloadType {
   returnTypeWrapper: TypeWrapper;
 }
 
-export interface IFunctionType {
+export interface IFunctionHomonymType {
   overloadTypeWrappers: Array<TypeWrapper>;
 }
 
@@ -152,7 +152,7 @@ export class FunctionOverloadType extends Type implements IFunctionOverloadType 
   }
 }
 
-export class FunctionType extends Type implements IFunctionType {
+export class FunctionHomonymType extends Type implements IFunctionHomonymType {
   constructor(
     public overloadTypeWrappers: Array<TypeWrapper>,
   ) {
@@ -175,7 +175,7 @@ export class BuiltinFunctionOverloadType extends Type implements IFunctionOverlo
   }
 }
 
-export class BuiltinFunctionType extends Type implements IFunctionType {
+export class BuiltinFunctionHomonymType extends Type implements IFunctionHomonymType {
   constructor(
     public overloadTypeWrappers: Array<TypeWrapper>,
   ) {
