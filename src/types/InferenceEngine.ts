@@ -27,10 +27,16 @@ class UnappliedFunctionOverloadAnnotation {
 
 export class InferenceEngine {
   private constraints: InferenceEngineConstraints = new InferenceEngineConstraints();
-  private solver: InferenceEngineSolver = new InferenceEngineSolver(this.constraints);
+  private solver: InferenceEngineSolver;
   private classPropertyCache: Map<TypeWrapper, Map<string, TypeWrapper>> = new Map();
   private unappliedTypeAnnotations: Array<UnappliedTypeAnnotation> = []; // annotations for vars, function/method parameters, class fields, and declared types
   private unappliedFunctionOverloadAnnotations: Array<UnappliedFunctionOverloadAnnotation> = []; // annotations for params and return type
+
+  constructor(
+    public isDebug: boolean,
+  ) {
+    this.solver = new InferenceEngineSolver(this.constraints, this.isDebug);
+  }
 
   applyAnnotationConstraint(typeWrapper: TypeWrapper, resolverScope: ResolverScope, typeAnnotation: TypeAnnotation | null) {
     if (typeAnnotation !== null) {

@@ -1,6 +1,7 @@
 import { builtinsById } from "../builtins/builtins"
 import { OpCode } from "./opcodes"
 import { ByteBuffer } from "./ByteBuffer"
+import { InternalError } from "../util"
 
 export function dumpDecompile(buffer: ByteBuffer) {
   buffer.setByteCursor(0); // redundant, we're about to "jump" to whatever is in [0]
@@ -108,7 +109,7 @@ export function decompileOneInstruction(buffer: ByteBuffer, pendingDecompilation
       return false;
     default:
       console.log(line)
-      throw new Error(`unknown opcode ${opCode}`);
+      throw new InternalError(`unknown opcode ${opCode}`);
   }
   console.log(line);
   return true;

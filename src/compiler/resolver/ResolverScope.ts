@@ -1,5 +1,5 @@
 import { ReadOnlyStatus, TypeWrapper } from "../../types/types"
-import { throwExpr } from "../../util"
+import { InternalError, throwExpr } from "../../util"
 import { SyntaxNode } from "../syntax/syntax"
 import { Resolver } from "./resolver"
 
@@ -46,9 +46,9 @@ export class ResolverScope implements IResolverScopeOutput {
   }
 
   // types
-  public declareType(identifier: string, typeWrapper: TypeWrapper): void {
+  public declareType(referenceNode: SyntaxNode, identifier: string, typeWrapper: TypeWrapper): void {
     if (this.lookupTypeWrapper(identifier) !== null) {
-      throw new Error(`cannot define type "${identifier}": already defined in stack!`);
+      this.resolver.generateResolverError(referenceNode, `cannot define type "${identifier}": already defined in stack!`);
     }
     this.typeWrappers.set(identifier, typeWrapper);
   }
@@ -108,10 +108,10 @@ export class ResolverScope implements IResolverScopeOutput {
   }
 
   public findClosestFunctionScope(): ResolverScope {
-    return this.isFunctionScope ? this : (this.parentScope?.findClosestFunctionScope() ?? throwExpr(new Error(`findClosestFunctionScope could not find a function scope`)));
+    return this.isFunctionScope ? this : (this.parentScope?.findClosestFunctionScope() ?? throwExpr(new InternalError(`findClosestFunctionScope could not find a function scope`)));
   }
   public registerObservedReturnTypeWrapper(returnTypeWrapper: TypeWrapper) {
-    if (this.isFunctionScope === false) { throw new Error(`can only be called on function scope`); }
+    if (this.isFunctionScope === false) { throw new InternalError(`can only be called on function scope`); }
     this.observedReturnTypeWrappers.push(returnTypeWrapper);
   }
   public getObservedReturnTypeWrappers(): Array<TypeWrapper> {

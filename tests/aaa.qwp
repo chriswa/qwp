@@ -2,8 +2,8 @@ const foo = 123;
 
 // printFloat32(foo);
 
-const f = fn (arg: float32): void {
-  // printFloat32(arg);
+const f = fn (arg): void {
+  printFloat32(arg);
 };
 f(foo);
 

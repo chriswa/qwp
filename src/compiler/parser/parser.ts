@@ -8,10 +8,10 @@ import { CompileError } from "../CompileError"
 import { TokenReader } from "./TokenReader"
 import { ParserHelper } from "./ParserHelper"
 import { FunctionParameter } from "../syntax/FunctionParameter"
-import { mapGetOrPut } from "../../util"
+import { InternalError, mapGetOrPut } from "../../util"
 
-export function parse(source: string, path: string): SyntaxNode {
-  const tokens = lex(source, path);
+export function parse(source: string, path: string, isDebug: boolean): SyntaxNode {
+  const tokens = lex(source, path, isDebug);
 
   const parserErrorsWithSourcePos: Array<ErrorWithSourcePos> = [];
   function generateParseError(token: Token, message: string) {
@@ -34,7 +34,7 @@ export function parse(source: string, path: string): SyntaxNode {
   }
   if (ast === null) {
     if (parserErrorsWithSourcePos.length === 0) {
-      throw new Error(`Internal error: Parser fail! ast is null but no parserErrorsWithSourcePos set!`);
+      throw new InternalError(`Internal error: Parser fail! ast is null but no parserErrorsWithSourcePos set!`);
     }
     throw new CompileError(parserErrorsWithSourcePos);
   }
@@ -224,7 +224,7 @@ export class Parser {
         return new MemberAssignmentSyntaxNode(referenceToken, expr.object, expr.memberName, rvalue);
       }
       else {
-        throw new Error("assignment lvalue has unexpected syntaxnode type");
+        throw new InternalError("assignment lvalue has unexpected syntaxnode type");
       }
     }
     return expr;

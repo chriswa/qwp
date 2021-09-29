@@ -1,6 +1,6 @@
 import { Builtin } from "../builtins/builtins"
 import { SyntaxNode } from "../compiler/syntax/syntax"
-import { primitiveTypes, TypeWrapper } from "../types/types"
+import { primitiveTypes, Type, TypeWrapper } from "../types/types"
 import { mapMapToArray } from "../util"
 
 export function interpreterValueFactory(typeWrapper: TypeWrapper, javascriptValue: boolean | number | null): InterpreterValue {
@@ -29,6 +29,9 @@ export abstract class InterpreterValue {
   public abstract toJavascriptValue(): unknown;
   compareStrictEquality(other: InterpreterValue): boolean { // overridden for subtypes
     return other === this;
+  }
+  public getType(): Type {
+    return primitiveTypes.never; // ???
   }
   asFloat32() {
     if (this instanceof InterpreterValueFloat32) {
@@ -65,6 +68,9 @@ export class InterpreterValueBoolean extends InterpreterValue {
   compareStrictEquality(other: InterpreterValue): boolean {
     return other instanceof InterpreterValueBoolean && other.value === this.value;
   }
+  getType() {
+    return primitiveTypes.bool32;
+  }
   toJavascriptValue() {
     return this.value;
   }
@@ -82,6 +88,9 @@ export class InterpreterValueFloat32 extends InterpreterValue {
   compareStrictEquality(other: InterpreterValue): boolean {
     return other instanceof InterpreterValueFloat32 && other.value === this.value;
   }
+  getType() {
+    return primitiveTypes.float32;
+  }
   toJavascriptValue() {
     return this.value;
   }
@@ -97,6 +106,9 @@ export class InterpreterValueClosure extends InterpreterValue {
   ) {
     super();
   }
+  getType() {
+    return primitiveTypes.func; // ???
+  }
   toJavascriptValue() {
     throw new Error(`InterpreterValueClosure cannot be converted to javascript value`);
   }
@@ -109,6 +121,9 @@ export class InterpreterValueVoid extends InterpreterValue {
   constructor(
   ) {
     super();
+  }
+  getType() {
+    return primitiveTypes.void;
   }
   toJavascriptValue() {
     throw new Error(`InterpreterValueVoid cannot be converted to javascript value`);
@@ -124,6 +139,9 @@ export class InterpreterValueBuiltin extends InterpreterValue {
   ) {
     super();
   }
+  getType() {
+    return primitiveTypes.func; // ???
+  }
   toJavascriptValue() {
     throw new Error(`InterpreterValueBuiltin cannot be converted to javascript value`);
   }
@@ -138,6 +156,9 @@ export class InterpreterValueObject extends InterpreterValue {
     public classTypeWrapper: TypeWrapper,
   ) {
     super();
+  }
+  getType() {
+    return this.classTypeWrapper.type;
   }
   toJavascriptValue() {
     throw new Error(`InterpreterValueObject cannot be converted to javascript value`);

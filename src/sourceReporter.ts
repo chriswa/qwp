@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { Token } from "./compiler/Token"
 import { ErrorWithSourcePos } from "./ErrorWithSourcePos"
-import { throwExpr } from "./util"
+import { InternalError, throwExpr } from "./util"
 
 class SourceReporter {
   private registeredSources: Map<string, string> = new Map();
@@ -12,7 +12,7 @@ class SourceReporter {
     this.registeredSources.delete(path);
   }
   getSource(path: string) {
-    return this.registeredSources.get(path) ?? throwExpr(new Error(`SourceReporter could not find registered source for path "${path}"`));
+    return this.registeredSources.get(path) ?? throwExpr(new InternalError(`SourceReporter could not find registered source for path "${path}"`));
   }
   
   generateErrorMessageWithLineNumber(path: string, errorWithSourcePos: ErrorWithSourcePos) {

@@ -3,7 +3,7 @@ import { GenericDefinition } from "../compiler/syntax/GenericDefinition"
 import { SyntaxNode } from "../compiler/syntax/syntax"
 import { TypeAnnotation } from "../compiler/syntax/TypeAnnotation"
 import { Token } from "../compiler/Token"
-import { throwExpr } from "../util"
+import { InternalError, throwExpr } from "../util"
 
 export enum ReadOnlyStatus {
   ReadOnly,
@@ -24,13 +24,13 @@ export class TypeWrapper {
     return this.type.isEqualTo(other.type);
   }
   public getFunctionHomonymType() {
-    return (this.type instanceof FunctionHomonymType || this.type instanceof BuiltinFunctionHomonymType) ? this.type as IFunctionHomonymType : throwExpr(new Error(`not an IFunctionHomonymType wrapper!`));
+    return (this.type instanceof FunctionHomonymType || this.type instanceof BuiltinFunctionHomonymType) ? this.type as IFunctionHomonymType : throwExpr(new InternalError(`not an IFunctionHomonymType wrapper!`));
   }
   public getFunctionOverloadType() {
-    return (this.type instanceof FunctionOverloadType || this.type instanceof BuiltinFunctionOverloadType) ? this.type as IFunctionOverloadType : throwExpr(new Error(`not an IFunctionOverloadType wrapper!`));
+    return (this.type instanceof FunctionOverloadType || this.type instanceof BuiltinFunctionOverloadType) ? this.type as IFunctionOverloadType : throwExpr(new InternalError(`not an IFunctionOverloadType wrapper!`));
   }
   public getClassType() {
-    return this.type instanceof ClassType ? this.type as ClassType : throwExpr(new Error(`not a ClassType wrapper!`));
+    return this.type instanceof ClassType ? this.type as ClassType : throwExpr(new InternalError(`not a ClassType wrapper!`));
   }
 }
 
@@ -81,7 +81,7 @@ export class ClassFieldBinaryRepresentation {
   public getFieldByteOffset(identifier: string): number {
     const byteOffset = this.fieldsToByteOffsets.get(identifier);
     if (byteOffset === undefined) {
-      throw new Error(`undeclared field "${identifier}"`);
+      throw new InternalError(`undeclared field "${identifier}"`);
     }
     return byteOffset;
   }
@@ -109,10 +109,10 @@ export class ClassType extends Type {
     return `class(${this.name})`;
   }
   getFieldTypeWrapper(propertyName: string) {
-    return this.fields.get(propertyName) ?? throwExpr(new Error(`could not find field on class type`));
+    return this.fields.get(propertyName) ?? throwExpr(new InternalError(`could not find field on class type`));
   }
   getPropertyTypeWrapper(propertyName: string) {
-    return this.fields.get(propertyName) ?? this.methods.get(propertyName) ?? throwExpr(new Error(`could not find property on class type`));
+    return this.fields.get(propertyName) ?? this.methods.get(propertyName) ?? throwExpr(new InternalError(`could not find property on class type`));
   }
 }
 
@@ -214,7 +214,7 @@ export class UnresolvedCoercionType extends Type {
   ) {
     super();
     if (this.typeWrappers.length < 1) {
-      throw new Error(`CoercedPeerType is intended to work with 1+ peer types`);
+      throw new InternalError(`CoercedPeerType is intended to work with 1+ peer types`);
     }
   }
   toString() {

@@ -6,6 +6,7 @@ import { CompileError } from "../compiler/CompileError"
 import chalk from "chalk"
 import { IInterpreterFacade, Interpreter } from "../interpreter/Interpreter"
 import { sourceReporter } from "../sourceReporter"
+import { InternalError } from "../util"
 
 var myArgs = process.argv.slice(2);
 
@@ -162,10 +163,10 @@ function interpretSource(path: string, source: string): TestResult {
 
 function getExpectedResultFromSource(source: string): TestResult {
   const matches = source.match(/\/\*\nEXPECT (COMPILE ERROR|RUNTIME ERROR|COMPLETION)\n((?:(?!\*\/).+))\*\//ms);
-  if (matches === null) { throw new Error(`test source did not have valid "EXPECTED" comment block: regex fail`) }
+  if (matches === null) { throw new InternalError(`test source did not have valid "EXPECTED" comment block: regex fail`) }
   // const kind = TestResultKind[matches[1].replace(' ', '_') as keyof typeof TestResultKind];
   const kind = testExpectedKindStringToEnum[matches[1]];
-  if (kind === undefined) { throw new Error(`test source did not have valid "EXPECTED" comment block: unknown kind`) }
+  if (kind === undefined) { throw new InternalError(`test source did not have valid "EXPECTED" comment block: unknown kind`) }
   const detail = matches[2];
   return new TestResult(kind, detail, undefined);
 }

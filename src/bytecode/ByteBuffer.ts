@@ -1,4 +1,5 @@
 import assert from "assert"
+import { InternalError } from "../util"
 
 export class ByteBuffer {
   private _buffer: ArrayBuffer;
@@ -24,7 +25,7 @@ export class ByteBuffer {
   private extendIfNecessary(extraBytes: number) {
     const newSize = this._byteCursor + extraBytes;
     if (newSize > this.pushByteLimit) {
-      throw new Error(`Stack overflow!`)
+      throw new InternalError(`Stack overflow!`)
     }
     if (newSize > this._buffer.byteLength) {
       this.resize(this._buffer.byteLength * 2);
@@ -142,7 +143,7 @@ export class ByteBuffer {
   public popBool32() {
     this._byteCursor -= 4;
     const value = this.dataView.getFloat32(this._byteCursor);
-    if (value !== 0 && value !== 1) { throw new Error(`assertion failed: tried to popBool32 on value which is not 1.0 or 0.0`) }
+    if (value !== 0 && value !== 1) { throw new InternalError(`assertion failed: tried to popBool32 on value which is not 1.0 or 0.0`) }
     return value === 1;
   }
 
@@ -172,7 +173,7 @@ export class ByteBuffer {
   }
   public peekAheadBool32(): boolean {
     const value = this.dataView.getFloat32(this._byteCursor);
-    if (value !== 0 && value !== 1) { throw new Error(`assertion failed: tried to popBool32 on value which is not 1.0 or 0.0`) }
+    if (value !== 0 && value !== 1) { throw new InternalError(`assertion failed: tried to popBool32 on value which is not 1.0 or 0.0`) }
     return value === 1;
   }
 
@@ -202,7 +203,7 @@ export class ByteBuffer {
   }
   public peekBehindBool32(): boolean {
     const value = this.dataView.getFloat32(this._byteCursor - 4);
-    if (value !== 0 && value !== 1) { throw new Error(`assertion failed: tried to popBool32 on value which is not 1.0 or 0.0`) }
+    if (value !== 0 && value !== 1) { throw new InternalError(`assertion failed: tried to popBool32 on value which is not 1.0 or 0.0`) }
     return value === 1;
   }
 

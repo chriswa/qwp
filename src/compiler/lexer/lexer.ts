@@ -74,6 +74,6 @@ addRule(filters.ALWAYS, /^\./, TokenType.DOT); // must be after NUMBER
 addRule(filters.ALWAYS, /^=/, TokenType.EQUAL); // must be after DOUBLE_EQUAL and ARROW
 
 
-export function lex(input: string, path: string) {
-  return lexer.lex(input, path, new LexerState(), new Token(TokenType.EOF));
+export function lex(input: string, path: string, isDebug: boolean) {
+  return lexer.lex(input, path, new LexerState(), new Token(TokenType.EOF), isDebug);
 }

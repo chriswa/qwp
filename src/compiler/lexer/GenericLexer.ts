@@ -1,4 +1,5 @@
 import { ErrorWithSourcePos } from "../../ErrorWithSourcePos"
+import { InternalError } from "../../util"
 
 export class GenericLexerToken {
   private _path: string = "";
@@ -34,7 +35,7 @@ export class GenericLexer<T_TOKEN extends GenericLexerToken, T_STATE> {
   public addRule(filter: (state: T_STATE) => boolean, pattern: RegExp, tokenize: (lexeme: string, state: T_STATE, matches: RegExpExecArray) => Array<T_TOKEN>) {
     this.rules.push(new GenericLexerRule<T_TOKEN, T_STATE>(filter, pattern, tokenize));
   }
-  public lex(input: string, path: string, state: T_STATE, eofToken: T_TOKEN): Array<T_TOKEN> {
+  public lex(input: string, path: string, state: T_STATE, eofToken: T_TOKEN, isDebug: boolean): Array<T_TOKEN> {
     let charPos = 0;
     let currentLine = "";
     const collectedTokens: Array<T_TOKEN> = [];
@@ -69,7 +70,7 @@ export class GenericLexer<T_TOKEN extends GenericLexerToken, T_STATE> {
       }
       if (!ruleSatisfied) {
         const remainderOfLineMatches = input.match(/^[^\n]*/);
-        if (remainderOfLineMatches === null) { throw new Error("impossible, since an empty string is valid for this pattern"); } // appease typescript
+        if (remainderOfLineMatches === null) { throw new InternalError("impossible, since an empty string is valid for this pattern"); } // appease typescript
         const snippet = currentLine + remainderOfLineMatches[0];
         throw new ErrorWithSourcePos("Lexer: Lexeme not recognized", path, charPos);
       }

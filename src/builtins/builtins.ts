@@ -1,4 +1,5 @@
 import { TypeWrapper, BuiltinFunctionHomonymType, Type, primitiveTypes, BuiltinFunctionOverloadType } from "../types/types"
+import { InternalError, zipMap } from "../util"
 
 let printCallback: (str: string) => void = console.log;
 
@@ -22,6 +23,28 @@ export class Builtin {
     public readonly overloads: Array<BuiltinOverload> = [],
     public readonly typeWrapper: TypeWrapper,
   ) { }
+  findMatchingOverload(argumentTypes: Array<Type>): BuiltinOverload {
+    if (this.overloads.length === 1) {
+      return this.overloads[0]
+    }
+    let bestOverload: BuiltinOverload | undefined
+    this.overloads.forEach((overload) => {
+      const overloadType = overload.typeWrapper.getFunctionOverloadType()
+      let isMatch = true
+      zipMap([overloadType.parameterTypeWrappers, argumentTypes], (parameterTypeWrapper, argumentType) => {
+        if (parameterTypeWrapper.type.isEqualTo(argumentType) === false) { // TODO: allow type coercion (e.g. super to sub class, or int to float) but score it lower!
+          isMatch = false
+        }
+      })
+      if (isMatch) {
+        bestOverload = overload
+      }
+    })
+    if (bestOverload === undefined) {
+      throw new InternalError(`could not find acceptable builtin overload for argument types!`)
+    }
+    return bestOverload
+  }
 }
 
 export const builtinsByName: Map<string, Builtin> = new Map();
@@ -34,7 +57,7 @@ function registerBuiltin(id: number, name: string, overloadDefs: Array<{ args: A
     const typeWrapper = new TypeWrapper(`builtin(${name})`, new BuiltinFunctionOverloadType(argumentTypeWrappers, returnTypeWrapper));
     return new BuiltinOverload(typeWrapper, handler);
   });
-  if (!Number.isInteger(id) || id < 0 || id > 2 ** 16 - 1) { throw new Error(`builtin id must be uint32`) }
+  if (!Number.isInteger(id) || id < 0 || id > 2 ** 16 - 1) { throw new InternalError(`builtin id must be uint32`) }
   const builtinTypeWrapper = new BuiltinFunctionHomonymType(overloads.map(overload => overload.typeWrapper));
   const builtin = new Builtin(id, name, overloads, new TypeWrapper(`builtin(${name})`, builtinTypeWrapper));
   builtinsByName.set(name, builtin);

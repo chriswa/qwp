@@ -1,37 +1,38 @@
 import chalk from "chalk"
 import { SyntaxNode } from "../compiler/syntax/syntax"
 import { drawBox } from "../testing/reporting"
-import { mapGetOrPut } from "../util"
+import { InternalError, mapGetOrPut } from "../util"
 import { CoercionConstraint, InferenceEngineConstraints } from "./constraints"
 import { primitiveTypes, Type, TypeWrapper, untypedType } from "./types"
 
 export class InferenceEngineSolver {
   constructor(
     public constraints: InferenceEngineConstraints,
+    public isDebug: boolean,
   ) {
   }
   solve() {
-    console.log(chalk.yellow(drawBox(`InferenceEngineSolver.solve`)));
+    this.isDebug && console.log(chalk.yellow(drawBox(`InferenceEngineSolver.solve`)));
     let shouldContinue = true;
     let iterationCount = 0;
     while (shouldContinue) {
       iterationCount += 1;
       if (iterationCount > 100) {
-        throw new Error(`InferenceEngine.solve max iteration count exceeded!`);
+        throw new InternalError(`InferenceEngine.solve max iteration count exceeded!`);
       }
-      console.log(chalk.bgMagenta.black("=== INFERENCE ENGINE ITERATION ==="));
+      this.isDebug && console.log(chalk.bgMagenta.black("=== INFERENCE ENGINE ITERATION ==="));
       shouldContinue = this.iterate();
     }
-    console.log(chalk.bgMagenta.black("=== INFERENCE ENGINE ITERATION COMPLETE === no more work to do!"));
+    this.isDebug && console.log(chalk.bgMagenta.black("=== INFERENCE ENGINE ITERATION COMPLETE === no more work to do!"));
 
   }
   iterate(): boolean {
     let hasProgressBeenMade = false;
     this.constraints.forEachCoercionConstraint(coercionConstraint => {
-      coercionConstraint.dump();
+      this.isDebug && coercionConstraint.dump();
       // if types are the same, remove the constaint
       if (coercionConstraint.inputTypeWrappers.every(inputTypeWrapper => inputTypeWrapper.isEqualTo(coercionConstraint.outputTypeWrapper))) {
-        console.log(chalk.yellow(`-> types are the same, remove`));
+        this.isDebug && console.log(chalk.yellow(`-> types are the same, remove`));
         this.constraints.removeCoercionConstraint(coercionConstraint);
         hasProgressBeenMade = true;
         return;
@@ -39,7 +40,7 @@ export class InferenceEngineSolver {
       // if output is untyped and all inputs are typed, set output type to least general of all inputs
       const leastGeneralType = coercionConstraint.inputTypeWrappers.map(typeWrapper => typeWrapper.type).reduce(getLeastGeneralCoercedType);
       if (leastGeneralType.isEqualTo(untypedType) === false && coercionConstraint.outputTypeWrapper.type.isEqualTo(untypedType)) {
-        console.log(chalk.yellow(`-> output is untyped and all inputs are typed, set output type to least general of all inputs`));
+        this.isDebug && console.log(chalk.yellow(`-> output is untyped and all inputs are typed, set output type to least general of all inputs`));
         coercionConstraint.outputTypeWrapper.type = leastGeneralType;
         hasProgressBeenMade = true;
         return;
@@ -51,7 +52,7 @@ export class InferenceEngineSolver {
             inputTypeWrapper.type = coercionConstraint.outputTypeWrapper.type
           }
         });
-        console.log(chalk.yellow(`-> output is void, all untyped inputs are set to void and consrtaint removed`));
+        this.isDebug && console.log(chalk.yellow(`-> output is void, all untyped inputs are set to void and consrtaint removed`));
         this.constraints.removeCoercionConstraint(coercionConstraint);
         hasProgressBeenMade = true;
         return;
@@ -61,26 +62,26 @@ export class InferenceEngineSolver {
         coercionConstraint.inputTypeWrappers.forEach((inputTypeWrapper) => {
           if (inputTypeWrapper.isEqualTo(coercionConstraint.outputTypeWrapper) === false) {
             if (inputTypeWrapper.type.isEqualTo(untypedType)) {
-              console.log(chalk.yellow(`-> output is typed, set all untyped inputs to it`));
+              this.isDebug && console.log(chalk.yellow(`-> output is typed, set all untyped inputs to it`));
               inputTypeWrapper.type = coercionConstraint.outputTypeWrapper.type;
               this.constraints.removeCoercionConstraint(coercionConstraint);
               hasProgressBeenMade = true;
             }
             else {
-              throw new Error(`TODO: output type is specified, but one or more input types differ and are not untyped!`);
+              // throw new InternalError(`TODO: output type is specified, but one or more input types differ and are not untyped!`);
             }
           }
         });
       }
     });
     this.constraints.functionCallConstraints.forEach(callConstraint => {
-      callConstraint.dump();
+      this.isDebug && callConstraint.dump();
     });
     this.constraints.functionOverloadConstraints.forEach(functionOverloadConstraint => {
-      functionOverloadConstraint.dump();
+      this.isDebug && functionOverloadConstraint.dump();
     });
     this.constraints.propertyConstraints.forEach(propertyConstraint => {
-      propertyConstraint.dump();
+      this.isDebug && propertyConstraint.dump();
     });
     return hasProgressBeenMade;
   }

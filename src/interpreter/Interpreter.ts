@@ -5,7 +5,7 @@ import { ResolverScope } from "../compiler/resolver/ResolverScope"
 import { SyntaxNode } from "../compiler/syntax/syntax"
 import { sourceReporter } from "../sourceReporter"
 import { drawBox } from "../testing/reporting"
-import { mapMapToArray } from "../util"
+import { InternalError, mapMapToArray } from "../util"
 import { InterpreterNodeVisitor } from "./InterpreterNodeVisitor"
 import { InterpreterScope } from "./InterpreterScope"
 import { InterpreterValue, InterpreterValueBuiltin } from "./InterpreterValue"
@@ -26,7 +26,7 @@ export class Interpreter implements IInterpreterFacade {
 
   ast: SyntaxNode;
   resolverOutput: IResolverOutput;
-  nodeStack: Array<NodeVisitationState> = [];
+  nodeVisitationStateStack: Array<NodeVisitationState> = [];
   valueStack: Array<InterpreterValue> = [];
   scope: InterpreterScope;
   
@@ -35,7 +35,7 @@ export class Interpreter implements IInterpreterFacade {
     source: string,
     public isDebug: boolean,
   ) {
-    const { ast, resolverOutput } = resolve(source, path);
+    const { ast, resolverOutput } = resolve(source, path, isDebug);
     if (isDebug) {
       console.log(chalk.yellow(drawBox(`ResolverOutput`)));
       resolverOutput.scopesByNode.forEach((scope, node) => {
@@ -56,7 +56,7 @@ export class Interpreter implements IInterpreterFacade {
     this.ast = ast;
     this.resolverOutput = resolverOutput;
     this.nodeVisitor = new InterpreterNodeVisitor(this);
-    this.nodeStack = [new NodeVisitationState(ast)];
+    this.nodeVisitationStateStack = [new NodeVisitationState(ast)];
     this.scope = new InterpreterScope(null, ast, resolverOutput);
     builtinsByName.forEach((builtin, builtinName) => {
       this.scope.overrideValueInThisScope(builtinName, new InterpreterValueBuiltin(builtin));
@@ -68,24 +68,24 @@ export class Interpreter implements IInterpreterFacade {
   }
   popScope() {
     if (this.scope.parentScope === null) {
-      throw new Error(`attempted to pop top scope!`);
+      throw new InternalError(`attempted to pop top scope!`);
     }
     this.scope = this.scope.parentScope;
   }
 
   runOneStep() {
-    const nextNode = this.nodeStack.shift()!;
+    const nextNodeVisitationState = this.nodeVisitationStateStack.shift()!;
     
     if (this.isDebug) {
-      console.log(chalk.bgWhite.black(`runOneStep: ${nextNode.node.constructor.name} - step ${nextNode.state}`));
-      sourceReporter.printPositionInSource(this.path, nextNode.node.referenceToken.charPos);
+      console.log(chalk.bgWhite.black(`runOneStep: ${nextNodeVisitationState.node.constructor.name} - step ${nextNodeVisitationState.stepCounter}`));
+      sourceReporter.printPositionInSource(this.path, nextNodeVisitationState.node.referenceToken.charPos);
     }
 
-    this.nodeVisitor.setCurrentNodeVisitationState(nextNode);
+    this.nodeVisitor.setCurrentNodeVisitationState(nextNodeVisitationState);
 
-    this.nodeVisitor.visit(nextNode.node);
+    this.nodeVisitor.visit(nextNodeVisitationState.node);
 
-    if (this.nodeStack.length === 0) {
+    if (this.nodeVisitationStateStack.length === 0) {
       this._isHalted = true;
     }
   }

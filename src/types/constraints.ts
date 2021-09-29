@@ -1,6 +1,6 @@
 import chalk from "chalk"
 import { SyntaxNode } from "../compiler/syntax/syntax"
-import { mapGetOrPut, throwExpr } from "../util"
+import { InternalError, mapGetOrPut, throwExpr } from "../util"
 import { TypeWrapper } from "./types"
 
 export class CoercionConstraint {
@@ -69,7 +69,7 @@ export class InferenceEngineConstraints {
   public propertyConstraints: Array<PropertyConstraint> = []; // a class type has a field/method with a type
   public addCoercionConstraint(newCoercionConstraint: CoercionConstraint) {
     if (this.coercionConstraints.has(newCoercionConstraint.outputTypeWrapper)) {
-      throw new Error(`attempted to add more than one coercion constraint for same output type wrapper`)
+      throw new InternalError(`attempted to add more than one coercion constraint for same output type wrapper`)
     }
     this.coercionConstraints.set(newCoercionConstraint.outputTypeWrapper, newCoercionConstraint);
   }
