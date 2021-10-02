@@ -1,5 +1,5 @@
-import { TokenType } from "../Token"
-import { SyntaxNodeVisitor, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionCallSyntaxNode, FunctionHomonymSyntaxNode, ReturnStatementSyntaxNode } from "./syntax"
+// import { TokenType } from '../Token'
+// import { ISyntaxNodeVisitor, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionCallSyntaxNode, FunctionHomonymSyntaxNode, ReturnStatementSyntaxNode } from './syntax'
 
 /*
 export class AstPrinter implements SyntaxNodeVisitor<string> {

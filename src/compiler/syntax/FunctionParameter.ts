@@ -1,5 +1,5 @@
-import { Token } from "../Token"
-import { TypeAnnotation } from "./TypeAnnotation"
+import { Token } from '../Token'
+import { TypeAnnotation } from './TypeAnnotation'
 
 export class FunctionParameter {
   constructor(

@@ -4,8 +4,8 @@
   "description": "A programming language prototype",
   "main": "",
   "scripts": {
-    "lint": "eslint --ext .js,.ts,.vue --ignore-path .gitignore src/",
-    "lint-fix": "eslint --ext .js,.ts,.vue --ignore-path .gitignore src/ --fix",
+    "lint": "eslint --ext .js,.ts --ignore-path .gitignore src/",
+    "lint-fix": "eslint --ext .js,.ts --ignore-path .gitignore src/ --fix",
     "test": "tsc && node bin/testing/runTests.js"
   },
   "author": "",
@@ -14,16 +14,30 @@
     "@tsconfig/recommended": "^1.0.1",
     "@types/node": "^15.12.4",
     "chalk": "^4.1.1",
-    "eslint-plugin-import": "^2.24.2",
     "typescript": "^4.3.4"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^4.32.0",
-    "eslint": "^7.32.0"
+    "@typescript-eslint/parser": "^4.32.0",
+    "eslint": "^7.32.0",
+    "eslint-config": "^0.3.0",
+    "eslint-import-resolver-typescript": "^2.5.0",
+    "eslint-plugin-import": "^2.24.2",
+    "eslint-plugin-node": "^11.1.0"
   },
   "eslintConfig": {
     "extends": [
       "../blockopolis/packages/client/node_modules/eslint-config/index.js"
-    ]
+    ],
+    "rules": {
+      "no-shadow": "off",
+      "@typescript-eslint/no-shadow": ["error"],
+
+      "no-console": "off",
+      "no-self-compare": "off",
+      "no-warning-comments": "off",
+      "quotes": ["error", "single", { "allowTemplateLiterals": true }],
+      "no-constant-condition": ["error", { "checkLoops": false }]
+    }
   }
 }

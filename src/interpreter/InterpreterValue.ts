@@ -1,23 +1,23 @@
-import { Builtin } from "../builtins/builtins"
-import { SyntaxNode } from "../compiler/syntax/syntax"
-import { primitiveTypes, Type, TypeWrapper } from "../types/types"
-import { mapMapToArray } from "../util"
+import { Builtin } from '../builtins/builtins'
+import { SyntaxNode } from '../compiler/syntax/syntax'
+import { primitiveTypes, Type, TypeWrapper } from '../types/types'
+import { mapMapToArray } from '../util'
 
 export function interpreterValueFactory(typeWrapper: TypeWrapper, javascriptValue: boolean | number | null | unknown): InterpreterValue {
   if (typeWrapper.type === primitiveTypes.bool32) {
     return new InterpreterValueBoolean(javascriptValue as boolean)
   }
   else if (typeWrapper.type === primitiveTypes.float32) {
-    return new InterpreterValueFloat32(javascriptValue as number);
+    return new InterpreterValueFloat32(javascriptValue as number)
   }
   // else if (typeWrapper.type === primitiveTypes.uint32) {
   //   return new InterpreterValueUint32(javascriptValue);
   // }
   else if (typeWrapper.type === primitiveTypes.void) {
-    return new InterpreterValueVoid();
+    return new InterpreterValueVoid()
   }
   else {
-    throw new Error(`runtime: cannot create InterpreterValue for TypeWrapper: ${typeWrapper.toString()}`);
+    throw new Error(`runtime: cannot create InterpreterValue for TypeWrapper: ${typeWrapper.toString()}`)
   }
 }
 
@@ -25,37 +25,37 @@ export abstract class InterpreterValue {
   constructor(
   ) {
   }
-  public abstract toString(): string;
-  public abstract toJavascriptValue(): unknown;
+  public abstract toString(): string
+  public abstract toJavascriptValue(): unknown
   compareStrictEquality(other: InterpreterValue): boolean { // overridden for subtypes
-    return other === this;
+    return other === this
   }
   public getType(): Type {
-    return primitiveTypes.never; // ???
+    return primitiveTypes.never // ???
   }
-  asFloat32() {
+  asFloat32(): InterpreterValueFloat32 {
     if (this instanceof InterpreterValueFloat32) {
-      return this;
+      return this
     }
-    throw new Error(`runtime error: attempted to interpret value as a float32`)
+    throw new Error('runtime error: attempted to interpret value as a float32')
   }
-  asBoolean() {
+  asBoolean(): InterpreterValueBoolean {
     if (this instanceof InterpreterValueBoolean) {
-      return this;
+      return this
     }
-    throw new Error(`runtime error: attempted to interpret value as a boolean`)
+    throw new Error('runtime error: attempted to interpret value as a boolean')
   }
-  asClosure() {
+  asClosure(): InterpreterValueClosure {
     if (this instanceof InterpreterValueClosure) {
-      return this;
+      return this
     }
-    throw new Error(`runtime error: attempted to interpret value as a closure`)
+    throw new Error('runtime error: attempted to interpret value as a closure')
   }
-  asObject() {
+  asObject(): InterpreterValueObject {
     if (this instanceof InterpreterValueObject) {
-      return this;
+      return this
     }
-    throw new Error(`runtime error: attempted to interpret value as an object`)
+    throw new Error('runtime error: attempted to interpret value as an object')
   }
 }
 
@@ -63,19 +63,19 @@ export class InterpreterValueBoolean extends InterpreterValue {
   constructor(
     public value: boolean,
   ) {
-    super();
+    super()
   }
   compareStrictEquality(other: InterpreterValue): boolean {
-    return other instanceof InterpreterValueBoolean && other.value === this.value;
+    return other instanceof InterpreterValueBoolean && other.value === this.value
   }
-  getType() {
-    return primitiveTypes.bool32;
+  getType(): Type {
+    return primitiveTypes.bool32
   }
-  toJavascriptValue() {
-    return this.value;
+  toJavascriptValue(): boolean {
+    return this.value
   }
-  toString() {
-    return `Boolean(${this.value ? 'true' : 'false'})`;
+  toString(): string {
+    return `Boolean(${this.value ? 'true' : 'false'})`
   }
 }
 
@@ -83,19 +83,19 @@ export class InterpreterValueFloat32 extends InterpreterValue {
   constructor(
     public value: number,
   ) {
-    super();
+    super()
   }
   compareStrictEquality(other: InterpreterValue): boolean {
-    return other instanceof InterpreterValueFloat32 && other.value === this.value;
+    return other instanceof InterpreterValueFloat32 && other.value === this.value
   }
-  getType() {
-    return primitiveTypes.float32;
+  getType(): Type {
+    return primitiveTypes.float32
   }
-  toJavascriptValue() {
-    return this.value;
+  toJavascriptValue(): number {
+    return this.value
   }
-  toString() {
-    return `Float32(${this.value})`;
+  toString(): string {
+    return `Float32(${this.value})`
   }
 }
 
@@ -104,32 +104,32 @@ export class InterpreterValueClosure extends InterpreterValue {
     public node: SyntaxNode,
     public closedVars: Map<string, InterpreterValue>,
   ) {
-    super();
+    super()
   }
-  getType() {
-    return primitiveTypes.func; // ???
+  getType(): Type {
+    return primitiveTypes.func // ???
   }
-  toJavascriptValue() {
-    throw new Error(`InterpreterValueClosure cannot be converted to javascript value`);
+  toJavascriptValue(): never {
+    throw new Error('InterpreterValueClosure cannot be converted to javascript value')
   }
-  toString() {
-    return `Closure(${this.node.referenceToken.lexeme} @ ${this.node.referenceToken.charPos}, closedVars: ${mapMapToArray(this.closedVars, (v, id) => `${id} => ${v.toString()}`).join(', ')})`;
+  toString(): string {
+    return `Closure(${this.node.referenceToken.lexeme} @ ${this.node.referenceToken.charPos}, closedVars: ${mapMapToArray(this.closedVars, (v, id) => `${id} => ${v.toString()}`).join(', ')})`
   }
 }
 
 export class InterpreterValueVoid extends InterpreterValue {
   constructor(
   ) {
-    super();
+    super()
   }
-  getType() {
-    return primitiveTypes.void;
+  getType(): Type {
+    return primitiveTypes.void
   }
-  toJavascriptValue() {
-    throw new Error(`InterpreterValueVoid cannot be converted to javascript value`);
+  toJavascriptValue(): never {
+    throw new Error('InterpreterValueVoid cannot be converted to javascript value')
   }
-  toString() {
-    return `Void`;
+  toString(): string {
+    return `Void`
   }
 }
 
@@ -137,47 +137,47 @@ export class InterpreterValueBuiltin extends InterpreterValue {
   constructor(
     public builtin: Builtin,
   ) {
-    super();
+    super()
   }
-  getType() {
-    return primitiveTypes.func; // ???
+  getType(): Type {
+    return primitiveTypes.func // ???
   }
-  toJavascriptValue() {
-    throw new Error(`InterpreterValueBuiltin cannot be converted to javascript value`);
+  toJavascriptValue(): never {
+    throw new Error('InterpreterValueBuiltin cannot be converted to javascript value')
   }
-  toString() {
-    return `Builtin(${this.builtin.name})`;
+  toString(): string {
+    return `Builtin(${this.builtin.name})`
   }
 }
 
 export class InterpreterValueObject extends InterpreterValue {
-  public fields: Map<string, InterpreterValue> = new Map();
+  public fields: Map<string, InterpreterValue> = new Map()
   constructor(
     public classTypeWrapper: TypeWrapper,
   ) {
-    super();
+    super()
   }
-  getType() {
-    return this.classTypeWrapper.type;
+  getType(): Type {
+    return this.classTypeWrapper.type
   }
-  toJavascriptValue() {
-    throw new Error(`InterpreterValueObject cannot be converted to javascript value`);
+  toJavascriptValue(): never {
+    throw new Error('InterpreterValueObject cannot be converted to javascript value')
   }
-  toString() {
-    return `Object(${this.classTypeWrapper.toString()})`;
+  toString(): string {
+    return `Object(${this.classTypeWrapper.toString()})`
   }
   getField(propertyName: string): InterpreterValue {
-    const fieldValue = this.fields.get(propertyName);
+    const fieldValue = this.fields.get(propertyName)
     if (fieldValue !== undefined) {
-      return fieldValue;
+      return fieldValue
     }
-    throw new Error(`internal error: property not defined or not initialized`);
+    throw new Error('internal error: property not defined or not initialized')
   }
-  setField(fieldName: string, newValue: InterpreterValue) {
+  setField(fieldName: string, newValue: InterpreterValue): void {
     if (this.classTypeWrapper.getClassType().fields.has(fieldName) === false) {
-      throw new Error(`internal error: field not defined`);
+      throw new Error('internal error: field not defined')
     }
-    this.fields.set(fieldName, newValue);
+    this.fields.set(fieldName, newValue)
   }
 }
 

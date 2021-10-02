@@ -1,37 +1,37 @@
-import { Token } from "../Token"
-import { ValueType } from "./ValueType"
-import { TypeAnnotation } from "./TypeAnnotation"
-import { FunctionParameter } from "./FunctionParameter"
-import { GenericDefinition } from "./GenericDefinition"
+import { Token } from '../Token'
+import { ValueType } from './ValueType'
+import { TypeAnnotation } from './TypeAnnotation'
+import { FunctionParameter } from './FunctionParameter'
+import { GenericDefinition } from './GenericDefinition'
 
-export interface SyntaxNodeVisitor<T> {
+export interface ISyntaxNodeVisitor<T> {
   // visitBinary(node: BinarySyntaxNode): T;
   // visitUnary(node: UnarySyntaxNode): T;
-  visitLiteral(node: LiteralSyntaxNode): T;
-  visitGrouping(node: GroupingSyntaxNode): T;
-  visitStatementBlock(node: StatementBlockSyntaxNode): T;
-  visitIfStatement(node: IfStatementSyntaxNode): T;
-  visitWhileStatement(node: WhileStatementSyntaxNode): T;
-  visitReturnStatement(node: ReturnStatementSyntaxNode): T;
-  visitLogicShortCircuit(node: LogicShortCircuitSyntaxNode): T;
-  visitVariableLookup(node: VariableLookupSyntaxNode): T;
-  visitClassDeclaration(node: ClassDeclarationSyntaxNode): T;
-  visitTypeDeclaration(node: TypeDeclarationSyntaxNode): T;
-  visitObjectInstantiation(node: ObjectInstantiationSyntaxNode): T;
-  visitVariableAssignment(node: VariableAssignmentSyntaxNode): T;
-  visitFunctionHomonym(node: FunctionHomonymSyntaxNode): T;
-  visitFunctionOverload(node: FunctionOverloadSyntaxNode): T;
-  visitFunctionCall(node: FunctionCallSyntaxNode): T;
-  visitMemberLookup(node: MemberLookupSyntaxNode): T;
-  visitMemberAssignment(node: MemberAssignmentSyntaxNode): T;
+  visitLiteral(node: LiteralSyntaxNode): T
+  visitGrouping(node: GroupingSyntaxNode): T
+  visitStatementBlock(node: StatementBlockSyntaxNode): T
+  visitIfStatement(node: IfStatementSyntaxNode): T
+  visitWhileStatement(node: WhileStatementSyntaxNode): T
+  visitReturnStatement(node: ReturnStatementSyntaxNode): T
+  visitLogicShortCircuit(node: LogicShortCircuitSyntaxNode): T
+  visitVariableLookup(node: VariableLookupSyntaxNode): T
+  visitClassDeclaration(node: ClassDeclarationSyntaxNode): T
+  visitTypeDeclaration(node: TypeDeclarationSyntaxNode): T
+  visitObjectInstantiation(node: ObjectInstantiationSyntaxNode): T
+  visitVariableAssignment(node: VariableAssignmentSyntaxNode): T
+  visitFunctionHomonym(node: FunctionHomonymSyntaxNode): T
+  visitFunctionOverload(node: FunctionOverloadSyntaxNode): T
+  visitFunctionCall(node: FunctionCallSyntaxNode): T
+  visitMemberLookup(node: MemberLookupSyntaxNode): T
+  visitMemberAssignment(node: MemberAssignmentSyntaxNode): T
 }
 
 export abstract class SyntaxNode {
   public constructor(
     public referenceToken: Token,
   ) { }
-  public abstract accept<R>(visitor: SyntaxNodeVisitor<R>): R;
-  public abstract kind(): string;
+  public abstract accept<R>(visitor: ISyntaxNodeVisitor<R>): R
+  public abstract kind(): string
 }
 
 export class LiteralSyntaxNode extends SyntaxNode {
@@ -40,13 +40,13 @@ export class LiteralSyntaxNode extends SyntaxNode {
     public value: unknown,
     public type: ValueType,
   ) {
-    super(referenceToken);
+    super(referenceToken)
   }
-  accept<R>(visitor: SyntaxNodeVisitor<R>) {
-    return visitor.visitLiteral(this);
+  accept<R>(visitor: ISyntaxNodeVisitor<R>): R {
+    return visitor.visitLiteral(this)
   }
-  kind() {
-    return 'Literal';
+  kind(): string {
+    return 'Literal'
   }
 }
 
@@ -55,13 +55,13 @@ export class GroupingSyntaxNode extends SyntaxNode {
     referenceToken: Token,
     public expr: SyntaxNode,
   ) {
-    super(referenceToken);
+    super(referenceToken)
   }
-  accept<R>(visitor: SyntaxNodeVisitor<R>) {
-    return visitor.visitGrouping(this);
+  accept<R>(visitor: ISyntaxNodeVisitor<R>): R {
+    return visitor.visitGrouping(this)
   }
-  kind() {
-    return 'Grouping';
+  kind(): string {
+    return 'Grouping'
   }
 }
 
@@ -70,13 +70,13 @@ export class StatementBlockSyntaxNode extends SyntaxNode {
     referenceToken: Token,
     public statementList: Array<SyntaxNode>,
   ) {
-    super(referenceToken);
+    super(referenceToken)
   }
-  accept<R>(visitor: SyntaxNodeVisitor<R>) {
-    return visitor.visitStatementBlock(this);
+  accept<R>(visitor: ISyntaxNodeVisitor<R>): R {
+    return visitor.visitStatementBlock(this)
   }
-  kind() {
-    return 'StatementBlock';
+  kind(): string {
+    return 'StatementBlock'
   }
 }
 
@@ -87,13 +87,13 @@ export class IfStatementSyntaxNode extends SyntaxNode {
     public thenBranch: StatementBlockSyntaxNode,
     public elseBranch: StatementBlockSyntaxNode | null,
   ) {
-    super(referenceToken);
+    super(referenceToken)
   }
-  accept<R>(visitor: SyntaxNodeVisitor<R>) {
-    return visitor.visitIfStatement(this);
+  accept<R>(visitor: ISyntaxNodeVisitor<R>): R {
+    return visitor.visitIfStatement(this)
   }
-  kind() {
-    return 'IfStatement';
+  kind(): string {
+    return 'IfStatement'
   }
 }
 
@@ -103,13 +103,13 @@ export class WhileStatementSyntaxNode extends SyntaxNode {
     public cond: SyntaxNode,
     public loopBody: StatementBlockSyntaxNode,
   ) {
-    super(referenceToken);
+    super(referenceToken)
   }
-  accept<R>(visitor: SyntaxNodeVisitor<R>) {
-    return visitor.visitWhileStatement(this);
+  accept<R>(visitor: ISyntaxNodeVisitor<R>): R {
+    return visitor.visitWhileStatement(this)
   }
-  kind() {
-    return 'WhileStatement';
+  kind(): string {
+    return 'WhileStatement'
   }
 }
 
@@ -118,13 +118,13 @@ export class ReturnStatementSyntaxNode extends SyntaxNode {
     referenceToken: Token,
     public retvalExpr: SyntaxNode | null,
   ) {
-    super(referenceToken);
+    super(referenceToken)
   }
-  accept<R>(visitor: SyntaxNodeVisitor<R>) {
-    return visitor.visitReturnStatement(this);
+  accept<R>(visitor: ISyntaxNodeVisitor<R>): R {
+    return visitor.visitReturnStatement(this)
   }
-  kind() {
-    return 'ReturnStatement';
+  kind(): string {
+    return 'ReturnStatement'
   }
 }
 
@@ -135,13 +135,13 @@ export class LogicShortCircuitSyntaxNode extends SyntaxNode {
     public op: Token,
     public right: SyntaxNode,
   ) {
-    super(referenceToken);
+    super(referenceToken)
   }
-  accept<R>(visitor: SyntaxNodeVisitor<R>) {
-    return visitor.visitLogicShortCircuit(this);
+  accept<R>(visitor: ISyntaxNodeVisitor<R>): R {
+    return visitor.visitLogicShortCircuit(this)
   }
-  kind() {
-    return 'LogicShortCircuit';
+  kind(): string {
+    return 'LogicShortCircuit'
   }
 }
 
@@ -150,13 +150,13 @@ export class VariableLookupSyntaxNode extends SyntaxNode {
     referenceToken: Token,
     public identifier: Token,
   ) {
-    super(referenceToken);
+    super(referenceToken)
   }
-  accept<R>(visitor: SyntaxNodeVisitor<R>) {
-    return visitor.visitVariableLookup(this);
+  accept<R>(visitor: ISyntaxNodeVisitor<R>): R {
+    return visitor.visitVariableLookup(this)
   }
-  kind() {
-    return 'VariableLookup';
+  kind(): string {
+    return 'VariableLookup'
   }
 }
 
@@ -169,11 +169,11 @@ export class TypeDeclarationSyntaxNode extends SyntaxNode {
   ) {
     super(referenceToken)
   }
-  accept<R>(visitor: SyntaxNodeVisitor<R>) {
-    return visitor.visitTypeDeclaration(this);
+  accept<R>(visitor: ISyntaxNodeVisitor<R>): R {
+    return visitor.visitTypeDeclaration(this)
   }
-  kind() {
-    return 'TypeDeclaration';
+  kind(): string {
+    return 'TypeDeclaration'
   }
 }
 
@@ -187,13 +187,13 @@ export class ClassDeclarationSyntaxNode extends SyntaxNode {
     public methods: Map<string, FunctionHomonymSyntaxNode>,
     public fields: Map<string, TypeAnnotation | null>,
   ) {
-    super(referenceToken);
+    super(referenceToken)
   }
-  accept<R>(visitor: SyntaxNodeVisitor<R>) {
-    return visitor.visitClassDeclaration(this);
+  accept<R>(visitor: ISyntaxNodeVisitor<R>): R {
+    return visitor.visitClassDeclaration(this)
   }
-  kind() {
-    return 'ClassDeclaration';
+  kind(): string {
+    return 'ClassDeclaration'
   }
 }
 
@@ -205,11 +205,11 @@ export class ObjectInstantiationSyntaxNode extends SyntaxNode {
   ) {
     super(referenceToken)
   }
-  accept<R>(visitor: SyntaxNodeVisitor<R>) {
-    return visitor.visitObjectInstantiation(this);
+  accept<R>(visitor: ISyntaxNodeVisitor<R>): R {
+    return visitor.visitObjectInstantiation(this)
   }
-  kind() {
-    return 'ObjectInstantiation';
+  kind(): string {
+    return 'ObjectInstantiation'
   }
 }
 
@@ -221,13 +221,13 @@ export class VariableAssignmentSyntaxNode extends SyntaxNode {
     public typeAnnotation: TypeAnnotation | null,
     public rvalue: SyntaxNode | null,
   ) {
-    super(referenceToken);
+    super(referenceToken)
   }
-  accept<R>(visitor: SyntaxNodeVisitor<R>) {
-    return visitor.visitVariableAssignment(this);
+  accept<R>(visitor: ISyntaxNodeVisitor<R>): R {
+    return visitor.visitVariableAssignment(this)
   }
-  kind() {
-    return 'VariableAssignment';
+  kind(): string {
+    return 'VariableAssignment'
   }
 }
 
@@ -239,13 +239,13 @@ export class FunctionOverloadSyntaxNode extends SyntaxNode {
     public returnTypeAnnotation: TypeAnnotation | null,
     public statementList: Array<SyntaxNode>,
   ) {
-    super(referenceToken);
+    super(referenceToken)
   }
-  accept<R>(visitor: SyntaxNodeVisitor<R>) {
-    return visitor.visitFunctionOverload(this);
+  accept<R>(visitor: ISyntaxNodeVisitor<R>): R {
+    return visitor.visitFunctionOverload(this)
   }
-  kind() {
-    return 'FunctionOverload';
+  kind(): string {
+    return 'FunctionOverload'
   }
 }
 
@@ -254,13 +254,13 @@ export class FunctionHomonymSyntaxNode extends SyntaxNode {
     public overloads: Array<FunctionOverloadSyntaxNode>,
     // public genericDefinition: GenericDefinition | null,
   ) {
-    super(overloads[0].referenceToken);
+    super(overloads[ 0 ].referenceToken)
   }
-  accept<R>(visitor: SyntaxNodeVisitor<R>) {
-    return visitor.visitFunctionHomonym(this);
+  accept<R>(visitor: ISyntaxNodeVisitor<R>): R {
+    return visitor.visitFunctionHomonym(this)
   }
-  kind() {
-    return 'FunctionHomonym';
+  kind(): string {
+    return 'FunctionHomonym'
   }
 }
 
@@ -270,13 +270,13 @@ export class FunctionCallSyntaxNode extends SyntaxNode {
     public callee: SyntaxNode,
     public argumentList: Array<SyntaxNode>,
   ) {
-    super(referenceToken);
+    super(referenceToken)
   }
-  accept<R>(visitor: SyntaxNodeVisitor<R>) {
-    return visitor.visitFunctionCall(this);
+  accept<R>(visitor: ISyntaxNodeVisitor<R>): R {
+    return visitor.visitFunctionCall(this)
   }
-  kind() {
-    return 'FunctionCall';
+  kind(): string {
+    return 'FunctionCall'
   }
 }
 
@@ -286,13 +286,13 @@ export class MemberLookupSyntaxNode extends SyntaxNode {
     public object: SyntaxNode,
     public memberName: Token,
   ) {
-    super(referenceToken);
+    super(referenceToken)
   }
-  accept<R>(visitor: SyntaxNodeVisitor<R>) {
-    return visitor.visitMemberLookup(this);
+  accept<R>(visitor: ISyntaxNodeVisitor<R>): R {
+    return visitor.visitMemberLookup(this)
   }
-  kind() {
-    return 'MemberLookup';
+  kind(): string {
+    return 'MemberLookup'
   }
 }
 
@@ -303,12 +303,12 @@ export class MemberAssignmentSyntaxNode extends SyntaxNode {
     public memberName: Token,
     public rvalue: SyntaxNode,
   ) {
-    super(referenceToken);
+    super(referenceToken)
   }
-  accept<R>(visitor: SyntaxNodeVisitor<R>) {
-    return visitor.visitMemberAssignment(this);
+  accept<R>(visitor: ISyntaxNodeVisitor<R>): R {
+    return visitor.visitMemberAssignment(this)
   }
-  kind() {
-    return 'MemberAssignment';
+  kind(): string {
+    return 'MemberAssignment'
   }
 }

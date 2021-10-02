@@ -1,19 +1,19 @@
-import chalk from "chalk"
-import { SyntaxNode } from "../compiler/syntax/syntax"
-import { InternalError, mapGetOrPut, throwExpr } from "../util"
-import { TypeWrapper } from "./types"
+import chalk from 'chalk'
+import { SyntaxNode } from '../compiler/syntax/syntax'
+import { InternalError, mapGetOrPut } from '../util'
+import { TypeWrapper } from './types'
 
 export class CoercionConstraint {
   constructor(
     public inputTypeWrappers: Array<TypeWrapper>,
     public outputTypeWrapper: TypeWrapper,
   ) { }
-  dump() {
-    console.log(chalk.bgBlue.whiteBright(`coercionConstraint: ${this.inputTypeWrappers.map(x => x.toString()).join(', ')} => ${this.outputTypeWrapper.toString()}`));
-    this.inputTypeWrappers.forEach(inputTypeWrapper => {
-      displayNodeSourcePosition('input', inputTypeWrapper.referenceNode);
-    });
-    displayNodeSourcePosition('output', this.outputTypeWrapper.referenceNode);
+  dump(): void {
+    console.log(chalk.bgBlue.whiteBright(`coercionConstraint: ${this.inputTypeWrappers.map((x) => x.toString()).join(', ')} => ${this.outputTypeWrapper.toString()}`))
+    this.inputTypeWrappers.forEach((inputTypeWrapper) => {
+      displayNodeSourcePosition('input', inputTypeWrapper.referenceNode)
+    })
+    displayNodeSourcePosition('output', this.outputTypeWrapper.referenceNode)
   }
 }
 
@@ -23,13 +23,13 @@ export class FunctionCallConstraint {
     public argumentTypeWrappers: Array<TypeWrapper>,
     public returnTypeWrapper: TypeWrapper,
   ) { }
-  dump() {
-    console.log(chalk.bgBlue.whiteBright(`callConstraint: call ${this.calleeTypeWrapper.toString()} with args (${this.argumentTypeWrappers.map(x => x.toString()).join(', ')}) returns ${this.returnTypeWrapper.toString()}`));
-    displayNodeSourcePosition('callee', this.calleeTypeWrapper.referenceNode);
-    this.argumentTypeWrappers.forEach(argumentTypeWrapper => {
-      displayNodeSourcePosition('argument', argumentTypeWrapper.referenceNode);
-    });
-    displayNodeSourcePosition('return', this.returnTypeWrapper.referenceNode);
+  dump(): void {
+    console.log(chalk.bgBlue.whiteBright(`callConstraint: call ${this.calleeTypeWrapper.toString()} with args (${this.argumentTypeWrappers.map((x) => x.toString()).join(', ')}) returns ${this.returnTypeWrapper.toString()}`))
+    displayNodeSourcePosition('callee', this.calleeTypeWrapper.referenceNode)
+    this.argumentTypeWrappers.forEach((argumentTypeWrapper) => {
+      displayNodeSourcePosition('argument', argumentTypeWrapper.referenceNode)
+    })
+    displayNodeSourcePosition('return', this.returnTypeWrapper.referenceNode)
   }
 }
 
@@ -39,13 +39,13 @@ export class FunctionOverloadConstraint {
     public parameterTypeWrappers: Array<TypeWrapper>,
     public returnTypeWrapper: TypeWrapper,
   ) { }
-  dump() {
-    console.log(chalk.bgBlue.whiteBright(`functionOverloadConstraint: ${this.calleeTypeWrapper.toString()} takes params (${this.parameterTypeWrappers.map(x => x.toString()).join(', ')}) and returns ${this.returnTypeWrapper.toString()}`));
-    displayNodeSourcePosition('callee', this.calleeTypeWrapper.referenceNode);
-    this.parameterTypeWrappers.forEach(parameterTypeWrapper => {
-      displayNodeSourcePosition('parameter', parameterTypeWrapper.referenceNode);
-    });
-    displayNodeSourcePosition('return', this.returnTypeWrapper.referenceNode);
+  dump(): void {
+    console.log(chalk.bgBlue.whiteBright(`functionOverloadConstraint: ${this.calleeTypeWrapper.toString()} takes params (${this.parameterTypeWrappers.map((x) => x.toString()).join(', ')}) and returns ${this.returnTypeWrapper.toString()}`))
+    displayNodeSourcePosition('callee', this.calleeTypeWrapper.referenceNode)
+    this.parameterTypeWrappers.forEach((parameterTypeWrapper) => {
+      displayNodeSourcePosition('parameter', parameterTypeWrapper.referenceNode)
+    })
+    displayNodeSourcePosition('return', this.returnTypeWrapper.referenceNode)
   }
 }
 
@@ -55,36 +55,36 @@ export class PropertyConstraint {
     public propertyName: string,
     public propertyTypeWrapper: TypeWrapper, // ?
   ) { }
-  dump() {
-    console.log(chalk.bgBlue.whiteBright(`propertyConstraint: object ${this.objectTypeWrapper.toString()} has a field called "${this.propertyName}" of type ${this.propertyTypeWrapper.toString()}`));
-    displayNodeSourcePosition('object', this.objectTypeWrapper.referenceNode);
-    displayNodeSourcePosition('property', this.propertyTypeWrapper.referenceNode);
+  dump(): void {
+    console.log(chalk.bgBlue.whiteBright(`propertyConstraint: object ${this.objectTypeWrapper.toString()} has a field called "${this.propertyName}" of type ${this.propertyTypeWrapper.toString()}`))
+    displayNodeSourcePosition('object', this.objectTypeWrapper.referenceNode)
+    displayNodeSourcePosition('property', this.propertyTypeWrapper.referenceNode)
   }
 }
 
 export class InferenceEngineConstraints {
-  private coercionConstraints: Map<TypeWrapper, CoercionConstraint> = new Map();
-  public functionCallConstraints: Array<FunctionCallConstraint> = [];
-  public functionOverloadConstraints: Array<FunctionOverloadConstraint> = [];
-  public propertyConstraints: Array<PropertyConstraint> = []; // a class type has a field/method with a type
-  public addCoercionConstraint(newCoercionConstraint: CoercionConstraint) {
+  private coercionConstraints: Map<TypeWrapper, CoercionConstraint> = new Map()
+  public functionCallConstraints: Array<FunctionCallConstraint> = []
+  public functionOverloadConstraints: Array<FunctionOverloadConstraint> = []
+  public propertyConstraints: Array<PropertyConstraint> = [] // a class type has a field/method with a type
+  public addCoercionConstraint(newCoercionConstraint: CoercionConstraint): void {
     if (this.coercionConstraints.has(newCoercionConstraint.outputTypeWrapper)) {
-      throw new InternalError(`attempted to add more than one coercion constraint for same output type wrapper`)
+      throw new InternalError('attempted to add more than one coercion constraint for same output type wrapper')
     }
-    this.coercionConstraints.set(newCoercionConstraint.outputTypeWrapper, newCoercionConstraint);
+    this.coercionConstraints.set(newCoercionConstraint.outputTypeWrapper, newCoercionConstraint)
   }
-  public getOrCreateCoercionConstraintByOutputTypeWrapper(outputTypeWrapper: TypeWrapper) {
+  public getOrCreateCoercionConstraintByOutputTypeWrapper(outputTypeWrapper: TypeWrapper): CoercionConstraint {
     return mapGetOrPut(this.coercionConstraints, outputTypeWrapper, () => {
-      return new CoercionConstraint([], outputTypeWrapper);
-    });
+      return new CoercionConstraint([], outputTypeWrapper)
+    })
   }
-  public removeCoercionConstraint(coercionConstraint: CoercionConstraint) {
-    this.coercionConstraints.delete(coercionConstraint.outputTypeWrapper);
+  public removeCoercionConstraint(coercionConstraint: CoercionConstraint): void {
+    this.coercionConstraints.delete(coercionConstraint.outputTypeWrapper)
   }
-  public forEachCoercionConstraint(callback: (coercionConstraint: CoercionConstraint) => void) {
-    this.coercionConstraints.forEach(callback);
+  public forEachCoercionConstraint(callback: (coercionConstraint: CoercionConstraint) => void): void {
+    this.coercionConstraints.forEach(callback)
   }
-  // public dump() {
+  // public dump(): void {
   //   this.coercionConstraints.forEach((coercionConstraint, _key) => {
   //     coercionConstraint.dump();
   //   });
@@ -102,9 +102,9 @@ export class InferenceEngineConstraints {
 
 function displayNodeSourcePosition(label: string, referenceNodeOrDescription: SyntaxNode | string) {
   if (referenceNodeOrDescription instanceof SyntaxNode) {
-    referenceNodeOrDescription.referenceToken.printPositionInSource(label);
+    referenceNodeOrDescription.referenceToken.printPositionInSource(label)
   }
   else {
-    console.log(chalk.cyan(label + ': ') + referenceNodeOrDescription);
+    console.log(chalk.cyan(label + ': ') + referenceNodeOrDescription)
   }
 }

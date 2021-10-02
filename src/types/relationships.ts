@@ -1,10 +1,10 @@
-import { TypeWrapper } from "./types"
+import { TypeWrapper } from './types'
 
-export const allTypeRelationships: Array<TypeRelationship> = [];
+export const allTypeRelationships: Array<TypeRelationship> = []
 
 export class TypeRelationship {
   protected constructor() {
-    allTypeRelationships.push(this);
+    allTypeRelationships.push(this)
   }
 }
 
@@ -14,7 +14,7 @@ export class TypeRelationshipCall extends TypeRelationship {
     public args: Array<TypeWrapper>,
     public ret: TypeWrapper,
   ) {
-    super();
+    super()
   }
 }
 
@@ -23,7 +23,7 @@ export class TypeRelationshipCoerce extends TypeRelationship {
     public source: TypeWrapper,
     public target: TypeWrapper,
   ) {
-    super();
+    super()
   }
 }
 

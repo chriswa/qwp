@@ -1,4 +1,4 @@
-import { ErrorWithSourcePos } from "../ErrorWithSourcePos"
+import { ErrorWithSourcePos } from '../ErrorWithSourcePos'
 
 export enum TestResultKind {
   COMPILE_ERROR,
@@ -17,9 +17,9 @@ export class TestResult {
     public errorsWithSourcePos: Array<ErrorWithSourcePos> | undefined,
   ) { }
   matchesKind(other: TestResult): boolean {
-    return this.constructor === other.constructor;
+    return this.constructor === other.constructor
   }
   matchesDetail(other: TestResult): boolean {
-    return this.matchesKind(other) && this.detail === other.detail;
+    return this.matchesKind(other) && this.detail === other.detail
   }
 }

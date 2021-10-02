@@ -1,7 +1,7 @@
-import { SyntaxNode } from "../compiler/syntax/syntax"
+import { SyntaxNode } from '../compiler/syntax/syntax'
 
 export class NodeVisitationState {
-  public stepCounter: number = 0;
+  public stepCounter = 0
   constructor(
     public node: SyntaxNode,
   ) { }

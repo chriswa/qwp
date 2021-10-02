@@ -1,5 +1,5 @@
-import { sourceReporter } from "../sourceReporter"
-import { GenericLexerToken } from "./lexer/GenericLexer";
+import { sourceReporter } from '../sourceReporter'
+import { GenericLexerToken } from './lexer/GenericLexer'
 
 export enum TokenType {
   EOF,
@@ -52,11 +52,11 @@ export enum TokenType {
 
 export class Token extends GenericLexerToken {
   public constructor(
-    public type: TokenType
+    public type: TokenType,
   ) {
-    super();
+    super()
   }
-  printPositionInSource(label: string | undefined) {
-    sourceReporter.printPositionInSource(this.path, this.charPos, label);
+  printPositionInSource(label: string | undefined): void {
+    sourceReporter.printPositionInSource(this.path, this.charPos, label)
   }
 }

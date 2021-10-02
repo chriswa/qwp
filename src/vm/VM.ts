@@ -1,6 +1,6 @@
-import { ByteBuffer } from "../bytecode/ByteBuffer"
-import { OpCode } from "../bytecode/opcodes"
-import { opCodeHandlers } from "./opCodeHandlers"
+import { ByteBuffer } from '../bytecode/ByteBuffer'
+import { OpCode } from '../bytecode/opcodes'
+import { opCodeHandlers } from './opCodeHandlers'
 
 /*
 class LegitHeap {
@@ -45,72 +45,72 @@ class ClosureStruct {
 }
 
 class Heap {
-  private ptrMap: Map<number, unknown> = new Map();
-  private nextIndex = 0xffff;
-  private reusableIndexes: Array<number> = [];
+  private ptrMap: Map<number, unknown> = new Map()
+  private nextIndex = 0xffff
+  private reusableIndexes: Array<number> = []
   public constructor(
     public vm: VM,
   ) {
   }
   private acquireIndex() {
     if (this.reusableIndexes.length > 0) {
-      return this.reusableIndexes.pop()!;
+      return this.reusableIndexes.pop()!
     }
     else {
-      const index = this.nextIndex;
-      this.nextIndex -= 1;
-      return index;
+      const index = this.nextIndex
+      this.nextIndex -= 1
+      return index
     }
   }
   public allocNumber(value: number): number {
-    const index = this.acquireIndex();
-    this.ptrMap.set(index, value);
-    return index;
+    const index = this.acquireIndex()
+    this.ptrMap.set(index, value)
+    return index
   }
   public allocClosure(functionIndex: number, closureValues: Array<number>): number {
-    const index = this.acquireIndex();
-    this.ptrMap.set(index, new ClosureStruct(functionIndex, closureValues.length, closureValues));
-    return index;
+    const index = this.acquireIndex()
+    this.ptrMap.set(index, new ClosureStruct(functionIndex, closureValues.length, closureValues))
+    return index
   }
   public fetchNumber(ptr: number): number {
-    return this.ptrMap.get(ptr) as number;
+    return this.ptrMap.get(ptr) as number
   }
   public fetchClosure(ptr: number): ClosureStruct {
-    return this.ptrMap.get(ptr) as ClosureStruct;
+    return this.ptrMap.get(ptr) as ClosureStruct
   }
   public assignNumber(ptr: number, value: number) {
-    this.ptrMap.set(ptr, value);
+    this.ptrMap.set(ptr, value)
   }
 }
 
 export class VM {
-  public ramBuffer: ByteBuffer; // this.ramBuffer.byteCursor is our stack pointer!
-  public isHalted = false;
-  public callFrameIndex = 0; // for accessing locals (e.g. callFrameIndex + 0 => first function argument)
-  public returnInfoOffset = 0;
-  public heap: Heap;
+  public ramBuffer: ByteBuffer // this.ramBuffer.byteCursor is our stack pointer!
+  public isHalted = false
+  public callFrameIndex = 0 // for accessing locals (e.g. callFrameIndex + 0 => first function argument)
+  public returnInfoOffset = 0
+  public heap: Heap
   public constructor(
     public constantBuffer: ByteBuffer,
     ramBytesTotal: number, // includes stack and heap!
   ) {
-    this.ramBuffer = new ByteBuffer(new ArrayBuffer(ramBytesTotal));
-    const startConstantIndex = this.constantBuffer.peekUint32At(0);
-    this.constantBuffer.setByteCursor(startConstantIndex * 4);
-    this.heap = new Heap(this); // TODO: figure out how to prevent conflicts between builtin Ids and closure indexes on the heap
+    this.ramBuffer = new ByteBuffer(new ArrayBuffer(ramBytesTotal))
+    const startConstantIndex = this.constantBuffer.peekUint32At(0)
+    this.constantBuffer.setByteCursor(startConstantIndex * 4)
+    this.heap = new Heap(this) // TODO: figure out how to prevent conflicts between builtin Ids and closure indexes on the heap
   }
-  public setStackLimit(wordLimit: number) {
-    const byteLength = 4 * wordLimit;
+  public setStackLimit(wordLimit: number): void {
+    const byteLength = 4 * wordLimit
     if (this.ramBuffer.byteCursor > byteLength) {
-      throw new Error(`Out of memory`);
+      throw new Error('Out of memory')
     }
-    this.ramBuffer.pushByteLimit = byteLength;
+    this.ramBuffer.pushByteLimit = byteLength
   }
-  public runOneInstruction() {
-    const opCode = this.constantBuffer.readUint8();
-    const handler = opCodeHandlers[opCode];
+  public runOneInstruction(): void {
+    const opCode = this.constantBuffer.readUint8()
+    const handler = opCodeHandlers[ opCode ]
     if (handler === undefined) {
-      throw new Error(`unknown opcode ${OpCode[opCode]}`)
+      throw new Error(`unknown opcode ${OpCode[ opCode ]}`)
     }
-    handler(this);
+    handler(this)
   }
 }

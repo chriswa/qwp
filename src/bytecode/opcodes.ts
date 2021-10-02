@@ -29,4 +29,4 @@ export enum OpCode {
   RETURN,
   PUSH_BUILTIN,
   CODESTOP, // only used by decompiler!
-};
+}

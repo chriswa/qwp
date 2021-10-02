@@ -1,13 +1,13 @@
-import { TypeWrapper, BuiltinFunctionHomonymType, Type, primitiveTypes, BuiltinFunctionOverloadType } from "../types/types"
-import { InternalError, zipMap } from "../util"
+import { TypeWrapper, BuiltinFunctionHomonymType, Type, primitiveTypes, BuiltinFunctionOverloadType } from '../types/types'
+import { InternalError, zipMap } from '../util'
 
-let printCallback: (str: string) => void = console.log;
+let printCallback: (str: string) => void = console.log
 
-export function setBuiltinPrintCallback(f: typeof printCallback) {
-  printCallback = f;
+export function setBuiltinPrintCallback(f: typeof printCallback): void {
+  printCallback = f
 }
 
-type BuiltinHandler = (args: Array<unknown>) => unknown;
+type BuiltinHandler = (args: Array<unknown>) => unknown
 
 export class BuiltinOverload {
   constructor(
@@ -25,17 +25,17 @@ export class Builtin {
     // public readonly typeWrapper: TypeWrapper,
   ) { }
   getTypeWrapper(): TypeWrapper {
-    return new TypeWrapper(`builtin(${this.name})`, new BuiltinFunctionHomonymType(this.overloads.map(overload => overload.typeWrapper)))
+    return new TypeWrapper(`builtin(${this.name})`, new BuiltinFunctionHomonymType(this.overloads.map((overload) => overload.typeWrapper)))
   }
   findMatchingOverload(argumentTypes: Array<Type>): BuiltinOverload {
     if (this.overloads.length === 1) {
-      return this.overloads[0]
+      return this.overloads[ 0 ]
     }
-    let bestOverload: BuiltinOverload | undefined
+    let bestOverload: BuiltinOverload | undefined = undefined
     this.overloads.forEach((overload) => {
       const overloadType = overload.typeWrapper.getFunctionOverloadType()
       let isMatch = true
-      zipMap([overloadType.parameterTypeWrappers, argumentTypes], (parameterTypeWrapper, argumentType) => {
+      zipMap([ overloadType.parameterTypeWrappers, argumentTypes ], (parameterTypeWrapper, argumentType) => {
         if (parameterTypeWrapper.type.isEqualTo(argumentType) === false) { // TODO: allow type coercion (e.g. super to sub class, or int to float) but score it lower!
           isMatch = false
         }
@@ -45,7 +45,7 @@ export class Builtin {
       }
     })
     if (bestOverload === undefined) {
-      throw new InternalError(`could not find acceptable builtin overload for argument types!`)
+      throw new InternalError('could not find acceptable builtin overload for argument types!')
     }
     return bestOverload
   }
@@ -55,15 +55,15 @@ export const builtinsByName: Map<string, Builtin> = new Map()
 export const builtinsById: Map<number, Builtin> = new Map()
 
 let incId = 0
-export function registerBuiltinOverload(name: string, argTypes: Array<Type>, retvalType: Type, cost: number, handler: BuiltinHandler) {
+export function registerBuiltinOverload(name: string, argTypes: Array<Type>, retvalType: Type, cost: number, handler: BuiltinHandler): void {
   // find existing builtin by name or create it
   let builtin = builtinsByName.get(name)
   if (builtin === undefined) {
     const id = incId++
-    if (!Number.isInteger(id) || id < 0 || id > 2 ** 16 - 1) { throw new InternalError(`builtin id must be uint32`) }
+    if (!Number.isInteger(id) || id < 0 || id > (2 ** 16) - 1) { throw new InternalError('builtin id must be uint32') }
     builtin = new Builtin(id, name)
-    builtinsByName.set(name, builtin);
-    builtinsById.set(id, builtin);
+    builtinsByName.set(name, builtin)
+    builtinsById.set(id, builtin)
   }
   // TODO: ensure that the caller doesn't add an ambiguous overload
   const overloadArgumentTypeWrappers = argTypes.map((argumentType, index) => new TypeWrapper(`builtin(${name}).arg[${index}]`, argumentType))
@@ -73,33 +73,33 @@ export function registerBuiltinOverload(name: string, argTypes: Array<Type>, ret
   builtin.overloads.push(overload)
 }
 
-registerBuiltinOverload("printFloat32", [primitiveTypes.float32], primitiveTypes.void, 1, (args) => {
+registerBuiltinOverload('printFloat32', [ primitiveTypes.float32 ], primitiveTypes.void, 1, (args) => {
   printCallback(`printFloat32: ${args}`)
 })
 
-registerBuiltinOverload("printUint32", [primitiveTypes.uint32], primitiveTypes.void, 1, (args) => {
+registerBuiltinOverload('printUint32', [ primitiveTypes.uint32 ], primitiveTypes.void, 1, (args) => {
   printCallback(`printUint32: ${args}`)
 })
 
-registerBuiltinOverload("print", [primitiveTypes.uint32], primitiveTypes.void, 1, (args) => {
+registerBuiltinOverload('print', [ primitiveTypes.uint32 ], primitiveTypes.void, 1, (args) => {
   printCallback(`print: ${args}`)
 })
-registerBuiltinOverload("print", [primitiveTypes.float32], primitiveTypes.void, 1, (args) => {
+registerBuiltinOverload('print', [ primitiveTypes.float32 ], primitiveTypes.void, 1, (args) => {
   printCallback(`print: ${args}`)
 })
 
-registerBuiltinOverload("+", [primitiveTypes.float32, primitiveTypes.float32], primitiveTypes.float32, 0, (args: any) => {
-  return args[0] + args[1]
+registerBuiltinOverload('+', [ primitiveTypes.float32, primitiveTypes.float32 ], primitiveTypes.float32, 0, (args: any) => {
+  return (args[ 0 ] as number) + (args[ 1 ] as number)
 })
-registerBuiltinOverload("+", [primitiveTypes.uint32, primitiveTypes.uint32], primitiveTypes.uint32, 0, (args: any) => {
-  return args[0] + args[1]
+registerBuiltinOverload('+', [ primitiveTypes.uint32, primitiveTypes.uint32 ], primitiveTypes.uint32, 0, (args: any) => {
+  return (args[ 0 ] as number) + (args[ 1 ] as number)
 })
 
-registerBuiltinOverload("==", [primitiveTypes.float32, primitiveTypes.float32], primitiveTypes.bool32, 0, (args: any) => {
-  return args[0] === args[1]
+registerBuiltinOverload('==', [ primitiveTypes.float32, primitiveTypes.float32 ], primitiveTypes.bool32, 0, (args: any) => {
+  return (args[ 0 ] as number) === (args[ 1 ] as number)
 })
-registerBuiltinOverload("==", [primitiveTypes.uint32, primitiveTypes.uint32], primitiveTypes.bool32, 0, (args: any) => {
-  return args[0] === args[1]
+registerBuiltinOverload('==', [ primitiveTypes.uint32, primitiveTypes.uint32 ], primitiveTypes.bool32, 0, (args: any) => {
+  return (args[ 0 ] as number) === (args[ 1 ] as number)
 })
 
 // case TokenType.PLUS: /* OpCode.ADD */ this.pushValue(new InterpreterValueFloat32(left.asFloat32().value + right.asFloat32().value)); break;

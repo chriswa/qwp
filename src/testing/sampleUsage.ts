@@ -1,18 +1,18 @@
-import { registerBuiltinOverload } from "../builtins/builtins"
+import { registerBuiltinOverload } from '../builtins/builtins'
 import { createInterpreter } from '../interpreter/Interpreter'
-import { primitiveTypes } from "../types/types"
+import { primitiveTypes } from '../types/types'
 
-let heading = 0
-registerBuiltinOverload("querySensor", [primitiveTypes.uint32], primitiveTypes.float32, 1, ([]) => {
+// const heading = 0
+registerBuiltinOverload('querySensor', [ primitiveTypes.uint32 ], primitiveTypes.float32, 1, (_args) => {
   const result = Math.random() < 0.5 ? 0 : 1
   console.log(`sensor result returning ${result}`)
   return result
 })
-registerBuiltinOverload("turn", [primitiveTypes.uint32], primitiveTypes.void, 1, ([direction]) => {
+registerBuiltinOverload('turn', [ primitiveTypes.uint32 ], primitiveTypes.void, 1, ([ direction ]) => {
   console.log(`turning ${direction}`)
 })
-registerBuiltinOverload("move", [], primitiveTypes.void, 1, ([]) => {
-  console.log(`moving!`)
+registerBuiltinOverload('move', [], primitiveTypes.void, 1, (_args) => {
+  console.log('moving!')
 })
 
 const path = 'SAMPLE PATH'
@@ -26,7 +26,7 @@ else {
 }
 `.trim()
 
-//const source = fs.readFileSync(path, "utf8")
+// const source = fs.readFileSync(path, "utf8")
 const isDebug = false
 const interpreter = createInterpreter(path, source, isDebug)
 const remainingBudget = interpreter.runUntilBudgetExhausted(100)
