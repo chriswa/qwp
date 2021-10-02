@@ -103,7 +103,7 @@ export function decompileOneInstruction(buffer: ByteBuffer, pendingDecompilation
     case OpCode.PUSH_BUILTIN:
       const builtInId = buffer.readUint16();
       const builtin = builtinsById.get(builtInId)!;
-      line += ` ${builtInId.toString(16).padStart(4, "0")} => ${builtin.name} : ${builtin.typeWrapper.toString()}`;
+      line += ` ${builtInId.toString(16).padStart(4, "0")} => ${builtin.name} : ${builtin.getTypeWrapper().toString()}`;
       break;
     case OpCode.CODESTOP:
       return false;

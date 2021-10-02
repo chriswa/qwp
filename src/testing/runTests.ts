@@ -4,7 +4,7 @@ import { printFailedTestHeader, printTestsRunnerHeader, printTestsRunnerSuccess,
 import { setBuiltinPrintCallback } from "../builtins/builtins"
 import { CompileError } from "../compiler/CompileError"
 import chalk from "chalk"
-import { IInterpreterFacade, Interpreter } from "../interpreter/Interpreter"
+import { createInterpreter, IInterpreterFacade, Interpreter } from "../interpreter/Interpreter"
 import { sourceReporter } from "../sourceReporter"
 import { InternalError } from "../util"
 
@@ -84,7 +84,7 @@ function interpretSource(path: string, source: string): TestResult {
   });
 
   try {
-    const interpreter = new Interpreter(path, source, DEBUG_MODE) as IInterpreterFacade;
+    const interpreter = createInterpreter(path, source, DEBUG_MODE);
     while (!interpreter.isHalted()) {
       interpreter.runOneStep();
     }

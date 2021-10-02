@@ -45,7 +45,7 @@ export class Resolver implements SyntaxNodeVisitor<TypeWrapper>, IResolverOutput
     this.inferenceEngine = new InferenceEngine(this.isDebug);
     const topScope = new ResolverScope(this, null, false, null);
     builtinsByName.forEach((builtin, builtinName) => {
-      topScope.initializeVariable(builtinName, builtin.typeWrapper, ReadOnlyStatus.ReadOnly);
+      topScope.initializeVariable(builtinName, builtin.getTypeWrapper(), ReadOnlyStatus.ReadOnly);
     });
     primitiveTypesMap.forEach((type, typeName) => {
       topScope.typeWrappers.set(typeName, new TypeWrapper(`primitiveType(${typeName})`, type));
@@ -123,7 +123,8 @@ export class Resolver implements SyntaxNodeVisitor<TypeWrapper>, IResolverOutput
     return new TypeWrapper(node, primitiveTypes.never);
   }
   visitIfStatement(node: IfStatementSyntaxNode): TypeWrapper {
-    this.resolveSyntaxNode(node.cond);
+    const condTypeWrapper = this.resolveSyntaxNode(node.cond);
+    this.inferenceEngine.addAssignmentConstraint(new TypeWrapper(node.cond, primitiveTypes.bool32), condTypeWrapper) // TODO: rename InferenceEngine.addAssignmentConstraint because this isn't assignment!
     this.resolveSyntaxNode(node.thenBranch);
     if (node.elseBranch !== null) {
       this.resolveSyntaxNode(node.elseBranch);

@@ -166,7 +166,7 @@ opCodeHandlers[OpCode.CALL] = (vm: VM) => {
   }
 }
 function callBuiltin(vm: VM, builtin: Builtin, argumentCount: number) {
-  const builtinFunctionHomonymType = builtin.typeWrapper.getFunctionHomonymType();
+  const builtinFunctionHomonymType = builtin.getTypeWrapper().getFunctionHomonymType();
   
   if (builtin.overloads.length > 1) {
     throw new Error(`TODO: determine which overload to use based on information from resolver`)
@@ -192,10 +192,10 @@ function callBuiltin(vm: VM, builtin: Builtin, argumentCount: number) {
   if (builtinFunctionOverloadType.returnTypeWrapper.type !== primitiveTypes.void) {
     const returnTypeWrapper = builtinFunctionOverloadType.returnTypeWrapper;
     if (returnTypeWrapper.type === primitiveTypes.uint32) {
-      vm.ramBuffer.pushUint32(retval);
+      vm.ramBuffer.pushUint32(retval as number);
     }
     else if (returnTypeWrapper.type === primitiveTypes.float32) {
-      vm.ramBuffer.pushFloat32(retval);
+      vm.ramBuffer.pushFloat32(retval as number);
     }
     else {
       throw new Error(`callBuiltin has no logic for this builtin return value type`);

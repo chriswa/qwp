@@ -4,16 +4,26 @@
   "description": "A programming language prototype",
   "main": "",
   "scripts": {
+    "lint": "eslint --ext .js,.ts,.vue --ignore-path .gitignore src/",
+    "lint-fix": "eslint --ext .js,.ts,.vue --ignore-path .gitignore src/ --fix",
     "test": "tsc && node bin/testing/runTests.js"
   },
   "author": "",
   "license": "UNLICENSED",
   "dependencies": {
-    "chalk": "^4.1.1"
-  },
-  "devDependencies": {
     "@tsconfig/recommended": "^1.0.1",
     "@types/node": "^15.12.4",
+    "chalk": "^4.1.1",
+    "eslint-plugin-import": "^2.24.2",
     "typescript": "^4.3.4"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^4.32.0",
+    "eslint": "^7.32.0"
+  },
+  "eslintConfig": {
+    "extends": [
+      "../blockopolis/packages/client/node_modules/eslint-config/index.js"
+    ]
   }
 }

@@ -10,7 +10,7 @@ import { InterpreterScope } from "./InterpreterScope"
 import { InterpreterValue, InterpreterValueBoolean, InterpreterValueBuiltin, InterpreterValueClosure, interpreterValueFactory, InterpreterValueFloat32, InterpreterValueObject, InterpreterValueVoid } from "./InterpreterValue"
 import { NodeVisitationState } from "./NodeVisitationState"
 
-export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
+export class InterpreterNodeVisitor implements SyntaxNodeVisitor<number> {
   private nodeVisitationState: NodeVisitationState | undefined;
   private nodeInsertionBuffer: Array<NodeVisitationState> = [];
   constructor(
@@ -34,12 +34,12 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
   getNodeStepCounter() {
     return this.nodeVisitationState!.stepCounter;
   }
-  switchStep(stateCallbacks: Array<() => void>) {
+  switchStep(stateCallbacks: Array<() => number>): number {
     const state = this.getNodeStepCounter();
     if (state > stateCallbacks.length - 1) {
       throw new InternalError(`switchStep state logic fail!`);
     }
-    stateCallbacks[state]();
+    return stateCallbacks[state]();
   }
   pushStackValue(interpreterValue: InterpreterValue) {
     if (this.interpreter.isDebug) {
@@ -56,10 +56,11 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
     return interpreterValue;
   }
 
-  visit(node: SyntaxNode) {
-    node.accept(this);
-    this.interpreter.nodeVisitationStateStack.unshift(...this.nodeInsertionBuffer);
-    this.nodeInsertionBuffer = [];
+  visit(node: SyntaxNode): number {
+    const cost = node.accept(this)
+    this.interpreter.nodeVisitationStateStack.unshift(...this.nodeInsertionBuffer)
+    this.nodeInsertionBuffer = []
+    return cost
   }
   // ╔════════════════════════════════════════╗
   // ║ Binary expression                      ║
@@ -112,90 +113,101 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
   // ╔════════════════════════════════════════╗
   // ║ Literal expression                     ║
   // ╚════════════════════════════════════════╝
-  visitLiteral(node: LiteralSyntaxNode): void {
+  visitLiteral(node: LiteralSyntaxNode): number {
     switch (node.type) {
-      case ValueType.NUMBER: this.pushStackValue(new InterpreterValueFloat32(node.value as number)); break;
-      case ValueType.BOOLEAN: this.pushStackValue(new InterpreterValueBoolean(node.value as boolean)); break;
-      default: throw new InternalError(`unsupported literal type`);
+      case ValueType.NUMBER: this.pushStackValue(new InterpreterValueFloat32(node.value as number)); break
+      case ValueType.BOOLEAN: this.pushStackValue(new InterpreterValueBoolean(node.value as boolean)); break
+      default: throw new InternalError(`unsupported literal type`)
     }
+    return 1
   }
   // ╔════════════════════════════════════════╗
   // ║ Grouping expression                    ║
   // ╚════════════════════════════════════════╝
-  visitGrouping(node: GroupingSyntaxNode): void {
-    this.pushNewNode(node.expr);
+  visitGrouping(node: GroupingSyntaxNode): number {
+    this.pushNewNode(node.expr)
+    return 0
   }
   // ╔════════════════════════════════════════╗
   // ║ Statement Block                        ║
   // ╚════════════════════════════════════════╝
-  visitStatementBlock(node: StatementBlockSyntaxNode): void {
+  visitStatementBlock(node: StatementBlockSyntaxNode): number {
     node.statementList.forEach((statementNode) => {
-      this.pushNewNode(statementNode);
+      this.pushNewNode(statementNode)
     });
+    return 0
   }
   // ╔════════════════════════════════════════╗
   // ║ If Statement                           ║
   // ╚════════════════════════════════════════╝
-  visitIfStatement(node: IfStatementSyntaxNode): void {
-    this.switchStep([
+  visitIfStatement(node: IfStatementSyntaxNode): number {
+    return this.switchStep([
       () => {
         this.pushNewNode(node.cond);
         this.repushIncremented();
+        return 0
       },
       () => {
         const cond = this.popStackValue().asBoolean().value;
         this.pushNewNode(cond ? node.thenBranch : node.elseBranch);
+        return 1
       },
     ]);
   }
   // ╔════════════════════════════════════════╗
   // ║ While Statement                        ║
   // ╚════════════════════════════════════════╝
-  visitWhileStatement(node: WhileStatementSyntaxNode): void {
-    this.switchStep([
+  visitWhileStatement(node: WhileStatementSyntaxNode): number {
+    return this.switchStep([
       () => {
-        this.pushNewNode(node.cond);
-        this.repushIncremented();
+        this.pushNewNode(node.cond)
+        this.repushIncremented()
+        return 0
       },
       () => {
-        const cond = this.popStackValue().asBoolean().value;
+        const cond = this.popStackValue().asBoolean().value
         if (cond) {
-          this.pushNewNode(node.loopBody);
-          this.repush();
+          this.pushNewNode(node.loopBody)
+          this.repush()
         }
+        return 1
       },
     ]);
   }
   // ╔════════════════════════════════════════╗
   // ║ Return Statement                       ║
   // ╚════════════════════════════════════════╝
-  visitReturnStatement(node: ReturnStatementSyntaxNode): void {
-    this.pushNewNode(node.retvalExpr);
+  visitReturnStatement(node: ReturnStatementSyntaxNode): number {
+    this.pushNewNode(node.retvalExpr)
     // remove remaining nodes in function call to skip out of it
     while (true) {
-      const foo = this.interpreter.nodeVisitationStateStack.shift()!;
+      const foo = this.interpreter.nodeVisitationStateStack.shift()!
       if (foo.node instanceof FunctionCallSyntaxNode) {
-        break;
+        break
       }
     }
+    return 0
   }
   // ╔════════════════════════════════════════╗
   // ║ Logic Short Circuit expression         ║
   // ╚════════════════════════════════════════╝
-  visitLogicShortCircuit(node: LogicShortCircuitSyntaxNode): void {
+  visitLogicShortCircuit(node: LogicShortCircuitSyntaxNode): number {
     const isOpOr = node.op.type === TokenType.DOUBLE_PIPE;
-    this.switchStep([
+    return this.switchStep([
       () => {
         this.pushNewNode(node.left);
         this.repushIncremented();
+        return 0
       },
       () => {
         const left = this.popStackValue().asBoolean().value;
         if ((isOpOr && left === false) || (!isOpOr && left === true)) {
           this.pushNewNode(node.left);
+          return 1
         }
         else {
           this.pushStackValue(new InterpreterValueBoolean(false));
+          return 0
         }
       },
     ]);
@@ -203,35 +215,39 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
   // ╔════════════════════════════════════════╗
   // ║ Variable Lookup                        ║
   // ╚════════════════════════════════════════╝
-  visitVariableLookup(node: VariableLookupSyntaxNode): void {
+  visitVariableLookup(node: VariableLookupSyntaxNode): number {
     this.pushStackValue(this.interpreter.scope.getValue(node.identifier.lexeme));
+    return 1
   }
   // ╔════════════════════════════════════════╗
   // ║ Variable Assignment                    ║
   // ╚════════════════════════════════════════╝
-  visitVariableAssignment(node: VariableAssignmentSyntaxNode): void {
-    this.switchStep([
+  visitVariableAssignment(node: VariableAssignmentSyntaxNode): number {
+    return this.switchStep([
       () => {
         this.pushNewNode(node.rvalue);
         this.repushIncremented();
+        return 0
       },
       () => {
         const rvalue = this.popStackValue();
         // const varDef = this.interpreter.scope.getVariableDefinition(node.identifier.lexeme); // maybe needed for type coercion?
         this.interpreter.scope.setValue(node.identifier.lexeme, rvalue);
+        return 1
       },
     ]);
   }
   // ╔════════════════════════════════════════╗
   // ║ Object Instantiation                   ║
   // ╚════════════════════════════════════════╝
-  visitObjectInstantiation(node: ObjectInstantiationSyntaxNode): void {
-    this.switchStep([
+  visitObjectInstantiation(node: ObjectInstantiationSyntaxNode): number {
+    return this.switchStep([
       () => {
         node.constructorArgumentList.forEach((argumentNode) => {
           this.pushNewNode(argumentNode);
         })
         this.repushIncremented();
+        return 0
       },
       () => {
         const classTypeWrapper = this.interpreter.scope.getTypeWrapper(node.className.lexeme) ?? throwExpr(new InternalError(`cannot find class name for "new"`));
@@ -264,24 +280,26 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
           this.pushNewNode(statementNode)
         })
         this.repushIncremented();
-
+        return 1
       },
       () => {
         this.interpreter.popScope();
+        return 0
       },
     ]);
   }
   // ╔════════════════════════════════════════╗
   // ║ Function Call                          ║
   // ╚════════════════════════════════════════╝
-  visitFunctionCall(node: FunctionCallSyntaxNode): void {
-    this.switchStep([
+  visitFunctionCall(node: FunctionCallSyntaxNode): number {
+    return this.switchStep([
       () => {
         node.argumentList.forEach((argumentNode) => {
-          this.pushNewNode(argumentNode);
+          this.pushNewNode(argumentNode)
         });
-        this.pushNewNode(node.callee);
-        this.repushIncremented();
+        this.pushNewNode(node.callee)
+        this.repushIncremented()
+        return 0
       },
       () => {
         const callee = this.popStackValue();
@@ -306,6 +324,7 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
             this.pushNewNode(statementNode)
           })
           this.repushIncremented();
+          return 1
         }
         else if (callee instanceof InterpreterValueBuiltin) {
           const builtinOverload = callee.builtin.findMatchingOverload(argumentInterpreterTypes)
@@ -315,41 +334,46 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
           if (retvalInterpreterValue instanceof InterpreterValueVoid === false) {
             this.pushStackValue(retvalInterpreterValue);
           }
+          return builtinOverload.cost // TODO: return cost before executing builtin, then execute builtin for free in next step (to avoid the builtin being called in the first "tick" of a slow builtin)
         }
         else {
           throw new Error(`runtime: can't call ${callee.toString()} as a function!`);
         }
       },
       () => {
-        this.interpreter.popScope();
+        this.interpreter.popScope()
+        return 0
       },
     ]);
   }
   // ╔════════════════════════════════════════╗
   // ║ Function Homonym                       ║
   // ╚════════════════════════════════════════╝
-  visitFunctionHomonym(node: FunctionHomonymSyntaxNode): void {
+  visitFunctionHomonym(node: FunctionHomonymSyntaxNode): number {
     const closedVars: Map<string, InterpreterValue> = new Map();
     this.interpreter.resolverOutput.scopesByNode.get(node)!.getClosedVars().forEach((identifier) => {
       closedVars.set(identifier, this.interpreter.scope.getValue(identifier));
     });
     const value = new InterpreterValueClosure(node, closedVars);
     this.pushStackValue(value);
+    return 0
   }
   // ╔════════════════════════════════════════╗
   // ║ Function Overload                      ║
   // ╚════════════════════════════════════════╝
-  visitFunctionOverload(node: FunctionOverloadSyntaxNode): void {
+  visitFunctionOverload(node: FunctionOverloadSyntaxNode): number {
     // UNUSED FOR NOW
+    return 0
   }
   // ╔════════════════════════════════════════╗
   // ║ Member Lookup                          ║
   // ╚════════════════════════════════════════╝
-  visitMemberLookup(node: MemberLookupSyntaxNode): void {
-    this.switchStep([
+  visitMemberLookup(node: MemberLookupSyntaxNode): number {
+    return this.switchStep([
       () => {
         this.pushNewNode(node.object);
         this.repushIncremented();
+        return 0
       },
       () => {
         const object = this.popStackValue().asObject();
@@ -365,38 +389,43 @@ export class InterpreterNodeVisitor implements SyntaxNodeVisitor<void> {
           const value = new InterpreterValueClosure(method, closedVars);
           this.pushStackValue(value);
         }
+        return 1
       },
     ]);
   }
   // ╔════════════════════════════════════════╗
   // ║ Member Assignment                      ║
   // ╚════════════════════════════════════════╝
-  visitMemberAssignment(node: MemberAssignmentSyntaxNode): void {
-    this.switchStep([
+  visitMemberAssignment(node: MemberAssignmentSyntaxNode): number {
+    return this.switchStep([
       () => {
-        this.pushNewNode(node.rvalue);
-        this.pushNewNode(node.object);
-        this.repushIncremented();
+        this.pushNewNode(node.rvalue)
+        this.pushNewNode(node.object)
+        this.repushIncremented()
+        return 0
       },
       () => {
-        const object = this.popStackValue().asObject();
-        const rvalue = this.popStackValue();
-        object.setField(node.memberName.lexeme, rvalue);
-        // this.pushValue(rvalue);
+        const object = this.popStackValue().asObject()
+        const rvalue = this.popStackValue()
+        object.setField(node.memberName.lexeme, rvalue)
+        // this.pushValue(rvalue)
+        return 1
       },
     ]);
   }
   // ╔════════════════════════════════════════╗
   // ║ Class Declaration                      ║
   // ╚════════════════════════════════════════╝
-  visitClassDeclaration(node: ClassDeclarationSyntaxNode): void {
+  visitClassDeclaration(node: ClassDeclarationSyntaxNode): number {
     // noop
+    return 0
   }
   // ╔════════════════════════════════════════╗
   // ║ Type Declaration                       ║
   // ╚════════════════════════════════════════╝
-  visitTypeDeclaration(node: TypeDeclarationSyntaxNode): void {
+  visitTypeDeclaration(node: TypeDeclarationSyntaxNode): number {
     // noop
+    return 0
   }
 }
 

@@ -10,4 +10,7 @@
   },
   "include": ["src/**/*"],
   "lib": ["es2015"],
+  "rules": {
+    "semicolon": [true, "never"],
+  },
 }

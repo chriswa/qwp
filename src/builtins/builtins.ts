@@ -7,22 +7,26 @@ export function setBuiltinPrintCallback(f: typeof printCallback) {
   printCallback = f;
 }
 
-type BuiltinHandler = (args: Array<unknown>) => number;
+type BuiltinHandler = (args: Array<unknown>) => unknown;
 
 export class BuiltinOverload {
   constructor(
     public readonly typeWrapper: TypeWrapper,
     public readonly handler: BuiltinHandler,
+    public readonly cost: number,
   ) { }
 }
 
 export class Builtin {
+  public overloads: Array<BuiltinOverload> = []
   constructor(
     public readonly id: number,
     public readonly name: string,
-    public readonly overloads: Array<BuiltinOverload> = [],
-    public readonly typeWrapper: TypeWrapper,
+    // public readonly typeWrapper: TypeWrapper,
   ) { }
+  getTypeWrapper(): TypeWrapper {
+    return new TypeWrapper(`builtin(${this.name})`, new BuiltinFunctionHomonymType(this.overloads.map(overload => overload.typeWrapper)))
+  }
   findMatchingOverload(argumentTypes: Array<Type>): BuiltinOverload {
     if (this.overloads.length === 1) {
       return this.overloads[0]
@@ -47,70 +51,56 @@ export class Builtin {
   }
 }
 
-export const builtinsByName: Map<string, Builtin> = new Map();
-export const builtinsById: Map<number, Builtin> = new Map();
+export const builtinsByName: Map<string, Builtin> = new Map()
+export const builtinsById: Map<number, Builtin> = new Map()
 
-function registerBuiltin(id: number, name: string, overloadDefs: Array<{ args: Array<Type>, ret: Type, handler: BuiltinHandler }>) {
-  const overloads = overloadDefs.map(({ args, ret, handler }) => {
-    const argumentTypeWrappers = args.map((argumentType, index) => new TypeWrapper(`builtin(${name}).arg[${index}]`, argumentType));
-    const returnTypeWrapper = new TypeWrapper(`builtin(${name}).return`, ret);
-    const typeWrapper = new TypeWrapper(`builtin(${name})`, new BuiltinFunctionOverloadType(argumentTypeWrappers, returnTypeWrapper));
-    return new BuiltinOverload(typeWrapper, handler);
-  });
-  if (!Number.isInteger(id) || id < 0 || id > 2 ** 16 - 1) { throw new InternalError(`builtin id must be uint32`) }
-  const builtinTypeWrapper = new BuiltinFunctionHomonymType(overloads.map(overload => overload.typeWrapper));
-  const builtin = new Builtin(id, name, overloads, new TypeWrapper(`builtin(${name})`, builtinTypeWrapper));
-  builtinsByName.set(name, builtin);
-  builtinsById.set(id, builtin);
+let incId = 0
+export function registerBuiltinOverload(name: string, argTypes: Array<Type>, retvalType: Type, cost: number, handler: BuiltinHandler) {
+  // find existing builtin by name or create it
+  let builtin = builtinsByName.get(name)
+  if (builtin === undefined) {
+    const id = incId++
+    if (!Number.isInteger(id) || id < 0 || id > 2 ** 16 - 1) { throw new InternalError(`builtin id must be uint32`) }
+    builtin = new Builtin(id, name)
+    builtinsByName.set(name, builtin);
+    builtinsById.set(id, builtin);
+  }
+  // TODO: ensure that the caller doesn't add an ambiguous overload
+  const overloadArgumentTypeWrappers = argTypes.map((argumentType, index) => new TypeWrapper(`builtin(${name}).arg[${index}]`, argumentType))
+  const overloadReturnTypeWrapper = new TypeWrapper(`builtin(${name}).return`, retvalType)
+  const overloadTypeWrapper = new TypeWrapper(`builtin(${name})`, new BuiltinFunctionOverloadType(overloadArgumentTypeWrappers, overloadReturnTypeWrapper))
+  const overload = new BuiltinOverload(overloadTypeWrapper, handler, cost)
+  builtin.overloads.push(overload)
 }
 
-let incId = 0;
+registerBuiltinOverload("printFloat32", [primitiveTypes.float32], primitiveTypes.void, 1, (args) => {
+  printCallback(`printFloat32: ${args}`)
+})
 
-registerBuiltin(incId++, "printFloat32", [
-  {
-    args: [primitiveTypes.float32], ret: primitiveTypes.void, handler: (args) => {
-      printCallback(`printFloat32: ${args}`)
-      return 0; // ???
-    }
-  },
-]);
+registerBuiltinOverload("printUint32", [primitiveTypes.uint32], primitiveTypes.void, 1, (args) => {
+  printCallback(`printUint32: ${args}`)
+})
 
-registerBuiltin(incId++, "printUint32", [
-  {
-    args: [primitiveTypes.uint32], ret: primitiveTypes.void, handler: (args) => {
-      printCallback(`printUint32: ${args}`)
-      return 0; // ???
-    }
-  },
-]);
+registerBuiltinOverload("print", [primitiveTypes.uint32], primitiveTypes.void, 1, (args) => {
+  printCallback(`print: ${args}`)
+})
+registerBuiltinOverload("print", [primitiveTypes.float32], primitiveTypes.void, 1, (args) => {
+  printCallback(`print: ${args}`)
+})
 
-registerBuiltin(incId++, "print", [
-  {
-    args: [primitiveTypes.uint32], ret: primitiveTypes.void, handler: (args) => {
-      printCallback(`print: ${args}`)
-      return 0; // ???
-    }
-  },
-  {
-    args: [primitiveTypes.float32], ret: primitiveTypes.void, handler: (args) => {
-      printCallback(`print: ${args}`)
-      return 0; // ???
-    }
-  },
-]);
+registerBuiltinOverload("+", [primitiveTypes.float32, primitiveTypes.float32], primitiveTypes.float32, 0, (args: any) => {
+  return args[0] + args[1]
+})
+registerBuiltinOverload("+", [primitiveTypes.uint32, primitiveTypes.uint32], primitiveTypes.uint32, 0, (args: any) => {
+  return args[0] + args[1]
+})
 
-registerBuiltin(incId++, "+", [
-  {
-    args: [primitiveTypes.float32, primitiveTypes.float32], ret: primitiveTypes.float32, handler: (args: any) => {
-      return args[0] + args[1];
-    }
-  },
-  {
-    args: [primitiveTypes.uint32, primitiveTypes.uint32], ret: primitiveTypes.uint32, handler: (args: any) => {
-      return args[0] + args[1];
-    }
-  },
-]);
+registerBuiltinOverload("==", [primitiveTypes.float32, primitiveTypes.float32], primitiveTypes.bool32, 0, (args: any) => {
+  return args[0] === args[1]
+})
+registerBuiltinOverload("==", [primitiveTypes.uint32, primitiveTypes.uint32], primitiveTypes.bool32, 0, (args: any) => {
+  return args[0] === args[1]
+})
 
 // case TokenType.PLUS: /* OpCode.ADD */ this.pushValue(new InterpreterValueFloat32(left.asFloat32().value + right.asFloat32().value)); break;
 // case TokenType.MINUS: /* OpCode.SUBTRACT */ this.pushValue(new InterpreterValueFloat32(left.asFloat32().value - right.asFloat32().value)); break;

@@ -3,7 +3,7 @@ import { SyntaxNode } from "../compiler/syntax/syntax"
 import { primitiveTypes, Type, TypeWrapper } from "../types/types"
 import { mapMapToArray } from "../util"
 
-export function interpreterValueFactory(typeWrapper: TypeWrapper, javascriptValue: boolean | number | null): InterpreterValue {
+export function interpreterValueFactory(typeWrapper: TypeWrapper, javascriptValue: boolean | number | null | unknown): InterpreterValue {
   if (typeWrapper.type === primitiveTypes.bool32) {
     return new InterpreterValueBoolean(javascriptValue as boolean)
   }
