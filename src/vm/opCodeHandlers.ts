@@ -32,27 +32,39 @@ opCodeHandlers[ OpCode.DIVIDE ] = (vm: VM) => {
 }
 
 opCodeHandlers[ OpCode.LT ] = (vm: VM) => {
-  vm.ramBuffer.pushBool32(vm.ramBuffer.popFloat32() < vm.ramBuffer.popFloat32())
+  const leftValue = vm.ramBuffer.popFloat32()
+  const rightValue = vm.ramBuffer.popFloat32()
+  vm.ramBuffer.pushBool32(leftValue < rightValue)
 }
 
 opCodeHandlers[ OpCode.LTE ] = (vm: VM) => {
-  vm.ramBuffer.pushBool32(vm.ramBuffer.popFloat32() <= vm.ramBuffer.popFloat32())
+  const leftValue = vm.ramBuffer.popFloat32()
+  const rightValue = vm.ramBuffer.popFloat32()
+  vm.ramBuffer.pushBool32(leftValue <= rightValue)
 }
 
 opCodeHandlers[ OpCode.GT ] = (vm: VM) => {
-  vm.ramBuffer.pushBool32(vm.ramBuffer.popFloat32() > vm.ramBuffer.popFloat32())
+  const leftValue = vm.ramBuffer.popFloat32()
+  const rightValue = vm.ramBuffer.popFloat32()
+  vm.ramBuffer.pushBool32(leftValue > rightValue)
 }
 
 opCodeHandlers[ OpCode.GTE ] = (vm: VM) => {
-  vm.ramBuffer.pushBool32(vm.ramBuffer.popFloat32() >= vm.ramBuffer.popFloat32())
+  const leftValue = vm.ramBuffer.popFloat32()
+  const rightValue = vm.ramBuffer.popFloat32()
+  vm.ramBuffer.pushBool32(leftValue >= rightValue)
 }
 
 opCodeHandlers[ OpCode.EQ ] = (vm: VM) => {
-  vm.ramBuffer.pushBool32(vm.ramBuffer.popFloat32() === vm.ramBuffer.popFloat32())
+  const leftValue = vm.ramBuffer.popFloat32()
+  const rightValue = vm.ramBuffer.popFloat32()
+  vm.ramBuffer.pushBool32(leftValue === rightValue)
 }
 
 opCodeHandlers[ OpCode.NEQ ] = (vm: VM) => {
-  vm.ramBuffer.pushBool32(vm.ramBuffer.popFloat32() !== vm.ramBuffer.popFloat32())
+  const leftValue = vm.ramBuffer.popFloat32()
+  const rightValue = vm.ramBuffer.popFloat32()
+  vm.ramBuffer.pushBool32(leftValue !== rightValue)
 }
 
 opCodeHandlers[ OpCode.PUSH_CONSTANT ] = (vm: VM) => {
