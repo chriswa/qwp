@@ -2,7 +2,6 @@ import { ByteBuffer } from '../bytecode/ByteBuffer'
 import { OpCode } from '../bytecode/opcodes'
 import { opCodeHandlers } from './opCodeHandlers'
 
-/*
 class LegitHeap {
   private ramWordCount: number;
   public constructor(
@@ -34,7 +33,6 @@ class LegitHeap {
     return holeIndex;
   }
 }
-*/
 
 class ClosureStruct {
   constructor(

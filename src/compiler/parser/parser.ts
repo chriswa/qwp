@@ -1,6 +1,24 @@
 import { lex } from '../lexer/lexer'
 import { Token, TokenType } from '../Token'
-import { LiteralSyntaxNode, SyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionHomonymSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode, TypeDeclarationSyntaxNode, ClassDeclarationSyntaxNode, ObjectInstantiationSyntaxNode, MemberLookupSyntaxNode, MemberAssignmentSyntaxNode, FunctionOverloadSyntaxNode } from '../syntax/syntax'
+import {
+  LiteralSyntaxNode,
+  SyntaxNode,
+  StatementBlockSyntaxNode,
+  IfStatementSyntaxNode,
+  WhileStatementSyntaxNode,
+  LogicShortCircuitSyntaxNode,
+  VariableLookupSyntaxNode,
+  VariableAssignmentSyntaxNode,
+  FunctionCallSyntaxNode,
+  ReturnStatementSyntaxNode,
+  TypeDeclarationSyntaxNode,
+  ClassDeclarationSyntaxNode,
+  ObjectInstantiationSyntaxNode,
+  MemberLookupSyntaxNode,
+  MemberAssignmentSyntaxNode,
+  FunctionOverloadSyntaxNode,
+  FunctionDefinitionSyntaxNode,
+} from '../syntax/syntax'
 import { ErrorWithSourcePos } from '../../ErrorWithSourcePos'
 import { ValueType } from '../syntax/ValueType'
 import { TypeAnnotation } from '../syntax/TypeAnnotation'
@@ -128,7 +146,7 @@ export class Parser {
     }
     
     this.reader.consume(TokenType.OPEN_BRACE, 'expected opening brace as part of class definition')
-    const methodOverloads: Map<string, Array<FunctionOverloadSyntaxNode>> = new Map()
+    const methods: Map<string, FunctionDefinitionSyntaxNode> = new Map()
     const fields: Map<string, TypeAnnotation | null> = new Map()
     while (this.reader.match(TokenType.CLOSE_BRACE) === false) {
       const memberName = this.reader.consumeOneOf([ TokenType.IDENTIFIER, TokenType.KEYWORD_NEW ], 'identifier for member expected in class definition member block')
@@ -136,8 +154,9 @@ export class Parser {
       if (this.reader.match(TokenType.OPEN_PAREN)) {
         const { parameterList, statementBlockNode, returnTypeAnnotation } = this.parseFunctionOverloadAfterOpenParen() // n.b. statementBlockNode is discarded!
         const overload = new FunctionOverloadSyntaxNode(memberName, null, parameterList, returnTypeAnnotation, statementBlockNode.statementList)
-        const methodOverloadList = mapGetOrPut(methodOverloads, memberName.lexeme, () => [])
-        methodOverloadList.push(overload)
+        const methodOverloads = methods.get(memberName.lexeme)?.overloads ?? []
+        methodOverloads.push(overload)
+        methods.set(memberName.lexeme, new FunctionDefinitionSyntaxNode(memberName, methodOverloads))
       }
       // or field
       else {
@@ -149,10 +168,6 @@ export class Parser {
         this.reader.consume(TokenType.SEMICOLON, 'expected semicolon after class field definition')
       }
     }
-    const methods: Map<string, FunctionHomonymSyntaxNode> = new Map()
-    methodOverloads.forEach((overloads, methodName) => {
-      methods.set(methodName, new FunctionHomonymSyntaxNode(overloads))
-    })
     return new ClassDeclarationSyntaxNode(classKeywordToken, newClassName, genericDefinition, baseClassName, implementedInterfaceNames, methods, fields)
   }
   parseVariableDeclarationStatement(): SyntaxNode {
@@ -252,7 +267,7 @@ export class Parser {
       overloads.push(new FunctionOverloadSyntaxNode(referenceToken, genericDefinition, parameterList, returnTypeAnnotation, statementBlockNode.statementList))
     }
     if (overloads.length > 0) {
-      return new FunctionHomonymSyntaxNode(overloads)
+      return new FunctionDefinitionSyntaxNode(overloads[0].referenceToken, overloads)
     }
     return this.parseOrExpression()
   }

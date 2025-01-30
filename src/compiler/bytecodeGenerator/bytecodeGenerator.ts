@@ -1,19 +1,16 @@
-/*
-
-import assert from "assert"
-import { Token, TokenType } from "../Token"
-import { SyntaxNodeVisitor, SyntaxNode, BinarySyntaxNode, UnarySyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionDefinitionSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode, TypeDeclarationSyntaxNode, ClassDeclarationSyntaxNode, ObjectInstantiationSyntaxNode } from "../syntax/syntax"
+import { TokenType } from "../Token"
+import { ISyntaxNodeVisitor, SyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, VariableAssignmentSyntaxNode, FunctionOverloadSyntaxNode, FunctionCallSyntaxNode, ReturnStatementSyntaxNode, TypeDeclarationSyntaxNode, ClassDeclarationSyntaxNode, ObjectInstantiationSyntaxNode, MemberAssignmentSyntaxNode, MemberLookupSyntaxNode, FunctionDefinitionSyntaxNode } from "../syntax/syntax"
 import { ByteBuffer } from "../../bytecode/ByteBuffer"
 import { OpCode } from "../../bytecode/opcodes"
 import { ValueType } from "../syntax/ValueType"
 import { ConstantsTable } from "./ConstantsTable"
 import { builtinsByName } from "../../builtins/builtins"
 import { resolve } from "../resolver/resolver"
-import { ResolverOutput } from "../resolver/resolverOutput"
+import { IResolverOutput } from "../resolver/resolver"
 import { VariableDefinition } from "../resolver/ResolverScope"
 
-export function generateBytecode(source: string, path: string) {
-  const { ast, resolverOutput } = resolve(source, path);
+export function generateBytecode(source: string, path: string, isDebug: boolean) {
+  const { ast, resolverOutput } = resolve(source, path, isDebug);
   const context = new BytecodeGeneratorContext(new ConstantsTable(), resolverOutput);
   return new BytecodeGenerator(context, null, ast).compileModule(ast);
 }
@@ -21,11 +18,11 @@ export function generateBytecode(source: string, path: string) {
 class BytecodeGeneratorContext {
   public constructor(
     public constantsTable: ConstantsTable,
-    public resolverOutput: ResolverOutput,
+    public resolverOutput: IResolverOutput,
   ) { }
 }
 
-class BytecodeGenerator implements SyntaxNodeVisitor<void> {
+class BytecodeGenerator implements ISyntaxNodeVisitor<void> {
   private functionScope: BytecodeGeneratorFunctionScope;
   private instructionBuffer: ByteBuffer = new ByteBuffer();
   constructor(
@@ -33,7 +30,11 @@ class BytecodeGenerator implements SyntaxNodeVisitor<void> {
     parentBytecodeGenerator: BytecodeGenerator | null,
     private node: SyntaxNode,
   ) {
-    this.functionScope = new BytecodeGeneratorFunctionScope(this.context, parentBytecodeGenerator?.functionScope ?? null, this.node);
+    this.functionScope = new BytecodeGeneratorFunctionScope(
+      this.context,
+      parentBytecodeGenerator?.functionScope ?? null,
+      this.node,
+    );
   }
   private get constantsTable() { return this.context.constantsTable }
   private getClosedVarsByFunctionNode(node: SyntaxNode) {
@@ -82,41 +83,6 @@ class BytecodeGenerator implements SyntaxNodeVisitor<void> {
     })
   }
 
-  private static readonly _binaryTokenTypeToOpCodeMap: Map<TokenType, OpCode> = new Map([
-    // [TokenType.MINUS, OpCode.NEGATE],
-    // [TokenType.BANG, OpCode.LOGICAL_NOT],
-    [TokenType.PLUS, OpCode.ADD],
-    [TokenType.MINUS, OpCode.SUBTRACT],
-    [TokenType.ASTERISK, OpCode.MULTIPLY],
-    [TokenType.FORWARD_SLASH, OpCode.DIVIDE],
-    [TokenType.LESS_THAN, OpCode.LT],
-    [TokenType.LESS_THAN_OR_EQUAL, OpCode.LTE],
-    [TokenType.GREATER_THAN, OpCode.GT],
-    [TokenType.GREATER_THAN_OR_EQUAL, OpCode.GTE],
-    [TokenType.DOUBLE_EQUAL, OpCode.EQ],
-    [TokenType.BANG_EQUAL, OpCode.NEQ],
-  ])
-  visitBinary(node: BinarySyntaxNode): void {
-    const opCode = BytecodeGenerator._binaryTokenTypeToOpCodeMap.get(node.op.type)
-    if (opCode === undefined) {
-      throw new Error(`impossible: unrecognized binary op token ${TokenType[node.op.type]}`)
-    }
-    this.compileNode(node.left);
-    this.compileNode(node.right);
-    this.instructionBuffer.pushUint8(opCode);
-  }
-  private static readonly _unaryTokenTypeToOpCodeMap: Map<TokenType, OpCode> = new Map([
-    [TokenType.MINUS, OpCode.NEGATE],
-    [TokenType.BANG, OpCode.LOGICAL_NOT],
-  ])
-  visitUnary(node: UnarySyntaxNode): void {
-    const opCode = BytecodeGenerator._unaryTokenTypeToOpCodeMap.get(node.op.type);
-    if (opCode === undefined) {
-      throw new Error(`impossible: unrecognized unary op token ${TokenType[node.op.type]}`);
-    }
-    this.compileNode(node.right);
-    this.instructionBuffer.pushUint8(opCode);
-  }
   visitLiteral(node: LiteralSyntaxNode): void {
     let constantIndex = 0;
     switch (node.type) {
@@ -251,24 +217,40 @@ class BytecodeGenerator implements SyntaxNodeVisitor<void> {
       this.instructionBuffer.pushUint8(OpCode.DEREF);
     }
   }
-  visitFunctionHomonym(node: FunctionDefinitionSyntaxNode): void {
-    const closedVars = this.getClosedVarsByFunctionNode(node);
-    const fnBytecodeGenerator = new BytecodeGenerator(this.context, this, node);
-    fnBytecodeGenerator.declareParametersAndClosedVars(node.parameterList.map(parameter => parameter.identifier.lexeme), closedVars);
-    fnBytecodeGenerator.compileNodeList(node.statementList);
-    fnBytecodeGenerator.popLocals();
-    fnBytecodeGenerator.instructionBuffer.pushUint8(OpCode.CODESTOP);
-    fnBytecodeGenerator.instructionBuffer.compact();
-    const constantIndex = this.constantsTable.storeBuffer(fnBytecodeGenerator.instructionBuffer.buffer); // safe because all jumps are relative and all references to constants table have already been added
-    this.instructionBuffer.pushUint8(OpCode.DEFINE_FUNCTION);
-    this.instructionBuffer.pushUint32(constantIndex);
-    this.instructionBuffer.pushUint8(closedVars.length);
-    closedVars.forEach((closedVar) => {
-      const callFrameVarInfo = this.functionScope.currentBlockScope.findIdentifierInStack(closedVar);
-      if (callFrameVarInfo === null) { throw new Error(`closedVar not found!?`) }
-      this.instructionBuffer.pushUint8(callFrameVarInfo.callFrameOffset);
-      // this.functionScope.currentBlockScope.markVariableAsRequiredByClosure(closedVar);
+  visitMemberLookup(node: MemberLookupSyntaxNode): void {
+    throw new Error("Method not implemented.")
+  }
+  visitMemberAssignment(node: MemberAssignmentSyntaxNode): void {
+    throw new Error("Method not implemented.")
+  }
+  visitFunctionDefinition(node: FunctionDefinitionSyntaxNode): void {
+    node.overloads.forEach((overload) => {
+      const closedVars = this.getClosedVarsByFunctionNode(node);
+      const fnBytecodeGenerator = new BytecodeGenerator(this.context, this, overload);
+      fnBytecodeGenerator.declareParametersAndClosedVars(
+        overload.parameterList.map(parameter => parameter.identifier.lexeme), 
+        closedVars,
+      );
+      fnBytecodeGenerator.compileNodeList(overload.statementList);
+      fnBytecodeGenerator.popLocals();
+      fnBytecodeGenerator.instructionBuffer.pushUint8(OpCode.CODESTOP);
+      fnBytecodeGenerator.instructionBuffer.compact();
+
+      const constantIndex = this.constantsTable.storeBuffer(fnBytecodeGenerator.instructionBuffer.buffer); // safe because all jumps are relative and all references to constants table have already been added
+      this.instructionBuffer.pushUint8(OpCode.DEFINE_FUNCTION);
+      this.instructionBuffer.pushUint32(constantIndex);
+      this.instructionBuffer.pushUint8(closedVars.length);
+      
+      closedVars.forEach((closedVar) => {
+        const callFrameVarInfo = this.functionScope.currentBlockScope.findIdentifierInStack(closedVar);
+        if (callFrameVarInfo === null) { throw new Error(`closedVar not found!?`) }
+        this.instructionBuffer.pushUint8(callFrameVarInfo.callFrameOffset);
+        // this.functionScope.currentBlockScope.markVariableAsRequiredByClosure(closedVar);
+      });
     });
+  }
+  visitFunctionOverload(node: FunctionOverloadSyntaxNode): void {
+    throw new Error("FunctionOverload nodes should be handled by FunctionDefinition visitor");
   }
   visitFunctionCall(node: FunctionCallSyntaxNode): void {
     node.argumentList.forEach((argument) => {
@@ -371,5 +353,3 @@ class BytecodeGeneratorBlockScope {
     return this.localIdentifiers.length;
   }
 }
-
-*/

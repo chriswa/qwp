@@ -1,12 +1,16 @@
 import fs from 'fs'
 import { testExpectedKindStringToEnum, TestResult, TestResultKind } from './results'
-import { printFailedTestHeader, printTestsRunnerHeader, printTestsRunnerSuccess, reportFailedTest, reportSuccessfulTest } from './reporting'
+import { drawBox, printFailedTestHeader, printTestsRunnerHeader, printTestsRunnerSuccess, reportFailedTest, reportSuccessfulTest } from './reporting'
 import { setBuiltinPrintCallback } from '../builtins/builtins'
 import { CompileError } from '../compiler/CompileError'
 import chalk from 'chalk'
 import { createInterpreter } from '../interpreter/Interpreter'
 import { sourceReporter } from '../sourceReporter'
 import { InternalError } from '../util'
+import { decompileOneInstruction, dumpDecompile } from '../bytecode/decompiler'
+import { ByteBuffer } from '../bytecode/ByteBuffer'
+import { generateBytecode } from '../compiler/bytecodeGenerator/bytecodeGenerator'
+import { VM } from '../vm/VM'
 
 const myArgs = process.argv.slice(2)
 
@@ -18,7 +22,7 @@ function isTestFileSpecified(candidateFilename: string) {
 
 const DEBUG_MODE = userSpecifiedTestFile !== undefined
 const RUN_WITH_INTERPRETER = true
-// const RUN_WITH_COMPILER_AND_VM = false
+const RUN_WITH_COMPILER_AND_VM = false
 
 printTestsRunnerHeader()
 
@@ -62,13 +66,13 @@ function performTest(path: string, source: string): boolean {
     }
   }
 
-  // if (RUN_WITH_COMPILER_AND_VM) {
-  //   const vmResult = compileAndRunSource(path, source)
-  //   if (!vmResult.matchesDetail(expectedResult)) {
-  //     reportFailedTest('compile and vm', path, expectedResult, vmResult)
-  //     return false
-  //   }
-  // }
+  if (RUN_WITH_COMPILER_AND_VM) {
+    const vmResult = compileAndRunSource(path, source)
+    if (!vmResult.matchesDetail(expectedResult)) {
+      reportFailedTest('compile and vm', path, expectedResult, vmResult)
+      return false
+    }
+  }
   
   reportSuccessfulTest(path)
   return true
@@ -106,60 +110,61 @@ function interpretSource(path: string, source: string): TestResult {
   return new TestResult(TestResultKind.COMPLETION, output, undefined)
 }
 
-// function compileAndRunSource(path: string, source: string): TestResult {
-//   let output = '';
-//   setBuiltinPrintCallback((str: string) => {
-//     output += str + "\n";
-//     if (DEBUG_MODE) {
-//       console.log(chalk.magentaBright("BUILTIN PRINT ➤➤➤ " + str));
-//     }
-//   });
-// 
-//   let constantBuffer: ByteBuffer;
-//   try {
-//     constantBuffer = generateBytecode(source, path)
-//   }
-//   catch (err) {
-//     if (err instanceof CompileError) {
-//       const errOutput = err.errorsWithSourcePos.map((errorWithSourcePos) => sourceReporter.generateErrorMessageWithLineNumber(path, errorWithSourcePos)).join("\n") + "\n";
-//       return new TestResult(TestResultKind.COMPILE_ERROR, errOutput, err.errorsWithSourcePos);
-//     }
-//     else {
-//       throw err;
-//     }
-//   }
-// 
-//   if (DEBUG_MODE) {
-//     console.log(chalk.magenta(drawBox(`Decompilation of ${path}`)));
-//     dumpDecompile(constantBuffer);
-//   }
-// 
-//   if (DEBUG_MODE) {
-//     console.log(chalk.cyan(drawBox("VM START")));
-//   }
-//   const vm = new VM(constantBuffer, 1024);
-//   while (!vm.isHalted) {
-//     if (DEBUG_MODE) {
-//       console.log(`---`)
-//       let stackView = ''
-//       const stackLength = vm.ramBuffer.byteCursor / 4
-//       for (let i = 0; i < stackLength; i += 1) {
-//         const bytePos = 4 * i
-//         if (i > 0) { stackView += ', ' }
-//         if (i === vm.callFrameIndex) { stackView += '[ ' }
-//         stackView += `${vm.ramBuffer.peekUint32At(bytePos)}`
-//       }
-//       console.log(`STACK: ${stackView}`)
-//       decompileOneInstructionAndRewind(vm.constantBuffer)
-//     }
-//     vm.runOneInstruction();
-//   }
-//   if (DEBUG_MODE) {
-//     console.log(`---`)
-//     console.log(`VM HALTED`)
-//   }
-//   return new TestResult(TestResultKind.COMPLETION, output, undefined);
-// }
+function compileAndRunSource(path: string, source: string): TestResult {
+  let output = '';
+  setBuiltinPrintCallback((str: string) => {
+    output += str + "\n";
+    if (DEBUG_MODE) {
+      console.log(chalk.magentaBright("BUILTIN PRINT ➤➤➤ " + str));
+    }
+  });
+
+  let constantBuffer: ByteBuffer;
+  try {
+    const isDebug = DEBUG_MODE
+    constantBuffer = generateBytecode(source, path, isDebug)
+  }
+  catch (err) {
+    if (err instanceof CompileError) {
+      const errOutput = err.errorsWithSourcePos.map((errorWithSourcePos) => sourceReporter.generateErrorMessageWithLineNumber(path, errorWithSourcePos)).join("\n") + "\n";
+      return new TestResult(TestResultKind.COMPILE_ERROR, errOutput, err.errorsWithSourcePos);
+    }
+    else {
+      throw err;
+    }
+  }
+
+  if (DEBUG_MODE) {
+    console.log(chalk.magenta(drawBox(`Decompilation of ${path}`)));
+    dumpDecompile(constantBuffer);
+  }
+
+  if (DEBUG_MODE) {
+    console.log(chalk.cyan(drawBox("VM START")));
+  }
+  const vm = new VM(constantBuffer, 1024);
+  while (!vm.isHalted) {
+    if (DEBUG_MODE) {
+      console.log(`---`)
+      let stackView = ''
+      const stackLength = vm.ramBuffer.byteCursor / 4
+      for (let i = 0; i < stackLength; i += 1) {
+        const bytePos = 4 * i
+        if (i > 0) { stackView += ', ' }
+        if (i === vm.callFrameIndex) { stackView += '[ ' }
+        stackView += `${vm.ramBuffer.peekUint32At(bytePos)}`
+      }
+      console.log(`STACK: ${stackView}`)
+      decompileOneInstructionAndRewind(vm.constantBuffer)
+    }
+    vm.runOneInstruction();
+  }
+  if (DEBUG_MODE) {
+    console.log(`---`)
+    console.log(`VM HALTED`)
+  }
+  return new TestResult(TestResultKind.COMPLETION, output, undefined);
+}
 
 function getExpectedResultFromSource(source: string): TestResult {
   const matches = source.match(/\/\*\nEXPECT (COMPILE ERROR|RUNTIME ERROR|COMPLETION)\n((?:(?!\*\/).+))\*\//ms)
@@ -171,10 +176,8 @@ function getExpectedResultFromSource(source: string): TestResult {
   return new TestResult(kind, detail, undefined)
 }
 
-// function decompileOneInstructionAndRewind(byteBuffer: ByteBuffer) {
-//   const origByteCursor = byteBuffer.byteCursor;
-//   decompileOneInstruction(byteBuffer, []);
-//   byteBuffer.setByteCursor(origByteCursor);
-// }
-
-
+function decompileOneInstructionAndRewind(byteBuffer: ByteBuffer) {
+  const origByteCursor = byteBuffer.byteCursor;
+  decompileOneInstruction(byteBuffer, []);
+  byteBuffer.setByteCursor(origByteCursor);
+}

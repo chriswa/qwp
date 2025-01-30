@@ -5,8 +5,6 @@ import { FunctionParameter } from './FunctionParameter'
 import { GenericDefinition } from './GenericDefinition'
 
 export interface ISyntaxNodeVisitor<T> {
-  // visitBinary(node: BinarySyntaxNode): T;
-  // visitUnary(node: UnarySyntaxNode): T;
   visitLiteral(node: LiteralSyntaxNode): T
   visitGrouping(node: GroupingSyntaxNode): T
   visitStatementBlock(node: StatementBlockSyntaxNode): T
@@ -19,7 +17,7 @@ export interface ISyntaxNodeVisitor<T> {
   visitTypeDeclaration(node: TypeDeclarationSyntaxNode): T
   visitObjectInstantiation(node: ObjectInstantiationSyntaxNode): T
   visitVariableAssignment(node: VariableAssignmentSyntaxNode): T
-  visitFunctionHomonym(node: FunctionHomonymSyntaxNode): T
+  visitFunctionDefinition(node: FunctionDefinitionSyntaxNode): T
   visitFunctionOverload(node: FunctionOverloadSyntaxNode): T
   visitFunctionCall(node: FunctionCallSyntaxNode): T
   visitMemberLookup(node: MemberLookupSyntaxNode): T
@@ -184,7 +182,7 @@ export class ClassDeclarationSyntaxNode extends SyntaxNode {
     public genericDefinition: GenericDefinition | null,
     public baseClassName: Token | null,
     public implementedInterfaceNames: Array<Token>,
-    public methods: Map<string, FunctionHomonymSyntaxNode>,
+    public methods: Map<string, FunctionDefinitionSyntaxNode>,
     public fields: Map<string, TypeAnnotation | null>,
   ) {
     super(referenceToken)
@@ -249,15 +247,16 @@ export class FunctionOverloadSyntaxNode extends SyntaxNode {
   }
 }
 
-export class FunctionHomonymSyntaxNode extends SyntaxNode {
+export class FunctionDefinitionSyntaxNode extends SyntaxNode {
   constructor(
+    referenceToken: Token,
     public overloads: Array<FunctionOverloadSyntaxNode>,
     // public genericDefinition: GenericDefinition | null,
   ) {
-    super(overloads[ 0 ].referenceToken)
+    super(referenceToken)
   }
   accept<R>(visitor: ISyntaxNodeVisitor<R>): R {
-    return visitor.visitFunctionHomonym(this)
+    return visitor.visitFunctionDefinition(this)
   }
   kind(): string {
     return 'FunctionHomonym'

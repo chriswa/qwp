@@ -1,4 +1,4 @@
-import { TypeWrapper, BuiltinFunctionHomonymType, Type, primitiveTypes, BuiltinFunctionOverloadType } from '../types/types'
+import { TypeWrapper, BuiltinFunctionHomonymType, Type, primitiveTypes as pt, BuiltinFunctionOverloadType } from '../types/types'
 import { InternalError, zipMap } from '../util'
 
 let printCallback: (str: string) => void = console.log
@@ -73,45 +73,44 @@ export function registerBuiltinOverload(name: string, argTypes: Array<Type>, ret
   builtin.overloads.push(overload)
 }
 
-registerBuiltinOverload('printFloat32', [ primitiveTypes.float32 ], primitiveTypes.void, 1, (args) => {
-  printCallback(`printFloat32: ${args}`)
-})
+registerBuiltinOverload('printFloat32', [ pt.float32 ], pt.void, 1, (args) => { printCallback(`printFloat32: ${args}`) })
 
-registerBuiltinOverload('printUint32', [ primitiveTypes.uint32 ], primitiveTypes.void, 1, (args) => {
-  printCallback(`printUint32: ${args}`)
-})
+registerBuiltinOverload('printUint32', [ pt.uint32 ], pt.void, 1, (args) => { printCallback(`printUint32: ${args}`) })
 
-registerBuiltinOverload('print', [ primitiveTypes.uint32 ], primitiveTypes.void, 1, (args) => {
-  printCallback(`print: ${args}`)
-})
-registerBuiltinOverload('print', [ primitiveTypes.float32 ], primitiveTypes.void, 1, (args) => {
-  printCallback(`print: ${args}`)
-})
+registerBuiltinOverload('print', [ pt.uint32 ], pt.void, 1, (args) => { printCallback(`print: ${args}`) })
+registerBuiltinOverload('print', [ pt.float32 ], pt.void, 1, (args) => { printCallback(`print: ${args}`) })
 
-registerBuiltinOverload('+', [ primitiveTypes.float32, primitiveTypes.float32 ], primitiveTypes.float32, 0, (args: any) => {
-  return (args[ 0 ] as number) + (args[ 1 ] as number)
-})
-registerBuiltinOverload('+', [ primitiveTypes.uint32, primitiveTypes.uint32 ], primitiveTypes.uint32, 0, (args: any) => {
-  return (args[ 0 ] as number) + (args[ 1 ] as number)
-})
+registerBuiltinOverload('+', [ pt.float32, pt.float32 ], pt.float32, 0, (args: any) => { return (args[ 0 ] as number) + (args[ 1 ] as number) })
+registerBuiltinOverload('+', [ pt.uint32, pt.uint32 ], pt.uint32, 0, (args: any) => { return (args[ 0 ] as number) + (args[ 1 ] as number) })
 
-registerBuiltinOverload('==', [ primitiveTypes.float32, primitiveTypes.float32 ], primitiveTypes.bool32, 0, (args: any) => {
-  return (args[ 0 ] as number) === (args[ 1 ] as number)
-})
-registerBuiltinOverload('==', [ primitiveTypes.uint32, primitiveTypes.uint32 ], primitiveTypes.bool32, 0, (args: any) => {
-  return (args[ 0 ] as number) === (args[ 1 ] as number)
-})
+registerBuiltinOverload('-', [ pt.float32, pt.float32 ], pt.float32, 0, (args: any) => { return (args[ 0 ] as number) - (args[ 1 ] as number) })
+registerBuiltinOverload('-', [ pt.uint32, pt.uint32 ], pt.uint32, 0, (args: any) => { return (args[ 0 ] as number) - (args[ 1 ] as number) })
 
-// case TokenType.PLUS: /* OpCode.ADD */ this.pushValue(new InterpreterValueFloat32(left.asFloat32().value + right.asFloat32().value)); break;
-// case TokenType.MINUS: /* OpCode.SUBTRACT */ this.pushValue(new InterpreterValueFloat32(left.asFloat32().value - right.asFloat32().value)); break;
-// case TokenType.ASTERISK: /* OpCode.MULTIPLY */ this.pushValue(new InterpreterValueFloat32(left.asFloat32().value * right.asFloat32().value)); break;
-// case TokenType.FORWARD_SLASH: /* OpCode.DIVIDE */ this.pushValue(new InterpreterValueFloat32(left.asFloat32().value / right.asFloat32().value)); break;
-// case TokenType.LESS_THAN: /* OpCode.LT */ this.pushValue(new InterpreterValueBoolean(left.asFloat32().value < right.asFloat32().value)); break;
-// case TokenType.LESS_THAN_OR_EQUAL: /* OpCode.LTE */ this.pushValue(new InterpreterValueBoolean(left.asFloat32().value <= right.asFloat32().value)); break;
-// case TokenType.GREATER_THAN: /* OpCode.GT */ this.pushValue(new InterpreterValueBoolean(left.asFloat32().value > right.asFloat32().value)); break;
-// case TokenType.GREATER_THAN_OR_EQUAL: /* OpCode.GTE */ this.pushValue(new InterpreterValueBoolean(left.asFloat32().value >= right.asFloat32().value)); break;
-// case TokenType.DOUBLE_EQUAL: /* OpCode.EQ */ this.pushValue(new InterpreterValueBoolean(left.compareStrictEquality(right) === true)); break;
-// case TokenType.BANG_EQUAL: /* OpCode.NEQ */ this.pushValue(new InterpreterValueBoolean(left.compareStrictEquality(right) === false)); break;
-// 
-// case TokenType.MINUS: /* OpCode.SUBTRACT */ this.pushValue(new InterpreterValueFloat32(-right.asFloat32().value)); break;
-// case TokenType.BANG: /* OpCode.MULTIPLY */ this.pushValue(new InterpreterValueBoolean(!right.asBoolean().value)); break;
+registerBuiltinOverload('*', [ pt.float32, pt.float32 ], pt.float32, 0, (args: any) => { return (args[ 0 ] as number) * (args[ 1 ] as number) })
+registerBuiltinOverload('*', [ pt.uint32, pt.uint32 ], pt.uint32, 0, (args: any) => { return (args[ 0 ] as number) * (args[ 1 ] as number) })
+
+registerBuiltinOverload('/', [ pt.float32, pt.float32 ], pt.float32, 0, (args: any) => { return (args[ 0 ] as number) / (args[ 1 ] as number) })
+registerBuiltinOverload('/', [ pt.uint32, pt.uint32 ], pt.uint32, 0, (args: any) => { return (args[ 0 ] as number) / (args[ 1 ] as number) })
+
+registerBuiltinOverload('<', [ pt.float32, pt.float32 ], pt.bool32, 0, (args: any) => { return (args[ 0 ] as number) < (args[ 1 ] as number) })
+registerBuiltinOverload('<', [ pt.uint32, pt.uint32 ], pt.bool32, 0, (args: any) => { return (args[ 0 ] as number) < (args[ 1 ] as number) })
+
+registerBuiltinOverload('<=', [ pt.float32, pt.float32 ], pt.bool32, 0, (args: any) => { return (args[ 0 ] as number) <= (args[ 1 ] as number) })
+registerBuiltinOverload('<=', [ pt.uint32, pt.uint32 ], pt.bool32, 0, (args: any) => { return (args[ 0 ] as number) <= (args[ 1 ] as number) })
+
+registerBuiltinOverload('>', [ pt.float32, pt.float32 ], pt.bool32, 0, (args: any) => { return (args[ 0 ] as number) > (args[ 1 ] as number) })
+registerBuiltinOverload('>', [ pt.uint32, pt.uint32 ], pt.bool32, 0, (args: any) => { return (args[ 0 ] as number) > (args[ 1 ] as number) })
+
+registerBuiltinOverload('>=', [ pt.float32, pt.float32 ], pt.bool32, 0, (args: any) => { return (args[ 0 ] as number) >= (args[ 1 ] as number) })
+registerBuiltinOverload('>=', [ pt.uint32, pt.uint32 ], pt.bool32, 0, (args: any) => { return (args[ 0 ] as number) >= (args[ 1 ] as number) })
+
+registerBuiltinOverload('==', [ pt.float32, pt.float32 ], pt.bool32, 0, (args: any) => { return (args[ 0 ] as number) === (args[ 1 ] as number) })
+registerBuiltinOverload('==', [ pt.uint32, pt.uint32 ], pt.bool32, 0, (args: any) => { return (args[ 0 ] as number) === (args[ 1 ] as number) })
+
+registerBuiltinOverload('!=', [ pt.float32, pt.float32 ], pt.bool32, 0, (args: any) => { return (args[ 0 ] as number) !== (args[ 1 ] as number) })
+registerBuiltinOverload('!=', [ pt.uint32, pt.uint32 ], pt.bool32, 0, (args: any) => { return (args[ 0 ] as number) !== (args[ 1 ] as number) })
+
+registerBuiltinOverload('0-', [ pt.float32 ], pt.float32, 0, (args: any) => { return -(args[ 0 ] as number) })
+registerBuiltinOverload('0-', [ pt.uint32 ], pt.uint32, 0, (args: any) => { return -(args[ 0 ] as number) })
+
+registerBuiltinOverload('!', [ pt.bool32 ], pt.bool32, 0, (args: any) => { return !(args[ 0 ] as boolean) })

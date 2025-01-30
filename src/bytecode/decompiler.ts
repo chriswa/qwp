@@ -1,4 +1,3 @@
-/*
 import { builtinsById } from '../builtins/builtins'
 import { OpCode } from './opcodes'
 import { ByteBuffer } from './ByteBuffer'
@@ -115,4 +114,3 @@ export function decompileOneInstruction(buffer: ByteBuffer, pendingDecompilation
   console.log(line)
   return true
 }
-*/

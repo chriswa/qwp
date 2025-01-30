@@ -1,12 +1,41 @@
 import chalk from 'chalk'
 import { IResolverOutput } from '../compiler/resolver/resolver'
-import { ISyntaxNodeVisitor, SyntaxNode, LiteralSyntaxNode, GroupingSyntaxNode, StatementBlockSyntaxNode, IfStatementSyntaxNode, WhileStatementSyntaxNode, ReturnStatementSyntaxNode, LogicShortCircuitSyntaxNode, VariableLookupSyntaxNode, ClassDeclarationSyntaxNode, TypeDeclarationSyntaxNode, ObjectInstantiationSyntaxNode, VariableAssignmentSyntaxNode, FunctionHomonymSyntaxNode, FunctionCallSyntaxNode, MemberLookupSyntaxNode, MemberAssignmentSyntaxNode, FunctionOverloadSyntaxNode } from '../compiler/syntax/syntax'
+import {
+  ISyntaxNodeVisitor,
+  SyntaxNode,
+  LiteralSyntaxNode,
+  GroupingSyntaxNode,
+  StatementBlockSyntaxNode,
+  IfStatementSyntaxNode,
+  WhileStatementSyntaxNode,
+  ReturnStatementSyntaxNode,
+  LogicShortCircuitSyntaxNode,
+  VariableLookupSyntaxNode,
+  ClassDeclarationSyntaxNode,
+  TypeDeclarationSyntaxNode,
+  ObjectInstantiationSyntaxNode,
+  VariableAssignmentSyntaxNode,
+  FunctionCallSyntaxNode,
+  MemberLookupSyntaxNode,
+  MemberAssignmentSyntaxNode,
+  FunctionOverloadSyntaxNode,
+  FunctionDefinitionSyntaxNode,
+} from '../compiler/syntax/syntax'
 import { ValueType } from '../compiler/syntax/ValueType'
 import { TokenType } from '../compiler/Token'
 import { TypeWrapper } from '../types/types'
 import { InternalError, throwExpr } from '../util'
 import { Interpreter } from './Interpreter'
-import { InterpreterValue, InterpreterValueBoolean, InterpreterValueBuiltin, InterpreterValueClosure, interpreterValueFactory, InterpreterValueFloat32, InterpreterValueObject, InterpreterValueVoid } from './InterpreterValue'
+import {
+  InterpreterValue,
+  InterpreterValueBoolean,
+  InterpreterValueBuiltin,
+  InterpreterValueClosure,
+  interpreterValueFactory,
+  InterpreterValueFloat32,
+  InterpreterValueObject,
+  InterpreterValueVoid,
+} from './InterpreterValue'
 import { NodeVisitationState } from './NodeVisitationState'
 
 export class InterpreterNodeVisitor implements ISyntaxNodeVisitor<number> {
@@ -61,57 +90,6 @@ export class InterpreterNodeVisitor implements ISyntaxNodeVisitor<number> {
     this.nodeInsertionBuffer = []
     return cost
   }
-  // ╔════════════════════════════════════════╗
-  // ║ Binary expression                      ║
-  // ╚════════════════════════════════════════╝
-  // visitBinary(node: BinarySyntaxNode): void {
-  //   this.switchStep([
-  //     () => {
-  //       this.pushNewNode(node.left);
-  //       this.pushNewNode(node.right);
-  //       this.repushIncremented();
-  //     },
-  //     () => {
-  //       const left = this.popValue();
-  //       const right = this.popValue();
-  //       switch (node.op.type) {
-  //         case TokenType.PLUS: /* OpCode.ADD */ this.pushValue(new InterpreterValueFloat32(left.asFloat32().value + right.asFloat32().value)); break;
-  //         case TokenType.MINUS: /* OpCode.SUBTRACT */ this.pushValue(new InterpreterValueFloat32(left.asFloat32().value - right.asFloat32().value)); break;
-  //         case TokenType.ASTERISK: /* OpCode.MULTIPLY */ this.pushValue(new InterpreterValueFloat32(left.asFloat32().value * right.asFloat32().value)); break;
-  //         case TokenType.FORWARD_SLASH: /* OpCode.DIVIDE */ this.pushValue(new InterpreterValueFloat32(left.asFloat32().value / right.asFloat32().value)); break;
-  //         case TokenType.LESS_THAN: /* OpCode.LT */ this.pushValue(new InterpreterValueBoolean(left.asFloat32().value < right.asFloat32().value)); break;
-  //         case TokenType.LESS_THAN_OR_EQUAL: /* OpCode.LTE */ this.pushValue(new InterpreterValueBoolean(left.asFloat32().value <= right.asFloat32().value)); break;
-  //         case TokenType.GREATER_THAN: /* OpCode.GT */ this.pushValue(new InterpreterValueBoolean(left.asFloat32().value > right.asFloat32().value)); break;
-  //         case TokenType.GREATER_THAN_OR_EQUAL: /* OpCode.GTE */ this.pushValue(new InterpreterValueBoolean(left.asFloat32().value >= right.asFloat32().value)); break;
-  //         case TokenType.DOUBLE_EQUAL: /* OpCode.EQ */ this.pushValue(new InterpreterValueBoolean(left.compareStrictEquality(right) === true)); break;
-  //         case TokenType.BANG_EQUAL: /* OpCode.NEQ */ this.pushValue(new InterpreterValueBoolean(left.compareStrictEquality(right) === false)); break;
-  //         default: throw new InternalError(`unknown binary op`);
-  //       }
-  //     },
-  //   ]);
-  // }
-  // ╔════════════════════════════════════════╗
-  // ║ Unary expression                       ║
-  // ╚════════════════════════════════════════╝
-  // visitUnary(node: UnarySyntaxNode): void {
-  //   this.switchStep([
-  //     () => {
-  //       this.pushNewNode(node.right);
-  //       this.repushIncremented();
-  //     },
-  //     () => {
-  //       const right = this.popValue();
-  //       switch (node.op.type) {
-  //         case TokenType.MINUS: /* OpCode.SUBTRACT */ this.pushValue(new InterpreterValueFloat32(-right.asFloat32().value)); break;
-  //         case TokenType.BANG: /* OpCode.MULTIPLY */ this.pushValue(new InterpreterValueBoolean(!right.asBoolean().value)); break;
-  //         default: throw new InternalError(`unknown unary op`);
-  //       }
-  //     },
-  //   ]);
-  // }
-  // ╔════════════════════════════════════════╗
-  // ║ Literal expression                     ║
-  // ╚════════════════════════════════════════╝
   visitLiteral(node: LiteralSyntaxNode): number {
     switch (node.type) {
       case ValueType.NUMBER: this.pushStackValue(new InterpreterValueFloat32(node.value as number)); break
@@ -120,25 +98,16 @@ export class InterpreterNodeVisitor implements ISyntaxNodeVisitor<number> {
     }
     return 1
   }
-  // ╔════════════════════════════════════════╗
-  // ║ Grouping expression                    ║
-  // ╚════════════════════════════════════════╝
   visitGrouping(node: GroupingSyntaxNode): number {
     this.pushNewNode(node.expr)
     return 0
   }
-  // ╔════════════════════════════════════════╗
-  // ║ Statement Block                        ║
-  // ╚════════════════════════════════════════╝
   visitStatementBlock(node: StatementBlockSyntaxNode): number {
     node.statementList.forEach((statementNode) => {
       this.pushNewNode(statementNode)
     })
     return 0
   }
-  // ╔════════════════════════════════════════╗
-  // ║ If Statement                           ║
-  // ╚════════════════════════════════════════╝
   visitIfStatement(node: IfStatementSyntaxNode): number {
     return this.switchStep([
       () => {
@@ -153,9 +122,6 @@ export class InterpreterNodeVisitor implements ISyntaxNodeVisitor<number> {
       },
     ])
   }
-  // ╔════════════════════════════════════════╗
-  // ║ While Statement                        ║
-  // ╚════════════════════════════════════════╝
   visitWhileStatement(node: WhileStatementSyntaxNode): number {
     return this.switchStep([
       () => {
@@ -173,9 +139,6 @@ export class InterpreterNodeVisitor implements ISyntaxNodeVisitor<number> {
       },
     ])
   }
-  // ╔════════════════════════════════════════╗
-  // ║ Return Statement                       ║
-  // ╚════════════════════════════════════════╝
   visitReturnStatement(node: ReturnStatementSyntaxNode): number {
     this.pushNewNode(node.retvalExpr)
     // remove remaining nodes in function call to skip out of it
@@ -187,9 +150,6 @@ export class InterpreterNodeVisitor implements ISyntaxNodeVisitor<number> {
     }
     return 0
   }
-  // ╔════════════════════════════════════════╗
-  // ║ Logic Short Circuit expression         ║
-  // ╚════════════════════════════════════════╝
   visitLogicShortCircuit(node: LogicShortCircuitSyntaxNode): number {
     const isOpOr = node.op.type === TokenType.DOUBLE_PIPE
     return this.switchStep([
@@ -211,16 +171,10 @@ export class InterpreterNodeVisitor implements ISyntaxNodeVisitor<number> {
       },
     ])
   }
-  // ╔════════════════════════════════════════╗
-  // ║ Variable Lookup                        ║
-  // ╚════════════════════════════════════════╝
   visitVariableLookup(node: VariableLookupSyntaxNode): number {
     this.pushStackValue(this.interpreter.scope.getValue(node.identifier.lexeme))
     return 1
   }
-  // ╔════════════════════════════════════════╗
-  // ║ Variable Assignment                    ║
-  // ╚════════════════════════════════════════╝
   visitVariableAssignment(node: VariableAssignmentSyntaxNode): number {
     return this.switchStep([
       () => {
@@ -236,9 +190,6 @@ export class InterpreterNodeVisitor implements ISyntaxNodeVisitor<number> {
       },
     ])
   }
-  // ╔════════════════════════════════════════╗
-  // ║ Object Instantiation                   ║
-  // ╚════════════════════════════════════════╝
   visitObjectInstantiation(node: ObjectInstantiationSyntaxNode): number {
     return this.switchStep([
       () => {
@@ -287,9 +238,6 @@ export class InterpreterNodeVisitor implements ISyntaxNodeVisitor<number> {
       },
     ])
   }
-  // ╔════════════════════════════════════════╗
-  // ║ Function Call                          ║
-  // ╚════════════════════════════════════════╝
   visitFunctionCall(node: FunctionCallSyntaxNode): number {
     return this.switchStep([
       () => {
@@ -309,12 +257,12 @@ export class InterpreterNodeVisitor implements ISyntaxNodeVisitor<number> {
           callee.closedVars.forEach((value, identifier) => {
             this.interpreter.scope.overrideValueInThisScope(identifier, value)
           })
-          const functionHomonym = callee.node as FunctionHomonymSyntaxNode
+          const functionDefinition = callee.node as FunctionDefinitionSyntaxNode
 
-          if (functionHomonym.overloads.length > 1) {
+          if (functionDefinition.overloads.length > 1) {
             throw new InternalError('TODO: select which function overload to call based on information from resolver...')
           }
-          const functionOverload = functionHomonym.overloads[ 0 ] // TODO: select which function overload to call based on information from resolver
+          const functionOverload = functionDefinition.overloads[0] // TODO: select which function overload to call based on information from resolver
 
           functionOverload.parameterList.forEach((functionParameter) => {
             this.interpreter.scope.overrideValueInThisScope(functionParameter.identifier.lexeme, argumentList.shift()!)
@@ -345,28 +293,19 @@ export class InterpreterNodeVisitor implements ISyntaxNodeVisitor<number> {
       },
     ])
   }
-  // ╔════════════════════════════════════════╗
-  // ║ Function Homonym                       ║
-  // ╚════════════════════════════════════════╝
-  visitFunctionHomonym(node: FunctionHomonymSyntaxNode): number {
+  visitFunctionDefinition(node: FunctionDefinitionSyntaxNode): number {
     const closedVars: Map<string, InterpreterValue> = new Map()
     this.interpreter.resolverOutput.scopesByNode.get(node)!.getClosedVars().forEach((identifier) => {
-      closedVars.set(identifier, this.interpreter.scope.getValue(identifier))
+        closedVars.set(identifier, this.interpreter.scope.getValue(identifier))
     })
     const value = new InterpreterValueClosure(node, closedVars)
     this.pushStackValue(value)
     return 0
   }
-  // ╔════════════════════════════════════════╗
-  // ║ Function Overload                      ║
-  // ╚════════════════════════════════════════╝
   visitFunctionOverload(_node: FunctionOverloadSyntaxNode): number {
-    // UNUSED FOR NOW
-    return 0
+    // This should never be called directly since we handle overloads through FunctionDefinitionSyntaxNode
+    throw new Error("FunctionOverload nodes should be handled by FunctionDefinition visitor")
   }
-  // ╔════════════════════════════════════════╗
-  // ║ Member Lookup                          ║
-  // ╚════════════════════════════════════════╝
   visitMemberLookup(node: MemberLookupSyntaxNode): number {
     return this.switchStep([
       () => {
@@ -392,9 +331,6 @@ export class InterpreterNodeVisitor implements ISyntaxNodeVisitor<number> {
       },
     ])
   }
-  // ╔════════════════════════════════════════╗
-  // ║ Member Assignment                      ║
-  // ╚════════════════════════════════════════╝
   visitMemberAssignment(node: MemberAssignmentSyntaxNode): number {
     return this.switchStep([
       () => {
@@ -412,16 +348,10 @@ export class InterpreterNodeVisitor implements ISyntaxNodeVisitor<number> {
       },
     ])
   }
-  // ╔════════════════════════════════════════╗
-  // ║ Class Declaration                      ║
-  // ╚════════════════════════════════════════╝
   visitClassDeclaration(_node: ClassDeclarationSyntaxNode): number {
     // noop
     return 0
   }
-  // ╔════════════════════════════════════════╗
-  // ║ Type Declaration                       ║
-  // ╚════════════════════════════════════════╝
   visitTypeDeclaration(_node: TypeDeclarationSyntaxNode): number {
     // noop
     return 0
