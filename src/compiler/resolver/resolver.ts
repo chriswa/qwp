@@ -44,6 +44,7 @@ import { TypeAnnotation } from '../syntax/TypeAnnotation'
 export interface IResolverOutput {
   scopesByNode: Map<SyntaxNode, IResolverScopeOutput>
   classNodesByClassTypeWrapper: Map<TypeWrapper, ClassDeclarationSyntaxNode>
+  memberOffsetsByNode: Map<SyntaxNode, number>
 }
 
 interface IResolverResponse {
@@ -66,6 +67,7 @@ export class Resolver implements ISyntaxNodeVisitor<TypeWrapper>, IResolverOutpu
   scope: ResolverScope
   scopesByNode: Map<SyntaxNode, ResolverScope> = new Map()
   classNodesByClassTypeWrapper: Map<TypeWrapper, ClassDeclarationSyntaxNode> = new Map()
+  memberOffsetsByNode: Map<SyntaxNode, number> = new Map()
   inferenceEngine: InferenceEngine
   resolverErrors: Array<ErrorWithSourcePos> = []
   constructor(
@@ -228,11 +230,15 @@ export class Resolver implements ISyntaxNodeVisitor<TypeWrapper>, IResolverOutpu
     const classTypeWrapper = new TypeWrapper(node, new UnresolvedAnnotatedType(this.scope, new TypeAnnotation(node.newClassName, undefined)))
 
     const fields: Map<string, TypeWrapper> = new Map()
+    let fieldOffset = 0
     node.fields.forEach((typeAnnotation, fieldName) => {
       this.disallowShadowing(fieldName, node)
       const fieldTypeWrapper = this.inferenceEngine.getPropertyTypeWrapper(classTypeWrapper, fieldName)
       this.inferenceEngine.applyAnnotationConstraint(fieldTypeWrapper, this.scope, typeAnnotation)
       fields.set(fieldName, fieldTypeWrapper)
+      // Store the offset for this field in the class
+      this.scope.fieldOffsets.set(fieldName, fieldOffset)
+      fieldOffset++  // Increment offset for next field
     })
     const methods: Map<string, TypeWrapper> = new Map()
     node.methods.forEach((typeAnnotation, methodName) => {
@@ -337,7 +343,7 @@ export class Resolver implements ISyntaxNodeVisitor<TypeWrapper>, IResolverOutpu
   }
   visitFunctionDefinition(node: FunctionDefinitionSyntaxNode): TypeWrapper {
     const overloadTypeWrappers = node.overloads.map((overload) => {
-      this.beginScope(true, node)
+      this.beginScope(true, overload)
       const parameterTypeWrappers = this.initializeFunctionParameters(node, overload.parameterList)
       this.resolveList(overload.statementList)
       const observedReturnTypeWrappers = this.scope.getObservedReturnTypeWrappers()
@@ -383,6 +389,16 @@ export class Resolver implements ISyntaxNodeVisitor<TypeWrapper>, IResolverOutpu
   visitMemberLookup(node: MemberLookupSyntaxNode): TypeWrapper {
     const objectTypeWrapper = this.resolveSyntaxNode(node.object)
     const propertyTypeWrapper = this.inferenceEngine.getPropertyTypeWrapper(objectTypeWrapper, node.memberName.lexeme)
+    
+    // Get the class type and look up the field offset
+    const classType = objectTypeWrapper.getClassType()
+    if (classType) {
+      const fieldOffset = this.scope.fieldOffsets.get(node.memberName.lexeme)
+      if (fieldOffset !== undefined) {
+        this.memberOffsetsByNode.set(node, fieldOffset)
+      }
+    }
+    
     return propertyTypeWrapper
     // const classType = objectTypeWrapper.getClassType();
     // const propertyTypeWrapper = classType.getPropertyTypeWrapper(node.memberName.lexeme);
@@ -391,8 +407,17 @@ export class Resolver implements ISyntaxNodeVisitor<TypeWrapper>, IResolverOutpu
   visitMemberAssignment(node: MemberAssignmentSyntaxNode): TypeWrapper {
     const rvalueTypeWrapper = this.resolveSyntaxNode(node.rvalue)
     const objectTypeWrapper = this.resolveSyntaxNode(node.object)
-
     const propertyTypeWrapper = this.inferenceEngine.getPropertyTypeWrapper(objectTypeWrapper, node.memberName.lexeme)
+    
+    // Get the class type and look up the field offset
+    const classType = objectTypeWrapper.getClassType()
+    if (classType) {
+      const fieldOffset = this.scope.fieldOffsets.get(node.memberName.lexeme)
+      if (fieldOffset !== undefined) {
+        this.memberOffsetsByNode.set(node, fieldOffset)
+      }
+    }
+    
     this.inferenceEngine.addAssignmentConstraint(propertyTypeWrapper, rvalueTypeWrapper)
     return propertyTypeWrapper
 

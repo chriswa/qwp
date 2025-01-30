@@ -29,4 +29,6 @@ export enum OpCode {
   RETURN,
   PUSH_BUILTIN,
   CODESTOP, // only used by decompiler!
+  FETCH_MEMBER,  // pop object ptr, read member offset, push member value
+  ASSIGN_MEMBER, // pop object ptr, read member offset, assign (peeked) value to member
 }

@@ -51,7 +51,7 @@ export class InferenceEngineSolver {
             inputTypeWrapper.type = coercionConstraint.outputTypeWrapper.type
           }
         })
-        if (this.isDebug) { console.log(chalk.yellow('-> output is void, all untyped inputs are set to void and consrtaint removed')) }
+        if (this.isDebug) { console.log(chalk.yellow('-> output is void, all untyped inputs are set to void and constraint removed')) }
         this.constraints.removeCoercionConstraint(coercionConstraint)
         hasProgressBeenMade = true
         return

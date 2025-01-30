@@ -180,9 +180,7 @@ opCodeHandlers[ OpCode.CALL ] = (vm: VM) => {
 function callBuiltin(vm: VM, builtin: Builtin, argumentCount: number) {
   const _builtinFunctionHomonymType = builtin.getTypeWrapper().getFunctionHomonymType()
   
-  if (builtin.overloads.length > 1) {
-    throw new Error('TODO: determine which overload to use based on information from resolver')
-  }
+  // TODO: determine which overload to use based on information from resolver
   const builtinOverload = builtin.overloads[ 0 ]
   const builtinFunctionOverloadType = builtinOverload.typeWrapper.getFunctionOverloadType()
   
@@ -254,4 +252,18 @@ opCodeHandlers[ OpCode.CODESTOP ] = (vm: VM) => {
   if (vm.callFrameIndex > 0) {
     throw new Error('CODESTOP opcode reached while executing a function!')
   }
+}
+
+opCodeHandlers[ OpCode.FETCH_MEMBER ] = (vm: VM) => {
+  const objectPtr = vm.ramBuffer.popUint32()
+  const memberOffset = vm.constantBuffer.readUint8()
+  const memberValue = vm.heap.fetchNumber(objectPtr + memberOffset)
+  vm.ramBuffer.pushUint32(memberValue)
+}
+
+opCodeHandlers[ OpCode.ASSIGN_MEMBER ] = (vm: VM) => {
+  const objectPtr = vm.ramBuffer.popUint32()
+  const memberOffset = vm.constantBuffer.readUint8()
+  const value = vm.ramBuffer.peekBehindFloat32()
+  vm.heap.assignNumber(objectPtr + memberOffset, value)
 }

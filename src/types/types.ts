@@ -30,7 +30,7 @@ export class TypeWrapper {
     return (this.type instanceof FunctionOverloadType || this.type instanceof BuiltinFunctionOverloadType) ? this.type as IFunctionOverloadType : throwExpr(new InternalError('not an IFunctionOverloadType wrapper!'))
   }
   public getClassType(): ClassType {
-    return this.type instanceof ClassType ? this.type as ClassType : throwExpr(new InternalError('not a ClassType wrapper!'))
+    return this.type instanceof ClassType ? this.type as ClassType : throwExpr(new InternalError('not a ClassType wrapper: ' + this.type.toString()))
   }
 }
 

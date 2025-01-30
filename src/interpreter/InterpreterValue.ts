@@ -1,5 +1,5 @@
 import { Builtin } from '../builtins/builtins'
-import { SyntaxNode } from '../compiler/syntax/syntax'
+import { FunctionOverloadSyntaxNode, FunctionDefinitionSyntaxNode } from '../compiler/syntax/syntax'
 import { primitiveTypes, Type, TypeWrapper } from '../types/types'
 import { mapMapToArray } from '../util'
 
@@ -101,13 +101,13 @@ export class InterpreterValueFloat32 extends InterpreterValue {
 
 export class InterpreterValueClosure extends InterpreterValue {
   constructor(
-    public node: SyntaxNode,
+    public node: FunctionDefinitionSyntaxNode,
     public closedVars: Map<string, InterpreterValue>,
   ) {
     super()
   }
   getType(): Type {
-    return primitiveTypes.func // ???
+    return primitiveTypes.func
   }
   toJavascriptValue(): never {
     throw new Error('InterpreterValueClosure cannot be converted to javascript value')

@@ -2,6 +2,7 @@ import { ReadOnlyStatus, TypeWrapper } from '../../types/types'
 import { InternalError, throwExpr } from '../../util'
 import { SyntaxNode } from '../syntax/syntax'
 import { Resolver } from './resolver'
+import { builtinsByName } from '../../builtins/builtins'
 
 export class VariableDefinition {
   public isRef = false
@@ -24,12 +25,14 @@ export interface IResolverScopeOutput {
   isVarDefinedInThisScope(identifier: string): boolean
   lookupVar(identifier: string): VariableDefinition | null
   getClosedVars(): Array<string>
+  fieldOffsets: Map<string, number>
 }
 
 export class ResolverScope implements IResolverScopeOutput {
   public variableDefinitions: Map<string, VariableDefinition> = new Map()
   public initializedVars: Set<string> = new Set()
   public typeWrappers: Map<string, TypeWrapper> = new Map()
+  public fieldOffsets: Map<string, number> = new Map()
   private observedReturnTypeWrappers: Array<TypeWrapper> = [] // only used if `this.isFunctionScope`
 
   public constructor(
@@ -100,7 +103,7 @@ export class ResolverScope implements IResolverScopeOutput {
   public getClosedVars(): Array<string> {
     const closedVars: Array<string> = []
     this.variableDefinitions.forEach((varDef, identifier) => {
-      if (varDef.isFromClosure) {
+      if (varDef.isFromClosure && !builtinsByName.has(identifier)) {
         closedVars.push(identifier)
       }
     })

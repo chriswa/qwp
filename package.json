@@ -6,7 +6,8 @@
   "scripts": {
     "lint": "eslint --ext .js,.ts --ignore-path .gitignore src/",
     "lint-fix": "eslint --ext .js,.ts --ignore-path .gitignore src/ --fix",
-    "test": "tsc && node bin/testing/runTests.js"
+    "test": "tsc && node bin/testing/runTests.js",
+    "test-hello": "tsc && node bin/testing/runTests.js hello"
   },
   "author": "",
   "license": "UNLICENSED",

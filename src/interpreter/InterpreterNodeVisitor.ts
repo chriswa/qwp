@@ -253,16 +253,17 @@ export class InterpreterNodeVisitor implements ISyntaxNodeVisitor<number> {
         const argumentList = node.argumentList.map((_argumentNode) => this.popStackValue()).reverse()
         const argumentInterpreterTypes = argumentList.map((argument) => argument.getType())
         if (callee instanceof InterpreterValueClosure) {
-          this.interpreter.pushScope(callee.node)
-          callee.closedVars.forEach((value, identifier) => {
-            this.interpreter.scope.overrideValueInThisScope(identifier, value)
-          })
           const functionDefinition = callee.node as FunctionDefinitionSyntaxNode
 
           if (functionDefinition.overloads.length > 1) {
             throw new InternalError('TODO: select which function overload to call based on information from resolver...')
           }
           const functionOverload = functionDefinition.overloads[0] // TODO: select which function overload to call based on information from resolver
+
+          this.interpreter.pushScope(functionOverload)
+          callee.closedVars.forEach((value, identifier) => {
+            this.interpreter.scope.overrideValueInThisScope(identifier, value)
+          })
 
           functionOverload.parameterList.forEach((functionParameter) => {
             this.interpreter.scope.overrideValueInThisScope(functionParameter.identifier.lexeme, argumentList.shift()!)
@@ -295,8 +296,10 @@ export class InterpreterNodeVisitor implements ISyntaxNodeVisitor<number> {
   }
   visitFunctionDefinition(node: FunctionDefinitionSyntaxNode): number {
     const closedVars: Map<string, InterpreterValue> = new Map()
-    this.interpreter.resolverOutput.scopesByNode.get(node)!.getClosedVars().forEach((identifier) => {
-        closedVars.set(identifier, this.interpreter.scope.getValue(identifier))
+    // Get the first overload's scope since we don't support multiple overloads yet
+    const overload = node.overloads[0]
+    this.interpreter.resolverOutput.scopesByNode.get(overload)!.getClosedVars().forEach((identifier) => {
+      closedVars.set(identifier, this.interpreter.scope.getValue(identifier))
     })
     const value = new InterpreterValueClosure(node, closedVars)
     this.pushStackValue(value)

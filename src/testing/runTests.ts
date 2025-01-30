@@ -22,7 +22,7 @@ function isTestFileSpecified(candidateFilename: string) {
 
 const DEBUG_MODE = userSpecifiedTestFile !== undefined
 const RUN_WITH_INTERPRETER = true
-const RUN_WITH_COMPILER_AND_VM = false
+const RUN_WITH_COMPILER_AND_VM = true
 
 printTestsRunnerHeader()
 

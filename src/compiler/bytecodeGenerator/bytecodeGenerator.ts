@@ -37,7 +37,7 @@ class BytecodeGenerator implements ISyntaxNodeVisitor<void> {
     );
   }
   private get constantsTable() { return this.context.constantsTable }
-  private getClosedVarsByFunctionNode(node: SyntaxNode) {
+  private getClosedVarsByFunctionNode(node: FunctionOverloadSyntaxNode) {
     return this.context.resolverOutput.scopesByNode.get(node)?.getClosedVars() ?? [];
   }
 
@@ -57,6 +57,7 @@ class BytecodeGenerator implements ISyntaxNodeVisitor<void> {
 
   public compileModule(ast: SyntaxNode) {
     const startJumpPos = 0;
+    // Reserve space for the module's bytecode constant index, which will be backpatched later
     this.constantsTable.buffer.pushUint32(0);
 
     // this.functionScope.currentBlockScope.declare
@@ -84,6 +85,7 @@ class BytecodeGenerator implements ISyntaxNodeVisitor<void> {
   }
 
   visitLiteral(node: LiteralSyntaxNode): void {
+    node.referenceToken.printPositionInSource(`trace: visitLiteral`)
     let constantIndex = 0;
     switch (node.type) {
       case ValueType.NULL:
@@ -106,6 +108,7 @@ class BytecodeGenerator implements ISyntaxNodeVisitor<void> {
     this.instructionBuffer.pushUint32(constantIndex);
   }
   visitGrouping(node: GroupingSyntaxNode): void {
+    node.referenceToken.printPositionInSource(`trace: visitGrouping`)
     this.compileNode(node.expr);
   }
   private backpatchRelativeJumpToHere(pos: number) {
@@ -117,6 +120,7 @@ class BytecodeGenerator implements ISyntaxNodeVisitor<void> {
     });
   }
   visitIfStatement(node: IfStatementSyntaxNode): void {
+    node.referenceToken.printPositionInSource(`trace: visitIfStatement`)
     const IB = this.instructionBuffer;
     this.compileNode(node.cond);
     IB.pushUint8(OpCode.JUMP_FORWARD_IF_POP_FALSE);
@@ -136,6 +140,7 @@ class BytecodeGenerator implements ISyntaxNodeVisitor<void> {
     }
   }
   visitWhileStatement(node: WhileStatementSyntaxNode): void {
+    node.referenceToken.printPositionInSource(`trace: visitWhileStatement`)
     const IB = this.instructionBuffer;
     const whileStartPos = IB.byteCursor;
     this.compileNode(node.cond);
@@ -148,6 +153,7 @@ class BytecodeGenerator implements ISyntaxNodeVisitor<void> {
     this.backpatchRelativeJumpToHere(skipLoopJumpPos);
   }
   visitLogicShortCircuit(node: LogicShortCircuitSyntaxNode): void {
+    node.referenceToken.printPositionInSource(`trace: visitLogicShortCircuit`)
     this.compileNode(node.left);
     const isOpOr = node.op.type === TokenType.DOUBLE_PIPE;
     const IB = this.instructionBuffer;
@@ -164,21 +170,26 @@ class BytecodeGenerator implements ISyntaxNodeVisitor<void> {
     this.instructionBuffer.pushUint8(localCount);
   }
   visitStatementBlock(node: StatementBlockSyntaxNode): void {
+    node.referenceToken.printPositionInSource(`trace: visitStatementBlock`)
     this.functionScope.pushBlockScope(node);
     this.compileNodeList(node.statementList);
     this.popLocals();
     this.functionScope.popBlockScope();
   }
-  visitClassDeclaration(_node: ClassDeclarationSyntaxNode): void {
+  visitClassDeclaration(node: ClassDeclarationSyntaxNode): void {
+    node.referenceToken.printPositionInSource(`trace: visitClassDeclaration`)
     // TODO: methods need to be written to constants table
   }
-  visitTypeDeclaration(_node: TypeDeclarationSyntaxNode): void {
+  visitTypeDeclaration(node: TypeDeclarationSyntaxNode): void {
+    node.referenceToken.printPositionInSource(`trace: visitTypeDeclaration`)
     // pass
   }
   visitObjectInstantiation(node: ObjectInstantiationSyntaxNode): void {
+    node.referenceToken.printPositionInSource(`trace: visitObjectInstantiation`)
     // TODO: instantiate object (calling constructor), leave it on the stack
   }
   visitVariableAssignment(node: VariableAssignmentSyntaxNode): void {
+    node.referenceToken.printPositionInSource(`trace: visitVariableAssignment`)
     const identifier = node.identifier.lexeme;
     const callFrameVarInfo = this.functionScope.declareOrAssign(identifier, node.modifier !== null);
     if (node.rvalue !== null) {
@@ -203,6 +214,7 @@ class BytecodeGenerator implements ISyntaxNodeVisitor<void> {
     }
   }
   visitVariableLookup(node: VariableLookupSyntaxNode): void {
+    node.referenceToken.printPositionInSource(`trace: visitVariableLookup`)
     const identifier = node.identifier.lexeme;
     const builtin = builtinsByName.get(identifier);
     if (builtin !== undefined) {
@@ -218,14 +230,42 @@ class BytecodeGenerator implements ISyntaxNodeVisitor<void> {
     }
   }
   visitMemberLookup(node: MemberLookupSyntaxNode): void {
-    throw new Error("Method not implemented.")
+    node.referenceToken.printPositionInSource(`trace: visitMemberLookup`)
+    // First compile the object expression to get its pointer on the stack
+    this.compileNode(node.object)
+    
+    // Get the member offset from the resolver
+    const memberOffset = this.context.resolverOutput.memberOffsetsByNode.get(node)
+    if (memberOffset === undefined) {
+      throw new Error(`Could not find member offset for ${node.memberName.lexeme}`)
+    }
+
+    // Emit instruction to fetch the member value
+    this.instructionBuffer.pushUint8(OpCode.FETCH_MEMBER)
+    this.instructionBuffer.pushUint8(memberOffset)
   }
   visitMemberAssignment(node: MemberAssignmentSyntaxNode): void {
-    throw new Error("Method not implemented.")
+    node.referenceToken.printPositionInSource(`trace: visitMemberAssignment`)
+    // First compile the object expression to get its pointer on the stack
+    this.compileNode(node.object)
+    
+    // Then compile the value to be assigned
+    this.compileNode(node.rvalue)
+    
+    // Get the member offset from the resolver
+    const memberOffset = this.context.resolverOutput.memberOffsetsByNode.get(node)
+    if (memberOffset === undefined) {
+      throw new Error(`Could not find member offset for ${node.memberName.lexeme}`)
+    }
+
+    // Emit instruction to assign the member value
+    this.instructionBuffer.pushUint8(OpCode.ASSIGN_MEMBER)
+    this.instructionBuffer.pushUint8(memberOffset)
   }
   visitFunctionDefinition(node: FunctionDefinitionSyntaxNode): void {
+    node.referenceToken.printPositionInSource(`trace: visitFunctionDefinition`)
     node.overloads.forEach((overload) => {
-      const closedVars = this.getClosedVarsByFunctionNode(node);
+      const closedVars = this.getClosedVarsByFunctionNode(overload);
       const fnBytecodeGenerator = new BytecodeGenerator(this.context, this, overload);
       fnBytecodeGenerator.declareParametersAndClosedVars(
         overload.parameterList.map(parameter => parameter.identifier.lexeme), 
@@ -250,9 +290,11 @@ class BytecodeGenerator implements ISyntaxNodeVisitor<void> {
     });
   }
   visitFunctionOverload(node: FunctionOverloadSyntaxNode): void {
-    throw new Error("FunctionOverload nodes should be handled by FunctionDefinition visitor");
+    node.referenceToken.printPositionInSource(`trace: visitFunctionOverload`)
+    throw new Error("FunctionOverload nodes should be handled by FunctionDefinition");
   }
   visitFunctionCall(node: FunctionCallSyntaxNode): void {
+    node.referenceToken.printPositionInSource(`trace: visitFunctionCall`)
     node.argumentList.forEach((argument) => {
       this.compileNode(argument);
     });
@@ -261,6 +303,7 @@ class BytecodeGenerator implements ISyntaxNodeVisitor<void> {
     this.instructionBuffer.pushUint8(node.argumentList.length);
   }
   visitReturnStatement(node: ReturnStatementSyntaxNode): void {
+    node.referenceToken.printPositionInSource(`trace: visitReturnStatement`)
     if (node.retvalExpr !== null) {
       this.compileNode(node.retvalExpr);
     }
@@ -326,7 +369,11 @@ class BytecodeGeneratorBlockScope {
     this.localsCount += 2; // support return address and callframe jumpback distance in stack
   }
   private findVarDef(identifier: string): VariableDefinition {
-    return this.context.resolverOutput.scopesByNode.get(this.node)!.lookupVar(identifier)!;
+    const scope = this.context.resolverOutput.scopesByNode.get(this.node);
+    if (!scope) { throw new Error(`BytecodeGenerator could not find scope by resolver for node`) }
+    const varDef = scope.lookupVar(identifier);
+    if (!varDef) { throw new Error(`BytecodeGenerator could not find var declaration by resolver for ${identifier}`) }
+    return varDef
   }
   public declare(identifier: string): CallFrameVarInfo {
     const varDef = this.findVarDef(identifier);
